@@ -28,6 +28,13 @@ if [ -x tools/drift-ratchet.sh ]; then
   fi
 fi
 
+# Preset lite (uso personal): el reviewer es RECOMENDADO, no obligatorio → no bloquea por marker.
+# (El drift-ratchet de arriba SÍ sigue duro en ambos presets.)
+if [ "$(hook_preset)" = "lite" ]; then
+  echo "⚠️  [lite] reviewer-gate: review recomendada pero no obligatoria. Considera correr \`reviewer\`." >&2
+  hook_allow
+fi
+
 # ¿Hay cambios staged en código de producto? (si solo docs/tooling → pasa)
 CHANGED="$(git diff --cached --name-only 2>/dev/null || echo "")"
 [ -z "$CHANGED" ] && hook_allow

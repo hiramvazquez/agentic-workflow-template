@@ -38,6 +38,13 @@ for p in ios android web backend; do
   fi
 done
 
+# Preset de gates (full=equipo, bloquean · lite=personal, avisan).
+echo "→ Preset de gates: full (equipo) | lite (personal, gates blandos avisan en vez de bloquear)."
+read -r -p "¿Preset? [full/lite] (default full): " PRESET
+case "$PRESET" in lite) _p=lite ;; *) _p=full ;; esac
+printf '%s\n# full (equipo, gates bloquean) | lite (personal, gates avisan). Lo lee io.sh (hook_preset).\n' "$_p" > tools/preset
+echo "  - preset = $_p"
+
 # Vía Claude: import vs symlink.
 echo "→ CLAUDE.md ya importa AGENTS.md con '@AGENTS.md'. Si prefieres symlink:"
 echo "    rm CLAUDE.md && ln -s AGENTS.md CLAUDE.md"

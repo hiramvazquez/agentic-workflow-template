@@ -69,6 +69,16 @@ docs/process/              ← PRD template, lessons, execution map, ledger view
 enterprise/                ← (opcional) managed-settings.json: enforcement org-wide NO anulable
 ```
 
+## Relación con spec-driven development (SDD)
+
+Este template es **un harness SDD hecho a medida** con governance mecánica encima: su flujo
+PRD → design-review → implementación → reviewer → judge es la misma familia que **GitHub Spec Kit**
+(`/speckit.constitution|specify|plan|tasks|implement`) y **AWS Kiro** (Requirements → Design → Tasks).
+Mapeo casi 1:1: `AGENTS.md` ≈ *constitution* · PRD ≈ *specify* · design-review ≈ *plan* ·
+sub-agentes ≈ *tasks/implement* · reviewer/judge ≈ *analyze*. La diferencia: aquí el enforcement
+(3 anillos, drift-ratchet, findings-ledger, reviewer-gate) es **mecánico y cross-tool**, algo que
+Spec Kit no trae. Si ya usas Spec Kit, adopta su vocabulario de comandos y monta estos gates encima.
+
 ## Cómo se adopta
 
 Ver **`docs/ADOPTION.md`**. En corto: clona → corre `scripts/bootstrap.sh` → rellena los

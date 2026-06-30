@@ -26,9 +26,26 @@ if [ -f "$map" ]; then
 fi
 
 echo ""
+echo "── Salud de configuración ──"
+PRESET="$(awk 'NR==1{print $1; exit}' tools/preset 2>/dev/null)"; [ -n "$PRESET" ] || PRESET=full
+echo "• Preset: $PRESET  (full=gates bloquean · lite=gates avisan)"
+_health=1
+grep -qE 'Plataformas:\*\* <!-- FILL' AGENTS.md 2>/dev/null && { echo "⚠️  AGENTS.md §2 (Stack) SIN rellenar — build/test/lenguaje desconocidos."; _health=0; }
+_src=0; for d in ios android web src; do [ -d "$d" ] && _src=1; done
+[ "$_src" = "0" ] && { echo "⚠️  Sin carpetas de código (ios/android/web/src) — check-drift inactivo."; _health=0; }
+grep -qE '\*View\*|\*\.swift|\*\.kt|\*\.ts' scripts/agent-hooks/skill-reminder.sh 2>/dev/null \
+  || { echo "⚠️  skill-reminder sin globs concretos — gate leer-skill MUDO (configura AGENTS.md §11)."; _health=0; }
+[ "$_health" = "1" ] && echo "✓ Stack, código y matriz de skills configurados."
+
+echo ""
 echo "── Guardrails activos ──"
-echo "• Edit/Write: BLOQUEA si no leíste la skill requerida (skill-reminder)."
-echo "• git commit: BLOQUEA sin review reciente o si sube el drift-ratchet (reviewer-gate)."
+if [ "$PRESET" = "lite" ]; then
+  echo "• Edit/Write: AVISA si no leíste la skill (skill-reminder) — preset lite."
+  echo "• git commit: AVISA sin review; el drift-ratchet SÍ bloquea (reviewer-gate)."
+else
+  echo "• Edit/Write: BLOQUEA si no leíste la skill requerida (skill-reminder)."
+  echo "• git commit: BLOQUEA sin review reciente o si sube el drift-ratchet (reviewer-gate)."
+fi
 echo "• Stop: BLOQUEA si introdujiste violaciones/errores nuevos (canon-enforce + drift-stop)."
 echo "• Markers se borran cada sesión → re-leer requerido."
 exit 0

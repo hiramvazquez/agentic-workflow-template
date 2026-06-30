@@ -58,3 +58,19 @@ hook_allow() { exit 0; }
 # ── Marcadores de estado compartidos (ambos clientes) ───────────────
 # Viven en .agents/state/ (gitignored) para que Claude y Cursor compartan.
 hook_state_dir() { echo "${PROJECT_ROOT:-$(pwd)}/.agents/state"; }
+
+# ── Preset: full (default, equipo) | lite (personal) ────────────────
+# Lite degrada los gates "blandos" (skill-read, reviewer-marker) de BLOQUEAR a AVISAR.
+# El drift-ratchet y canon/drift-stop siguen DUROS en ambos presets.
+# Fuente: env WORKFLOW_PRESET, o la primera palabra de tools/preset.
+hook_preset() {
+  local p="${WORKFLOW_PRESET:-}" root="${PROJECT_ROOT:-$(pwd)}"
+  [ -z "$p" ] && [ -f "$root/tools/preset" ] && p="$(awk 'NR==1{print $1; exit}' "$root/tools/preset" 2>/dev/null)"
+  case "$p" in lite) echo lite ;; *) echo full ;; esac
+}
+
+# Bloquea (exit 2) en full; avisa a stderr y permite (exit 0) en lite.
+hook_block_or_warn() {
+  if [ "$(hook_preset)" = "lite" ]; then printf '⚠️  [lite] %s\n' "$1" >&2; exit 0; fi
+  printf '%s\n' "$1" >&2; exit 2
+}

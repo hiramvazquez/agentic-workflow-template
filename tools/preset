@@ -1,0 +1,4 @@
+full
+# full (equipo: skill-reminder y reviewer-gate BLOQUEAN) | lite (personal: AVISAN).
+# El drift-ratchet, canon-enforce y drift-stop siguen duros en ambos.
+# Lo lee scripts/agent-hooks/lib/io.sh (hook_preset). Cámbialo a "lite" para uso en solitario.

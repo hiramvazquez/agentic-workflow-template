@@ -135,6 +135,8 @@ Todo commit que toque código de producto requiere ejecución previa del sub-age
 (verdict GREEN/AMBER → marca con `scripts/mark-reviewer-run.sh`). El hook `reviewer-gate`
 (Anillo 2) y `ci/run-gates.sh` (Anillo 3) lo verifican. Override de emergencia auditado:
 `REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...`.
+**Presets:** con `tools/preset = lite` (uso personal) este gate y el `skill-reminder` AVISAN en vez
+de bloquear; el drift-ratchet y los detectores siguen duros. `full` (equipo) es el default.
 
 ## 14. Cómo entrar a una sesión nueva
 

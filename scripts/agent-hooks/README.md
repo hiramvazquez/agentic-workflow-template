@@ -28,12 +28,15 @@ Abstrae las diferencias entre clientes:
 | Script | Evento Claude | Evento Cursor | Bloquea | Qué hace |
 |---|---|---|---|---|
 | `session-start.sh` | SessionStart | sessionStart | no | reset markers + estado |
-| `skill-reminder.sh` | PreToolUse Edit\|Write | preToolUse | **sí** | leer-skill-antes-de-editar |
+| `skill-reminder.sh` | PreToolUse Edit\|Write | preToolUse | **sí**¹ | leer-skill-antes-de-editar |
 | `track-reads.sh` | PostToolUse Read | postToolUse | no | marca skills leídas |
 | `track-trajectory.sh` | PostToolUse * | postToolUse | no | trayectoria sin secretos |
-| `reviewer-gate.sh` | PreToolUse Bash | beforeShellExecution | **sí** | gate de `git commit` + ratchet |
+| `reviewer-gate.sh` | PreToolUse Bash | beforeShellExecution | **sí**¹ | gate de `git commit` + ratchet |
 | `canon-enforce.sh` | Stop | stop | **sí** | reglas irrompibles (grep) |
 | `drift-stop.sh` | Stop | stop | **sí** | errores nuevos de drift |
+
+> ¹ En preset `lite` (`tools/preset`) `skill-reminder` y `reviewer-gate` **avisan** en vez de bloquear.
+> El drift-ratchet del `reviewer-gate`, `canon-enforce` y `drift-stop` siguen **duros en ambos presets**.
 
 ## Notas de portabilidad
 

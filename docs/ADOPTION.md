@@ -22,7 +22,7 @@
 ```bash
 git clone <este-template> mi-proyecto && cd mi-proyecto
 rm -rf .git && git init
-bash scripts/bootstrap.sh        # reemplaza <PROJECT>, deja solo tu(s) plataforma(s)
+bash scripts/bootstrap.sh        # reemplaza <PROJECT>, plataformas, y elige preset full/lite
 ```
 
 ## 2. Instalar los gates locales

@@ -59,4 +59,4 @@ done
 reason="🛑 Antes de editar \`$rel\` debes LEER (con la tool Read) en esta sesión:"$'\n'
 for m in "${missing[@]}"; do reason+="  • $m"$'\n'; done
 reason+="Tras leerlas, reintenta el Edit/Write. El sistema registra los Reads solo."
-hook_block "$reason"
+hook_block_or_warn "$reason"
