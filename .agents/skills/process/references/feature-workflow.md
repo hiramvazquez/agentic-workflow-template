@@ -19,16 +19,19 @@
 > el design-review (valida la solución con la skill de área cargada). No salteable para cambios de
 > arquitectura o de datos sensibles/PHI/pagos.
 
-## Fase 2 — Implementación
+## Fase 2 — Implementación (TDD: 🔴 red → 🟢 green → ♻️ refactor)
+
+> **Regla dura:** ninguna unidad de lógica/orquestación entra sin un test que haya fallado ANTES
+> de la implementación. Playbook + ejemplos iOS en `tdd-workflow.md`.
 
 | Paso | Acción |
 |---|---|
 | 2.0 | **Handshake pre-código** (sub-agentes): resumen ≤8 puntos + archivos a tocar (= PRD §5) + los que NO va a tocar + OQ bloqueantes. Si algo no cuadra → **para y pregunta**. |
-| 2.1 | Antes de tocar un file, lee la skill que aplique (matriz `AGENTS.md` §11) |
-| 2.2 | Sigue el patrón de capas (`architecture/SKILL.md`) y la estructura de carpetas |
-| 2.3 | Tests: mínimo 1 happy + 2 ramas de error por unidad de lógica/orquestación |
-| 2.4 | `<!-- FILL: build -->` verde antes de cada commit |
-| 2.5 | `bash tools/check-drift.sh` sin errores nuevos |
+| 2.1 | Antes de tocar un file, lee la skill que aplique (matriz `AGENTS.md` §11) + `tdd-workflow.md` |
+| 2.2 | 🔴 **RED** — escribe el test del comportamiento (1 happy) y míralo FALLAR por la razón correcta |
+| 2.3 | 🟢 **GREEN** — implementación MÍNIMA que lo pasa (scope = el test, nada de más) |
+| 2.4 | ♻️ **REFACTOR** — limpia en verde + añade ≥2 ramas de error/borde. Respeta capas (`architecture/SKILL.md`) |
+| 2.5 | `<!-- FILL: build+test -->` verde + `bash tools/check-drift.sh` sin errores nuevos antes de cada commit |
 
 ## Fase 3 — Pre-ship
 
@@ -57,7 +60,7 @@
 
 ## Flow corto (bug fixes / tweaks, 1-3h, no cross-feature)
 
-1. Identifica archivo(s). 2. Lee skill del área. 3. Fix + tests. 4. Build verde. 5. check-drift ok.
+1. Identifica archivo(s). 2. Lee skill del área + `tdd-workflow.md`. 3. 🔴 test que reproduce el bug (falla) → 🟢 fix → ♻️ refactor. 4. Build+test verde. 5. check-drift ok.
 6. `reviewer` → marca. 7. Commit. **Sin PRD, sin overhead.** Si empieza a ramificarse a >2 features, promueve a flow medio.
 
 ## Plantilla de commit

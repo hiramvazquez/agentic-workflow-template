@@ -1,10 +1,8 @@
 # ─── Agentic workflow runtime state (NO commitear) ───────────────────
 # Markers de skills leídos + baseline de drift (se regeneran por sesión).
 .agents/state/
-# Markers del reviewer-gate + log de overrides (auditable, pero local).
-.claude/markers/reviewer_run.txt
-.claude/markers/override_log.txt
-.cursor/markers/
+# (Los markers del reviewer-gate y el override_log viven en .agents/state/markers/,
+#  ya cubierto por la línea .agents/state/ de arriba — no dupliques rutas muertas aquí.)
 
 # ─── Secretos (NUNCA al repo) ────────────────────────────────────────
 # <!-- FILL: añade aquí los archivos de secretos reales de tu stack -->

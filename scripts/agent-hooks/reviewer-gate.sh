@@ -60,5 +60,16 @@ if [ -n "$MARKED_HEAD" ] && [ -n "$CUR_HEAD" ] && [ "$MARKED_HEAD" != "no-repo" 
   hook_block "❌ reviewer-gate: marker STALE (HEAD cambió $MARKED_HEAD→$CUR_HEAD). Re-corre \`reviewer\` y re-marca."
 fi
 
+# Binding al DIFF STAGED: lo que se revisó debe ser exactamente lo que se commitea.
+# (mark-reviewer-run.sh guarda staged_sha; si añadiste/quitaste cambios staged tras la
+#  review, el marker es stale aunque HEAD no haya cambiado. Cierra el hueco real.)
+MARKED_STAGED="$(grep -E '^staged_sha:' "$MARKER" | awk '{print $2}')"
+CUR_STAGED="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
+if [ -n "$MARKED_STAGED" ] && [ -n "$CUR_STAGED" ] && [ "$MARKED_STAGED" != "$CUR_STAGED" ]; then
+  hook_block "❌ reviewer-gate: el diff STAGED cambió desde la review (revisado=${MARKED_STAGED:0:12}… actual=${CUR_STAGED:0:12}…).
+Lo que se revisó ya no es lo que vas a commitear. Re-corre \`reviewer\` y re-marca,
+o usa REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON=\"...\" git commit ..."
+fi
+
 echo "✅ reviewer-gate: marker válido, commit permitido." >&2
 hook_allow

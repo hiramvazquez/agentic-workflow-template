@@ -5,9 +5,9 @@ description: Usar cuando la pregunta toca la arquitectura del código — patró
 
 # Arquitectura — <PROJECT>
 
-> **Esta skill la rellena la empresa.** Aquí va el HOW de TU código. Dejo la estructura y mi
-> opinión por defecto (`<!-- OPINIÓN: ... -->`); reemplaza los `<!-- FILL: ... -->` con tus decisiones reales.
-> Lo específico de cada plataforma vive en `platforms/{ios,android,web}.md`.
+> El HOW de tu código. Stack de referencia: **iOS 17+ / Swift 6 / SwiftUI vanilla + MVVM-C**.
+> Lo específico de iOS vive en `platforms/ios.md`; lo de otras plataformas en `platforms/{android,web}.md`.
+> Ajusta los `<!-- FILL -->` a las rutas/nombres reales de tu repo.
 
 ## Qué cargar por tema
 
@@ -21,38 +21,39 @@ description: Usar cuando la pregunta toca la arquitectura del código — patró
 
 ## §Patrón de pantalla/módulo
 
-<!-- FILL: define TU patrón canónico y sus capas. -->
-<!-- OPINIÓN: separa en archivos distintos (1) presentación/UI, (2) orquestación de estado,
-     (3) lógica de negocio pura y testeable. La lógica NO vive en la UI ni en el orquestador.
-     Ej. iOS: View+ViewModel+Logic · Android: Composable+ViewModel+UseCase · Web: Component+hook+service. -->
+Tres archivos por pantalla: **(1) presentación/UI, (2) orquestación de estado, (3) lógica pura
+testeable**. La lógica NO vive en la UI ni en el orquestador.
+
+- **iOS (referencia):** `View` (SwiftUI) + `ViewModel` (`@Observable @MainActor`) + `Logic`/`UseCase` (Swift puro).
+- Equivalentes: Android `Composable+ViewModel+UseCase` · Web `Component+hook+service`.
 
 | Capa | Qué hace | Qué NO hace |
 |---|---|---|
-| Presentación | <!-- FILL --> | lógica condicional de negocio, llamadas a datos |
-| Orquestación | <!-- FILL --> | validación de reglas, acceso directo a repos |
-| Lógica pura | <!-- FILL --> | tocar UI, conocer navegación |
+| Presentación | renderiza estado, emite intención | lógica condicional de negocio, llamadas a datos |
+| Orquestación | mantiene estado de pantalla, llama UseCases | validación de reglas, acceso directo a repos |
+| Lógica pura | la regla de negocio, composición de puertos | tocar UI, conocer navegación |
 
 ## §Capas y límites
 
-<!-- FILL: cómo se apilan App / Feature / Domain / Data / Core en tu repo. -->
-- Toda dependencia que cruza capa va por **interfaz/protocolo** + **inyección por constructor**.
+- App / Feature / Domain / Data / Core. Toda dependencia que cruza capa va por **protocolo** +
+  **inyección por constructor**.
 - El **dominio** (entidades, puertos, errores) NO importa UI ni infraestructura (ver skill `domain`).
 
 ## §Navegación
 
-<!-- FILL: tu mecanismo (Coordinator / Router / Navigation Compose / file-based routing). -->
-<!-- OPINIÓN: centraliza la navegación en una capa dedicada; las pantallas emiten intención,
-     no construyen rutas. Evita stacks de navegación anidados. -->
+Coordinator/Router central posee el stack de navegación; las pantallas **emiten intención**, no
+construyen rutas ni anidan stacks. Detalle iOS en `platforms/ios.md`.
 
 ## §Inyección de dependencias (DI)
 
-<!-- FILL: cómo registras e inyectas (manual ctor / Hilt / Koin / container / context). -->
-<!-- OPINIÓN: inyección por constructor por defecto; el service locator global solo en el
-     composition root, nunca dentro de la lógica de dominio. -->
+Inyección **por constructor** por defecto; el composition root (en `App`) arma el grafo. El service
+locator global solo en el composition root, nunca dentro de la lógica de dominio.
 
 ## §Acceso a datos
 
-<!-- FILL: cómo se habla con el backend/DB, dónde viven los repositorios, caché/refresh. -->
+La presentación/orquestación habla con **puertos (protocolos)** del dominio; las implementaciones
+concretas (red/DB/Keychain) viven en `Data/` e inyectan por ctor (`async/await`, `Sendable`).
+<!-- FILL: cliente HTTP/DB real, dónde viven los repos, caché/refresh. -->
 
 ## Fuentes de verdad
 

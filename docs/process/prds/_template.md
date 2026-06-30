@@ -59,7 +59,7 @@
 
 ## 15. Definition of Done
 - [ ] Escenarios golden pasan
-- [ ] Tests (happy + errores) verdes · build verde · check-drift sin errores nuevos
+- [ ] **TDD**: cada unidad de lógica tiene test escrito primero (happy + ≥2 errores), todos verdes · build verde · check-drift sin errores nuevos
 - [ ] `reviewer` GREEN/AMBER atendido · `security-reviewer` si tocó datos sensibles
 - [ ] Docs/skills actualizados en el mismo PR
 - [ ] Sin secretos (gitleaks limpio)

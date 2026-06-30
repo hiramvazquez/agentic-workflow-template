@@ -43,3 +43,7 @@ Abstrae las diferencias entre clientes:
 - **Cursor no tiene un "before file edit" que deniegue**: por eso el skill-reminder se engancha a
   `preToolUse` (genérico) y se auto-filtra por tool de edición.
 - **Failure-open**: todos hacen `exit 0` ante glitch. El backstop de lo que se cuele es el Anillo 3.
+- **Los hooks `Stop` tienen un escape en Claude Code:** tras **8 bloqueos consecutivos** Claude
+  anula el hook y cierra el turno igual. Por eso `canon-enforce`/`drift-stop` son una *red rápida*,
+  no el muro final — las reglas que DEBEN cumplirse sí o sí viven también en el Anillo 1 (pre-commit)
+  y el Anillo 3 (CI), que no tienen ese escape.

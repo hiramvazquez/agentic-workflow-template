@@ -1,24 +1,31 @@
 # <PROJECT> iOS — overrides de plataforma
 
 > `AGENTS.md` anidado. Se **combina** con el raíz; el más cercano al archivo editado gana.
-> Pon aquí SOLO lo específico de iOS; lo común queda en el raíz. Lo lee Cursor/Codex nativo.
+> Solo lo específico de iOS; lo común queda en el raíz. Lo lee Cursor/Codex nativo; Claude vía la skill `architecture`.
 
 ## Stack iOS
-<!-- FILL: Swift X, deployment target, SwiftUI/UIKit, SPM/Cocoapods, Xcode scheme -->
+- **Swift 6**, **iOS 17+**, **SwiftUI** (vanilla, sin TCA).
+- **SwiftPM** para modularizar (features/dominio como packages locales).
+- **Swift Testing** (Xcode 16+) para unit tests; XCTest solo legacy/UI.
+- <!-- FILL: deployment target exacto, versión de Xcode, scheme(s) reales. -->
 
 ## Build & test iOS
-<!-- FILL:
-- build: xcodebuild -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 17' build
-- test:  xcodebuild -scheme <Scheme> -destination '...' test
-- spm:   swift test --package-path Packages/<Pkg>
--->
+- **build:** `xcodebuild -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 16' build`
+- **test:**  `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 16'`
+- **spm:**   `swift test --package-path Packages/<Pkg>`
+- <!-- FILL: reemplaza <Scheme>/<Pkg> por los reales. -->
+
+## Arquitectura iOS
+- Patrón: **View + @Observable @MainActor ViewModel + Logic/UseCase puro + Coordinator + DI por ctor**.
+  Detalle y ejemplos: `.agents/skills/architecture/platforms/ios.md`.
+- Límites de tamaño y capas: ver `AGENTS.md` §3-§4 (raíz). TDD: `process/references/tdd-workflow.md`.
 
 ## Convenciones iOS específicas
-<!-- OPINIÓN: la adaptación iPhone↔iPad vive DENTRO del componente reutilizable (SPM/módulo),
-     no como `if idiom == .pad` repetido en pantallas. Design System tokeniza color/tipografía/
-     spacing — prohibido `Color(hex:)`/`Font.system(size:)` suelto en una View. -->
-<!-- FILL: tu Design System, tu patrón de pantalla, dónde vive cada cosa. -->
+- Adaptación iPhone↔iPad DENTRO del componente reutilizable, no `if idiom == .pad` por pantalla.
+- Design System tokeniza color/tipografía/spacing — prohibido `Color(hex:)`/`Font.system(size:)` suelto.
+- Concurrencia: `async/await`, tipos `Sendable`; el ViewModel es `@MainActor`.
+- <!-- FILL: tu Design System y estructura de módulos reales. -->
 
 ## Seguridad iOS
-<!-- OPINIÓN: secretos/sesión → Keychain (no UserDefaults). Datos sensibles en disco →
-     NSFileProtection. App Lock biométrico opcional. -->
+- Secretos/sesión → **Keychain** (nunca UserDefaults). Datos sensibles en disco → `NSFileProtection`.
+- Sin claves en el bundle; App Lock biométrico opcional. Ver skill `security`.

@@ -15,14 +15,16 @@ description: Usar al empezar una feature, abrir un PRD nuevo, o cuando preguntan
 | "¿Cuándo escribo un PRD? ¿Qué template?" | `references/prd-lifecycle.md` |
 | "¿Cuál es el flujo start-to-ship?" | `references/feature-workflow.md` |
 | "¿Cómo lanzo sub-agentes? ¿En paralelo?" | `references/multi-agent-orchestration.md` |
+| "¿Cómo aplico TDD? ¿Cómo testeo en iOS?" | `references/tdd-workflow.md` |
 | "¿Dónde vive cada doc?" | `references/documentation-map.md` |
 
-## Las 4 reglas de oro del proceso
+## Las 5 reglas de oro del proceso
 
-1. **Feature mediana/grande → PRD obligatorio** antes del primer commit de código.
-2. **Cambio de contrato (API/edge/schema) → contrato primero** (schema/interfaz), luego código.
-3. **Decisión arquitectónica reusable → ADR ligero** en `docs/process/decisions/`.
-4. **Feature shipped → cerrar el loop**: PRD a `Shipped`, Definition of Done marcado, gaps capturados.
+1. **TDD por defecto** — ninguna lógica nueva sin un test que falle primero (🔴→🟢→♻️). Ver `references/tdd-workflow.md`.
+2. **Feature mediana/grande → PRD obligatorio** antes del primer commit de código.
+3. **Cambio de contrato (API/edge/schema) → contrato primero** (schema/interfaz), luego código.
+4. **Decisión arquitectónica reusable → ADR ligero** en `docs/process/decisions/`.
+5. **Feature shipped → cerrar el loop**: PRD a `Shipped`, Definition of Done marcado, gaps capturados.
 
 ## Anti-patrones del proceso
 

@@ -6,6 +6,7 @@
 > No es un framework de código: es una **forma de trabajar** codificada en archivos que
 > los agentes leen y en *gates* que se ejecutan solos. La empresa lo clona, rellena los
 > placeholders de su stack, y arranca con governance desde el día 1.
+> Trae **iOS (SwiftUI + MVVM-C) y TDD** como referencia ya rellenada; otras plataformas quedan como skeleton.
 
 ---
 
@@ -42,6 +43,11 @@ defensa en capas, y lo hace **compatible con los tres clientes que usan los devs
 > **CI es "bring your own".** No imponemos GitHub. El Anillo 3 es un único script
 > (`ci/run-gates.sh`) que corre los mismos gates; lo invocas desde GitHub Actions, GitLab CI,
 > Bitbucket, Azure, Jenkins o nada. En `ci/examples/` hay stubs opcionales para varios proveedores.
+>
+> **Capa nativa de Claude Code (opcional, la más fuerte para empresa).** Para enforcement que
+> NI `--no-verify` NI los flags de CLI pueden saltar, despliega `enterprise/managed-settings.json`
+> (precedencia máxima). Y para bajar el coste de re-lectura, `.claude/rules/` carga la skill del
+> área por path de forma nativa. Detalle en `enterprise/README.md`.
 
 ## Mapa de archivos
 
@@ -56,8 +62,11 @@ ci/run-gates.sh + ci/examples/  ← Anillo 3 (CI opcional, provider-agnóstico �
 lefthook.yml + .gitleaks.toml  ← Anillo 1
 scripts/agent-hooks/       ← UNA implementación de los gates, compartida por Claude+Cursor
 tools/                     ← check-drift, drift-ratchet, findings-ledger, secret-scan
-.agents/skills/            ← base de conocimiento (rellenable por la empresa)
+.agents/skills/            ← base de conocimiento (iOS + TDD ya rellenados como referencia)
 docs/process/              ← PRD template, lessons, execution map, ledger view
+.claude/rules/             ← reglas path-scoped NATIVAS de Claude (espejo de §11, sin re-lectura forzada)
+.claude-plugin/            ← (opcional) plugin.json + marketplace.json para distribuir el tooling
+enterprise/                ← (opcional) managed-settings.json: enforcement org-wide NO anulable
 ```
 
 ## Cómo se adopta

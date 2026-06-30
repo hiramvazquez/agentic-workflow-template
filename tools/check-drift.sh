@@ -38,13 +38,37 @@ if [ -n "$EXISTING" ]; then
   [ -n "$HITS" ] && while IFS= read -r h; do err "Posible secreto hardcoded: $h"; done <<< "$HITS"
 fi
 
-# <!-- FILL: tus checks. Ejemplos a adaptar:
-# - "ViewModel llama a Repository directo" (debe ir por Logic)
-# - "color/spacing hardcoded fuera del design system"
-# - "lógica que ramifica sobre texto en lenguaje natural (i18n)"
-# - "NavigationStack fuera del Coordinator"
-# Patrón:  HITS=$(grep -rEln '<patrón>' $EXISTING); [ -n "$HITS" ] && err/warn "..."
-# -->
+# ── Check iOS (TDD): lógica de producción sin test espejo ──
+# Heurística: *UseCase/*Logic/*Reducer.swift sin ningún *Tests.swift que los referencie.
+# warn (no err): es señal, no veredicto. <!-- FILL: ajusta los sufijos a tu naming real. -->
+if [ -n "$EXISTING" ]; then
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    base="$(basename "$f" .swift)"
+    grep -rqs "$base" --include='*Tests.swift' $EXISTING 2>/dev/null \
+      || warn "Lógica sin test (TDD): $f — no hay *Tests.swift que referencie $base"
+  done < <(find $EXISTING -type f \( -name '*UseCase.swift' -o -name '*Logic.swift' -o -name '*Reducer.swift' \) 2>/dev/null)
+fi
+
+# ── Checks arquitectónicos iOS (MVVM-C). warn → suben el ratchet (techo 0) = gate efectivo. ──
+# <!-- FILL: ajusta rutas/patrones a tu repo. Estos son iOS de referencia. -->
+if [ -n "$EXISTING" ]; then
+  # 1) ViewModel que referencia un Repository directo (debe ir por UseCase/Logic).
+  HITS=$(grep -rEln 'Repository' --include='*ViewModel.swift' $EXISTING 2>/dev/null || true)
+  [ -n "$HITS" ] && while IFS= read -r h; do [ -n "$h" ] && warn "ViewModel referencia un Repository directo (usa un UseCase): $h"; done <<< "$HITS"
+
+  # 2) Color/Font hardcoded fuera del Design System (en Views).
+  HITS=$(grep -rEln 'Color\(hex:|Font\.system\(size:' --include='*View.swift' --include='*Screen.swift' $EXISTING 2>/dev/null || true)
+  [ -n "$HITS" ] && while IFS= read -r h; do [ -n "$h" ] && warn "Valor de diseño hardcoded (usa tokens del Design System): $h"; done <<< "$HITS"
+
+  # 3) Lógica que ramifica sobre texto en lenguaje natural (rompe i18n — AGENTS.md §3).
+  HITS=$(grep -rEln '(==|!=)[[:space:]]*"[^"]+"' --include='*Logic.swift' --include='*UseCase.swift' $EXISTING 2>/dev/null || true)
+  [ -n "$HITS" ] && while IFS= read -r h; do [ -n "$h" ] && warn "Posible branch sobre texto natural en lógica (usa enum/clave i18n): $h"; done <<< "$HITS"
+
+  # 4) NavigationStack fuera del Coordinator/App.
+  HITS=$(grep -rEln 'NavigationStack' --include='*View.swift' --include='*Screen.swift' $EXISTING 2>/dev/null | grep -viE 'Coordinator|App' || true)
+  [ -n "$HITS" ] && while IFS= read -r h; do [ -n "$h" ] && warn "NavigationStack en una View (centralízalo en el Coordinator): $h"; done <<< "$HITS"
+fi
 
 echo ""
 echo "DRIFT_SUMMARY errors=$ERRORS warns=$WARNS"

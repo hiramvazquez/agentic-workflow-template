@@ -60,11 +60,13 @@
 | Función | 40 | 60 |
 | Clase orquestadora (ViewModel/Controller) | 150 | 250 |
 
-## 5. Tests + build al final de cada ciclo (obligatorio)
+## 5. TDD obligatorio (🔴 red → 🟢 green → ♻️ refactor)
 
-Antes de marcar algo como terminado: (1) corre tests del área tocada, (2) build verde,
-(3) `bash tools/check-drift.sh` sin errores nuevos. Todo módulo de lógica y orquestación
-nuevo: **mínimo 1 happy path + 2 ramas de error**.
+**Ninguna lógica/orquestación nueva sin un test que falle PRIMERO.** Ciclo: escribe el test y
+míralo fallar → implementación mínima que lo pasa → refactor en verde. Cada unidad: **mínimo
+1 happy path + 2 ramas de error/borde**. Bug fix = primero un test que reproduce el bug (falla),
+luego el fix. Antes de marcar terminado: tests del área + build verde + `bash tools/check-drift.sh`
+sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/tdd-workflow.md`.
 
 ## 6. Seguridad (gate de cada commit)
 
@@ -109,15 +111,15 @@ se resuelve en el mismo turno: o lo arreglas, o lo **registras en el ledger** co
 Antes de editar un archivo, debes haber leído la referencia que aplica. El hook
 `skill-reminder` (Anillo 2) lo bloquea automáticamente; esta tabla es el fallback humano.
 
-<!-- FILL: mapea tus paths reales → skill reference. Ejemplo de arranque: -->
+<!-- iOS de referencia. Ajusta los globs a tus carpetas reales si difieren. -->
 
 | Path que vas a editar | Reference obligatorio |
 |---|---|
-| `**/<capa-ui>/*` | `.agents/skills/architecture/SKILL.md` (+ platform) |
-| `**/<capa-logica>/*` | `.agents/skills/architecture/SKILL.md` + `domain/SKILL.md` |
-| `**/<dominio>/**` | `.agents/skills/domain/SKILL.md` |
-| `<migraciones-db>/**` | `.agents/skills/domain/references/` (data) + `security/SKILL.md` |
-| `docs/process/prds/[0-9]*.md` | `.agents/skills/process/references/prd-lifecycle.md` + `feature-workflow.md` |
+| `**/*View*.swift`, `**/*Screen*.swift` | `architecture/SKILL.md` + `architecture/platforms/ios.md` |
+| `**/*ViewModel*.swift`, `**/*Logic*.swift`, `**/*UseCase*.swift` | `architecture/SKILL.md` + `domain/SKILL.md` + `process/references/tdd-workflow.md` |
+| `**/Domain/**` | `.agents/skills/domain/SKILL.md` + `process/references/tdd-workflow.md` |
+| `**/Data/**`, `<migraciones-db>/**` | `domain/SKILL.md` (puertos) + `security/SKILL.md` |
+| `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |
 
 ## 12. PRD obligatorio para features medianas/grandes
 

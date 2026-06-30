@@ -1,9 +1,10 @@
 # Sub-agentes — <PROJECT>
 
 > Roles especializados. Cada `.md` define un agente con su prompt, sus tools y su modelo
-> recomendado. Claude Code los invoca con la tool `Agent`; Cursor los ve vía el symlink
-> `.cursor/agents` → `.claude/agents` (formato compatible). Codex no tiene sub-agentes nativos:
-> usa estos `.md` como checklists que el agente principal sigue.
+> recomendado. Claude Code los invoca con la tool `Agent`. Cursor los expone vía el symlink
+> `.cursor/agents` → `.claude/agents`, pero **verifica la compatibilidad con tu versión de Cursor**
+> (su formato de subagents evoluciona; el frontmatter `name/description/tools/model` puede diferir).
+> Codex no tiene sub-agentes nativos: usa estos `.md` como checklists que el agente principal sigue.
 
 ## Catálogo
 

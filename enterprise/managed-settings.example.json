@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "EJEMPLO de managed-settings.json (Claude Code). Es la capa de MAYOR precedencia: ni los flags de CLI ni los settings de proyecto/usuario la pueden anular. Despliégalo en la ruta de OS (ver enterprise/README.md), NO en el repo. Quita el _comment al usarlo.",
+  "permissions": {
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git commit --no-verify*)",
+      "Bash(git commit -n*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.p12)",
+      "Read(**/*.keystore)"
+    ]
+  },
+  "disableBypassPermissionsMode": "disable"
+}

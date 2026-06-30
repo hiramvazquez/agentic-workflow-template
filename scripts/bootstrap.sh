@@ -12,7 +12,14 @@ echo "═══ Bootstrap del Agentic Workflow Template ═══"
 
 read -r -p "Nombre del proyecto (kebab-case, ej. acme-app): " PROJECT
 [ -z "$PROJECT" ] && { echo "Nombre vacío, aborto."; exit 1; }
-PROJECT_TITLE="$(echo "$PROJECT" | sed -E 's/(^|-)([a-z])/\U\2/g')"
+# Title-case PORTABLE (BSD/macOS + GNU): mayúscula inicial de cada segmento '-'.
+# NO usar `sed \U`: es extensión GNU; en BSD/macOS produce basura como "UacmeUapp".
+PROJECT_TITLE=""
+IFS='-' read -ra _parts <<< "$PROJECT"
+for _p in "${_parts[@]}"; do
+  [ -z "$_p" ] && continue
+  PROJECT_TITLE="${PROJECT_TITLE}$(printf '%s' "${_p:0:1}" | tr '[:lower:]' '[:upper:]')${_p:1}"
+done
 
 # Reemplazo de placeholders en archivos de texto (excluye .git y binarios).
 echo "→ Reemplazando <PROJECT> → $PROJECT_TITLE y <project> → $PROJECT ..."

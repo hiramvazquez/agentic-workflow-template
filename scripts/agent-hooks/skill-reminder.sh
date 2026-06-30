@@ -32,10 +32,11 @@ case "$rel" in
   *View*.swift|*.tsx|*Screen*.kt|*/ui/*)
       required+=(".agents/skills/architecture/SKILL.md") ;;
 esac
-# Lógica / casos de uso:
+# Lógica / casos de uso (TDD obligatorio: leer el playbook antes de tocar lógica):
 case "$rel" in
-  *Logic*.swift|*UseCase*.kt|*/services/*.ts|*/domain/*)
-      required+=(".agents/skills/architecture/SKILL.md" ".agents/skills/domain/SKILL.md") ;;
+  *Logic*.swift|*UseCase*.swift|*UseCase*.kt|*/services/*.ts|*/domain/*|*/Domain/*)
+      required+=(".agents/skills/architecture/SKILL.md" ".agents/skills/domain/SKILL.md" \
+                 ".agents/skills/process/references/tdd-workflow.md") ;;
 esac
 # PRDs:
 case "$rel" in

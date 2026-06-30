@@ -37,8 +37,9 @@ gitleaks version                 # verifica que está en PATH
 Todos leen `AGENTS.md` (la fuente canónica). Solo activas el adaptador de los que uses:
 
 - **Cursor** — ya lee `AGENTS.md` + `.cursor/rules/*.mdc`. Activa hooks: deja `.cursor/hooks.json`.
-- **Claude Code** — usa `CLAUDE.md` (importa `AGENTS.md`) + `.claude/settings.json` (hooks) + `.claude/agents/` (sub-agentes).
+- **Claude Code** — `CLAUDE.md` (importa `AGENTS.md`) + `.claude/settings.json` (hooks) + `.claude/agents/` (sub-agentes) + `.claude/rules/` (reglas path-scoped nativas).
 - **Codex** — lee `AGENTS.md` directo. No tiene hooks → su enforcement es el **Anillo 3 (CI)**.
+- **Gemini CLI** — NO lee `AGENTS.md` por defecto: añade `context.fileName: ["AGENTS.md", "GEMINI.md"]` en su `settings.json`.
 
 > Puedes borrar los directorios de los clientes que NO uses. El `AGENTS.md` y el Anillo 1
 > siguen funcionando igual.
@@ -71,6 +72,16 @@ Copia el ejemplo de tu proveedor y bórrale el `.example`:
 ```
 
 Todos invocan el mismo `ci/run-gates.sh`. Si no usas CI, te quedas con Anillos 1 y 2.
+
+## 5b. (Opcional, empresa) Enforcement nativo no anulable + distribución como plugin
+
+- **`enterprise/managed-settings.json`** — capa de precedencia máxima de Claude Code (ni `--no-verify`
+  ni flags de CLI la saltan; bloquea force-push, `--no-verify`, lectura de secretos). Despliégala por
+  MDM/Ansible a la ruta de OS. Detalle: `enterprise/README.md`.
+- **`.claude/rules/`** — reglas path-scoped nativas (espejo de §11) que cargan la skill del área sin el
+  coste de re-lectura forzada del hook. Ya vienen para iOS; ajústalas a tus paths.
+- **Distribución como plugin** — publica `.claude-plugin/` en un marketplace interno; los devs hacen
+  `/plugin install` en vez de clonar. Útil con muchos repos. Valida con `claude plugin validate .`.
 
 ## 6. Baseline de secretos (solo si el repo ya tiene historial)
 

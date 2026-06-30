@@ -21,7 +21,7 @@ proyecto. **No modificas código. No commiteas. Solo reportas.**
 - **Drift policy** (§9): cambio en enum/contrato/puerto compartido actualiza todas las capas + doc en el mismo PR.
 - **Seguridad** (§6): sin secretos, sin PII en logs, storage seguro, authz por recurso (si dudas, llama a `security-reviewer`).
 - **Scope** (§8): nada fuera de lo que el PRD/prompt lista; tooling/meta-doc intactos.
-- **Tests**: cada unidad nueva de lógica/orquestación tiene happy + ≥2 errores; build verde.
+- **TDD** (§5): cada unidad nueva de lógica/orquestación trae test (happy + ≥2 errores) que prueba **comportamiento**, no implementación; build+test verde. Si la lógica no es testeable sin levantar UI → **RED** (muévela a capa pura). Ver `process/references/tdd-workflow.md`.
 - **Design System / convenciones de UI**: <!-- FILL: tus reglas (tokens, no valores mágicos). -->
 - **Contratos cliente↔backend**: <!-- FILL: si tocó un contrato, ¿hay test/smoke que lo valide? -->
 
