@@ -1,0 +1,28 @@
+# ════════════════════════════════════════════════════════════════════
+# Codex CLI — configuración del proyecto
+# ════════════════════════════════════════════════════════════════════
+# Codex lee AGENTS.md (raíz + anidados + ~/.codex/AGENTS.md global) como
+# instrucciones — NO dupliques las reglas aquí. Este archivo es SOLO para
+# configuración propia de Codex (sandbox, aprobaciones, MCP, etc.).
+#
+# IMPORTANTE: Codex NO tiene hooks como Cursor/Claude. Por eso su capa de
+# enforcement real es:
+#   - Anillo 1: lefthook (git-nativo, dispara igual en Codex) → instálalo.
+#   - Anillo 3: ci/run-gates.sh en tu CI.
+# Las reglas AI-aware (skill-reminder, reviewer-gate) NO bloquean en Codex;
+# el agente debe seguirlas por instrucción (AGENTS.md) y el backstop es CI.
+# ════════════════════════════════════════════════════════════════════
+
+# <!-- FILL: ajusta a tu política. Ejemplos comentados abajo. -->
+
+# Modelo y aprobaciones
+# model = "<!-- FILL -->"
+# approval_policy = "on-request"   # untrusted | on-failure | on-request | never
+
+# Sandbox de escritura/red
+# sandbox_mode = "workspace-write"
+
+# Servidores MCP (si usas)
+# [mcp_servers.<nombre>]
+# command = "<!-- FILL -->"
+# args = []

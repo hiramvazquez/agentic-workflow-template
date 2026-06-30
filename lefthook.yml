@@ -1,0 +1,54 @@
+# ════════════════════════════════════════════════════════════════════
+# ANILLO 1 — enforcement git-nativo (UNIVERSAL)
+# ════════════════════════════════════════════════════════════════════
+# Dispara en TODO `git commit` / `git push`, sin importar el cliente:
+# Cursor, Claude Code, Codex, o un humano en terminal. Es la única capa
+# que cubre a todos por igual (los hooks de IA solo cubren su cliente).
+#
+# Instalación (una vez por clon):  lefthook install
+# Runner: lefthook (Go, binario único, paralelo, políglota).
+#   macOS:  brew install lefthook
+#   node :  npm i -D lefthook && npx lefthook install
+#   go   :  go install github.com/evilmartians/lefthook@latest
+#
+# Escape hatch (auditar su uso): git commit --no-verify   ← desaconsejado.
+# Por eso el Anillo 3 (CI) re-corre estos gates server-side.
+# ════════════════════════════════════════════════════════════════════
+
+pre-commit:
+  parallel: true
+  jobs:
+    # ── Secretos: el gate de mayor leverage (gitleaks sobre lo staged) ──
+    - name: secret-scan
+      run: bash tools/secret-scan.sh --staged
+      # Requiere gitleaks en PATH. Si falta, el script avisa cómo instalarlo.
+
+    # ── Drift ratchet: el conteo de deuda SOLO baja, nunca sube ──
+    - name: drift-ratchet
+      run: bash tools/drift-ratchet.sh --check
+
+    # ── Lint / format por-plataforma (rápido, solo staged) ──
+    # <!-- FILL: descomenta/añade el linter de tu stack. Mantenlo < 2s. -->
+    # - name: lint-ios
+    #   glob: "*.swift"
+    #   run: swiftformat --lint {staged_files}
+    # - name: lint-android
+    #   glob: "*.{kt,kts}"
+    #   run: ktlint {staged_files}
+    # - name: lint-web
+    #   glob: "*.{ts,tsx,js,jsx}"
+    #   run: npx eslint {staged_files}
+
+pre-push:
+  parallel: true
+  jobs:
+    # ── Checks un poco más pesados, pero que sigan siendo razonables ──
+    # <!-- FILL: tests rápidos / typecheck. Los tests completos van en CI. -->
+    # - name: typecheck-web
+    #   run: npx tsc --noEmit
+    - name: secret-scan-range
+      run: bash tools/secret-scan.sh --range
+
+# NOTA: los builds completos, la matriz de tests y los scans de historial
+# completo van en el Anillo 3 (ci/run-gates.sh), NO aquí. Regla de oro:
+# pre-commit = formato + lint staged + validación ligera; CI = lo pesado.

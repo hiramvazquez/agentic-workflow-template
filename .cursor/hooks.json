@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "_comment": "Anillo 2 (Cursor). Wrapper delgado: mapea eventos de Cursor (camelCase) a los MISMOS scripts compartidos que usa Claude. Paths relativos a la raíz del repo. failClosed solo en gates de seguridad.",
+  "hooks": {
+    "sessionStart": [
+      { "command": "bash scripts/agent-hooks/session-start.sh" }
+    ],
+    "preToolUse": [
+      { "command": "bash scripts/agent-hooks/skill-reminder.sh" }
+    ],
+    "beforeShellExecution": [
+      { "command": "bash scripts/agent-hooks/reviewer-gate.sh", "failClosed": false }
+    ],
+    "postToolUse": [
+      { "command": "bash scripts/agent-hooks/track-reads.sh" },
+      { "command": "bash scripts/agent-hooks/track-trajectory.sh" }
+    ],
+    "stop": [
+      { "command": "bash scripts/agent-hooks/canon-enforce.sh", "loop_limit": 5 },
+      { "command": "bash scripts/agent-hooks/drift-stop.sh", "loop_limit": 5 }
+    ]
+  }
+}

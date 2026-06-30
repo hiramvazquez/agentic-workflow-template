@@ -1,0 +1,37 @@
+# ─── Agentic workflow runtime state (NO commitear) ───────────────────
+# Markers de skills leídos + baseline de drift (se regeneran por sesión).
+.agents/state/
+# Markers del reviewer-gate + log de overrides (auditable, pero local).
+.claude/markers/reviewer_run.txt
+.claude/markers/override_log.txt
+.cursor/markers/
+
+# ─── Secretos (NUNCA al repo) ────────────────────────────────────────
+# <!-- FILL: añade aquí los archivos de secretos reales de tu stack -->
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.keystore
+secrets/
+config/secrets/
+
+# ─── Por-plataforma (descomenta lo que aplique) ──────────────────────
+# <!-- FILL: deja solo las plataformas que uses -->
+# iOS / Xcode
+# .build/
+# DerivedData/
+# *.xcuserstate
+# Android / Gradle
+# .gradle/
+# build/
+# local.properties
+# Web / Node
+# node_modules/
+# dist/
+# .next/
+
+# ─── OS / editor ─────────────────────────────────────────────────────
+.DS_Store
+*.log

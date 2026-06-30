@@ -1,0 +1,15 @@
+# OPCIONAL — ejemplo GitLab CI. Copia a .gitlab-ci.yml y bórrale el .example.
+stages: [gates]
+gates:
+  stage: gates
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache bash git curl
+    - curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz | tar -xz -C /usr/local/bin gitleaks
+  script:
+    - bash ci/run-gates.sh
+  variables:
+    GATES_SECRET_MODE: "history"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
