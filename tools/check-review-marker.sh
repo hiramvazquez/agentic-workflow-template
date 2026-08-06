@@ -109,7 +109,7 @@ MTIME=$(stat -f %m "$MARKER" 2>/dev/null || stat -c %Y "$MARKER" 2>/dev/null || 
 # ── 4. Binding a HEAD ───────────────────────────────────────────────
 MARKED_HEAD="$(get head)"; CUR_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
 if [ -n "$MARKED_HEAD" ] && [ -n "$CUR_HEAD" ] && [ "$MARKED_HEAD" != "no-repo" ] && [ "$MARKED_HEAD" != "$CUR_HEAD" ]; then
-  fail "❌ review-marker: STALE (HEAD cambió $MARKED_HEAD→$CUR_HEAD). Re-corre \`reviewer\`."
+  fail "❌ review-marker: STALE (HEAD cambió ${MARKED_HEAD}→${CUR_HEAD}). Re-corre \`reviewer\`."
 fi
 
 # ── 5. Binding al DIFF (solo aplica en modo staged) ─────────────────

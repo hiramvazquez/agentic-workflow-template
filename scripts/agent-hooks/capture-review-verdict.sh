@@ -81,7 +81,7 @@ fi
 
 # ── RED → sin marker, y el agente principal se entera ──────────────
 if ! verdict_is_markable "$VERDICT"; then
-  hook_context "$EV" "🔴 \`$AGENT\` emitió VERDICT: $VERDICT ($FINDINGS hallazgos) sobre «$SCOPE».
+  hook_context "$EV" "🔴 \`$AGENT\` emitió VERDICT: $VERDICT ($FINDINGS hallazgos) sobre «${SCOPE}».
 
 NO se escribió marker de review — el commit sigue BLOQUEADO por el reviewer-gate.
 Atiende los hallazgos y vuelve a invocar \`$AGENT\`. No intentes commitear
@@ -112,5 +112,5 @@ source: hook
 EOF
 done
 
-hook_context "$EV" "✅ Veredicto de \`$AGENT\` registrado por el sistema: $VERDICT ($FINDINGS hallazgos) — «$SCOPE».
+hook_context "$EV" "✅ Veredicto de \`$AGENT\` registrado por el sistema: $VERDICT (${FINDINGS} hallazgos) — «${SCOPE}».
 Marker ligado a head=$HEAD y al diff staged actual. Si cambias lo staged, el marker caduca."

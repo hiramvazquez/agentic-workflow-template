@@ -1,6 +1,12 @@
 ---
 name: process
-description: Usar al empezar una feature, abrir un PRD nuevo, o cuando preguntan "¿cuál es nuestro flujo de trabajo?". Cubre PRD lifecycle, feature workflow start-to-ship, orquestación multi-agente y el mapa de documentación. Invocar antes de cualquier feature mediana/grande.
+description: Usar al empezar una feature, abrir un PRD nuevo, o cuando preguntan "¿cuál es nuestro flujo de trabajo?". Cubre PRD lifecycle, feature workflow start-to-ship, TDD, el bucle de verificación y la orquestación multi-agente. Invocar antes de cualquier feature mediana/grande.
+when_to_use: Al arrancar una feature, escribir o mover un PRD de estado, decidir si algo necesita PRD, montar un gate nuevo, o preguntar "¿cómo sé que este código está bien?".
+paths:
+  - "docs/process/**"
+  - "tools/**"
+  - "ci/**"
+  - "scripts/agent-hooks/**"
 ---
 
 # Process & Workflow — <PROJECT>

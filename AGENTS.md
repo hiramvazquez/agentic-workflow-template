@@ -60,13 +60,25 @@
 | Función | 40 | 60 |
 | Clase orquestadora (ViewModel/Controller) | 150 | 250 |
 
-## 5. TDD obligatorio (🔴 red → 🟢 green → ♻️ refactor)
+## 5. TDD obligatorio + aserciones (🔴 red → 🟢 green → ♻️ refactor)
 
 **Ninguna lógica/orquestación nueva sin un test que falle PRIMERO.** Ciclo: escribe el test y
 míralo fallar → implementación mínima que lo pasa → refactor en verde. Cada unidad: **mínimo
 1 happy path + 2 ramas de error/borde**. Bug fix = primero un test que reproduce el bug (falla),
 luego el fix. Antes de marcar terminado: tests del área + build verde + `bash tools/check-drift.sh`
 sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/tdd-workflow.md`.
+
+- **Un test que pasa con cualquier implementación no es un test.** La prueba de bolsillo: *si
+  rompo a propósito la lógica que dice cubrir, ¿falla?* El veredicto mecánico lo da el
+  **mutation score** (`tools/mutation-score.sh`), cuyo piso **solo sube**. Es el gate que
+  distingue un test que verifica de uno escrito para que pase.
+- **Aserciones / Design by Contract:** toda función pública valida sus precondiciones. Objetivo
+  ≥2 aserciones por función (regla *Power of Ten*, NASA/JPL). Sin efectos secundarios, y con
+  **acción de recuperación explícita** al fallar. Prioriza siempre hacer el estado inválido
+  **imposible por tipo** antes que verificarlo en runtime.
+- **Invariantes → property-based tests.** Si la regla vale para todos los valores, no la
+  compruebes con tres ejemplos.
+- **Todo fake pasa la MISMA suite de conformidad que el adapter real** (`domain/SKILL.md`).
 
 ## 6. Seguridad (gate de cada commit)
 
@@ -93,18 +105,35 @@ Prohibido sin aprobación del owner: tocar tooling compartido (`tools/`, `ci/`, 
 meta-doc (este archivo, `.agents/skills/**`, `_template.md`), o refactorizar archivos fuera de scope.
 **Errores preexistentes: se reportan al ledger, NO se silencian ni se "arreglan de paso".**
 
-## 9. Drift policy + ratchet
+## 9. Drift policy + trinquetes
 
 - Cambio que toca un **enum/contrato compartido** o un **puerto de repositorio** → actualiza
   todas las capas afectadas + su doc en el **mismo PR**.
-- `tools/drift-ratchet.json` es el **techo committeado** de warnings/errores: **solo baja**.
-  Ningún commit puede subirlo (lo bloquea el Anillo 1). Subirlo a mano = esconder deuda (§8).
+- **Los trinquetes tienen una dirección fija y no se editan a mano.** Solo los actualiza su
+  propio script; están en `permissions.deny` de escritura a propósito. Un número que se puede
+  aflojar no es un trinquete: es una sugerencia.
+
+| Archivo | Métrica | Dirección | Actualiza con |
+|---|---|---|---|
+| `tools/drift-ratchet.json` | errores + warnings | **solo baja** | `tools/drift-ratchet.sh --update` |
+| `tools/mutation-ratchet.json` | mutation score | **solo sube** | `tools/mutation-score.sh --update` |
+
+- Ni el preset `lite` ni `REVIEWER_OVERRIDE` relajan un trinquete. Ese override existe para el
+  **marker de review** (juicio humano), nunca para un detector mecánico. Está fijado por
+  `tools/tests/test_ratchets.sh`.
 
 ## 10. Cero-deuda-nueva (ownership de findings)
 
 "No es mío, lo dejo" está **prohibido**. Cualquier gap que detectes (incluido uno preexistente)
 se resuelve en el mismo turno: o lo arreglas, o lo **registras en el ledger** con tier+área
 (`tools/findings/`). Reportar = loguear al ledger, no solo mencionarlo en prosa.
+
+**Y toda lección aprendida se convierte en un detector.** `docs/process/lessons_learned.md`
+exige el campo `Detector:` y `tools/lesson-detector-link.sh` lo verifica en CI. Sin ese paso,
+las lecciones son prosa que nadie relee y que el agente pierde en la primera compactación.
+Con él, cada error cometido una vez se vuelve mecánicamente imposible la segunda — que es el
+único mecanismo por el que la necesidad de revisión humana **decrece** en vez de mantenerse
+plana. Excepción legítima y explícita: `n/a-manual — <razón>`.
 
 ## 11. Skills enforcement — matriz path → lectura obligatoria
 
@@ -120,6 +149,11 @@ Antes de editar un archivo, debes haber leído la referencia que aplica. El hook
 | `**/Domain/**` | `.agents/skills/domain/SKILL.md` + `process/references/tdd-workflow.md` |
 | `**/Data/**`, `<migraciones-db>/**` | `domain/SKILL.md` (puertos) + `security/SKILL.md` |
 | `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |
+| `tools/**`, `ci/**`, `scripts/agent-hooks/**` | `process/references/verification-loop.md` (y §8: requiere aprobación del owner) |
+
+> Las skills declaran además `paths:` en su frontmatter, así que Claude Code las carga **sola**
+> al trabajar sobre un archivo que casa. El hook `skill-reminder` sigue siendo el gate duro; el
+> `paths:` es el camino feliz que hace que casi nunca se dispare.
 
 ## 12. PRD obligatorio para features medianas/grandes
 
@@ -131,14 +165,50 @@ es un gate distinto del "Approved" del owner** — no es salteable para cambios 
 
 ## 13. Reviewer-gate pre-commit
 
-Todo commit que toque código de producto requiere ejecución previa del sub-agente `reviewer`
-(verdict GREEN/AMBER → marca con `scripts/mark-reviewer-run.sh`). El hook `reviewer-gate`
-(Anillo 2) y `ci/run-gates.sh` (Anillo 3) lo verifican. Override de emergencia auditado:
-`REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...`.
-**Presets:** con `tools/preset = lite` (uso personal) este gate y el `skill-reminder` AVISAN en vez
-de bloquear; el drift-ratchet y los detectores siguen duros. `full` (equipo) es el default.
+Todo commit que toque código de producto requiere ejecución previa del sub-agente `reviewer`.
 
-## 14. Cómo entrar a una sesión nueva
+**El veredicto no lo emite el modelo, lo deriva el sistema.** El `reviewer` termina su mensaje
+con `VERDICT: GREEN|AMBER|RED`, y el hook `SubagentStop` escribe el marker a partir de esa línea
+real. `tools/check-review-marker.sh` solo acepta markers con `source: hook`; un marker escrito a
+mano se rechaza. (`scripts/mark-reviewer-run.sh` existe solo como fallback para clientes sin
+hooks, y queda auditado.)
+
+Lo verifican los **tres anillos**: `lefthook` (Anillo 1, cubre humanos y Codex), `reviewer-gate`
+(Anillo 2) y `ci/run-gates.sh` + `ci/ai-review.sh` (Anillo 3). Override de emergencia auditado:
+`REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...` — **relaja el marker, nunca
+un trinquete** (§9).
+
+**Presets:** con `tools/preset = lite` (uso personal) este gate y el `skill-reminder` AVISAN en vez
+de bloquear; los trinquetes, las capas y `canon-enforce` siguen duros. `full` (equipo) es el default.
+
+## 14. El bucle de verificación (cómo sabemos que el código está bien)
+
+Referencia completa: **`.agents/skills/process/references/verification-loop.md`**.
+
+Dos principios que gobiernan todo lo demás:
+
+1. **Cázalo en la capa más barata.** Cada nivel que un defecto sube sin detectarse multiplica
+   ~10× el coste. Un error que el compilador podía cazar y que llega a un juez de IA no es un
+   error del agente: es un fallo de diseño del harness.
+2. **El que escribe nunca es el que aprueba, y "aprobar" es presentar evidencia.** Un veredicto
+   es la salida de un comando, un exit code o un score — nunca una afirmación del modelo.
+
+```
+9 Métricas + lección→detector     8 Gate por evidencia      7 Review adversarial de IA
+6 Arquitectura (grafo imports)    5 Contratos (fake ≡ real) 4 CALIDAD del test (mutación)
+3 Spec ejecutable (TDD + DbC)     2 Patrón AST (Semgrep)    1 Lint/typecheck in-loop
+0 Imposibilitar (tipos)
+```
+
+**La ley del 10%:** un detector con más de ~10% de falsos positivos se descarta — y un agente
+además aprende a evadirlo. Por eso los patrones van en Semgrep (AST) y no en `grep`. Prefiere
+5 reglas exactas a 50 ruidosas.
+
+## 15. Cómo entrar a una sesión nueva
 
 1. Lee este archivo. 2. Lee `docs/process/current_execution_map.md`. 3. Carga la skill del área (§11).
 4. Abre el PRD/ADR relevante. 5. **Verifica los hechos contra el código/DB antes de editar.**
+
+> Si estás retomando tras una compactación de contexto: el hook `PostCompact` te reinyecta el
+> digest de reglas y los findings abiertos. Si algo de §11 no lo recuerdas con precisión, reléelo
+> — el `skill-reminder` te lo exigirá de todas formas.

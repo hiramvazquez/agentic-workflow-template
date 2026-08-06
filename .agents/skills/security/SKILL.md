@@ -1,7 +1,24 @@
 ---
 name: security
 description: Usar al manejar secretos, credenciales, datos sensibles (PII/PHI), almacenamiento, logging, autorización o dependencias. Reglas de seguridad básicas que aplican a CUALQUIER plataforma + checklist del sub-agente security-reviewer.
+when_to_use: Al tocar autenticación, autorización, secretos, criptografía, almacenamiento de datos personales, logging de datos de usuario, migraciones de base de datos o dependencias nuevas.
+paths:
+  - "**/auth/**"
+  - "**/Auth/**"
+  - "**/security/**"
+  - "**/crypto/**"
+  - "**/migrations/**"
+  - "**/*Keychain*"
+  - "**/*Credential*"
+  - "**/*Token*"
 ---
+
+<!-- Esta skill es el conocimiento. El ENFORCEMENT vive en tres sitios distintos,
+     de más barato a más caro:
+       .claude/security-patterns.yaml  → match determinista por edición (0 tokens)
+       .claude/claude-security-guidance.md → contexto del revisor de modelo
+       .gitleaks.toml + canon-enforce  → gates que bloquean
+     Si añades una regla aquí y no la reflejas en al menos uno de esos, es prosa. -->
 
 # Seguridad — <PROJECT>
 

@@ -19,22 +19,57 @@ defensa en capas, y lo hace **compatible con los tres clientes que usan los devs
 
 ## Filosofía (no negociable)
 
-1. **Detectar no basta — hay que CERRAR.** Cada hallazgo llega a un estado terminal y visible
+1. **El que escribe nunca es el que aprueba, y "aprobar" es presentar evidencia.** Un veredicto
+   es la salida de un comando, un exit code o un score — **nunca** una afirmación del modelo.
+   Los markers los escribe el sistema (hooks), no el agente.
+2. **Cázalo en la capa más barata.** Tipos → lint → AST → test → mutación → review IA → humano.
+   Cada nivel que sube un defecto multiplica ~10× su coste. Un error que el compilador podía
+   cazar y llega a un juez de IA es un fallo de diseño del harness, no del agente.
+3. **Un detector con >10% de falsos positivos es peor que no tenerlo** (ley de Tricorder). El
+   equipo lo desactiva y el agente aprende a evadirlo. Preferimos 5 reglas AST exactas a 50 greps.
+4. **Detectar no basta — hay que CERRAR.** Cada hallazgo llega a un estado terminal y visible
    (arreglado o aceptado-con-razón). Ver `tools/findings/`.
-2. **Defensa en capas.** Ningún método solo encuentra el 100%: detector mecánico + design-review
-   + reviewer + juez + lecciones, en capas.
-3. **Una fuente de verdad, muchos clientes.** `AGENTS.md` es canónico; cada cliente tiene un
+5. **Toda lección se convierte en un detector.** Es el único mecanismo por el que la necesidad
+   de revisión humana decrece en vez de mantenerse plana.
+6. **Una fuente de verdad, muchos clientes.** `AGENTS.md` es canónico; cada cliente tiene un
    adaptador delgado. Nada se duplica.
-4. **El que toca, cierra.** Si tocas un módulo con findings abiertos, los resuelves o los registras.
-5. **Open Question > suposición silenciosa.** Si el agente no sabe, pregunta; no inventa un default.
+7. **El que toca, cierra.** Si tocas un módulo con findings abiertos, los resuelves o los registras.
+8. **Open Question > suposición silenciosa.** Si el agente no sabe, pregunta; no inventa un default.
+
+## La pirámide de verificación
+
+El corazón del template. Detalle completo en
+`.agents/skills/process/references/verification-loop.md`.
+
+| # | Nivel | Implementado en |
+|---|---|---|
+| 9 | Métricas + lección→detector | `tools/metrics/escape-rate.sh` · `tools/lesson-detector-link.sh` |
+| 8 | Gate por evidencia | `capture-review-verdict.sh` (SubagentStop) · marker ↔ `sha256(diff)` · `/goal` |
+| 7 | Review adversarial de IA | sub-agentes `reviewer`/`security-reviewer` · plugin `security-guidance` · `ci/ai-review.sh` |
+| 6 | Arquitectura | `tools/check-layers.sh` + `tools/layers.conf` (grafo de imports) |
+| 5 | Contratos | suite de conformidad fake ≡ real (`domain/SKILL.md`) |
+| 4 | **Calidad del test** | `tools/mutation-score.sh` + trinquete que **solo sube** |
+| 3 | Spec ejecutable | TDD red-first + aserciones/DbC (`tdd-workflow.md`) |
+| 2 | Patrón semántico | `tools/semgrep/rules/*.yaml` (AST, no texto) |
+| 1 | Determinista in-loop | `post-edit-verify.sh` (PostToolUse → `additionalContext`) |
+| 0 | Imposibilitar | tipos, `-Werror`, exhaustividad (`AGENTS.md §2`) |
+
+> El nivel 4 es el que más importa con código escrito por IA: la función objetivo de un agente
+> es *"que los tests pasen"*, y la forma más barata de conseguirlo es escribir tests que no
+> comprueban nada. El mutation score es el único gate que los distingue.
 
 ## Los 3 anillos de enforcement (el "plus" cross-tool)
 
 | Anillo | Mecanismo | Dispara en | Para qué |
 |---|---|---|---|
-| **1 — git-nativo** | `lefthook.yml` | Cursor, Claude, Codex, **humano**, todo `git commit` | Gates deterministas: secretos, drift-ratchet, lint, tamaño. **La única capa universal.** |
-| **2 — hooks de IA** | `.claude/settings.json` + `.cursor/hooks.json` → `scripts/agent-hooks/` | Claude Code / Cursor | Gates *AI-aware*: leer-skill-antes-de-editar, reviewer-gate, captura de trayectoria. |
-| **3 — CI (opcional, BYO)** | `ci/run-gates.sh` invocado desde *tu* CI | server, cada push/PR + nocturno | Backstop independiente del cliente. Cubre Codex (sin hooks) y commits humanos. |
+| **0 — permisos nativos** | `permissions` de `.claude/settings.json` | Claude Code, antes de ejecutar la tool | Prohibiciones deterministas: `--no-verify`, `--force`, leer `.env`, editar trinquetes. **Ni siquiera llega a ejecutarse.** |
+| **1 — git-nativo** | `lefthook.yml` | Cursor, Claude, Codex, **humano**, todo `git commit` | Secretos, trinquete de drift, capas, **marker de review**, lint. **La única capa universal.** |
+| **2 — hooks de IA** | `.claude/settings.json` + `.cursor/hooks.json` → `scripts/agent-hooks/` | Claude Code / Cursor | Gates *AI-aware*: verificación in-loop, skill-antes-de-editar, reviewer-gate, **derivación del veredicto**, reinyección post-compactación. |
+| **3 — CI (opcional, BYO)** | `ci/run-gates.sh` + `ci/ai-review.sh` desde *tu* CI | server, cada push/PR + nocturno | Backstop independiente del cliente: mutación, semgrep, **review de IA headless**. Cubre Codex (sin hooks) y commits humanos. |
+
+> **Anillo 0 es nuevo y es el más barato:** una prohibición expresable como patrón va en
+> `permissions.deny`, no en prosa de `AGENTS.md`. El texto es advisory —el modelo puede
+> ignorarlo o perderlo tras una compactación—; el permiso es determinista.
 
 > **Por qué 3 anillos:** Codex no tiene hooks → su enforcement vive en CI. Los hooks de IA
 > bloquean rápido y local pero solo en su cliente. Los git hooks nativos disparan para *todos*
@@ -55,19 +90,77 @@ defensa en capas, y lo hace **compatible con los tres clientes que usan los devs
 AGENTS.md                  ← FUENTE CANÓNICA (la leen Cursor, Codex, Copilot, Gemini…)
 CLAUDE.md                  ← adaptador delgado: @AGENTS.md + maquinaria Claude-only
 ios|android|web/AGENTS.md  ← overrides por plataforma (el más cercano gana)
-.cursor/                   ← rules/*.mdc (glob-scoped) + hooks.json (Anillo 2)
-.claude/                   ← settings.json (Anillo 2) + agents/ (sub-agentes) + skills→.agents/skills
-.codex/config.toml         ← config Codex (lee AGENTS.md directo)
-ci/run-gates.sh + ci/examples/  ← Anillo 3 (CI opcional, provider-agnóstico — NO obliga GitHub)
-lefthook.yml + .gitleaks.toml  ← Anillo 1
+
+.claude/
+  settings.json            ← Anillo 0 (permissions) + Anillo 2 (hooks) + enabledPlugins
+  agents/                  ← sub-agentes; todos emiten el contrato VERDICT:
+  security-patterns.yaml   ← reglas de seguridad per-edit (coste 0 tokens)
+  claude-security-guidance.md ← threat model para el revisor de contexto fresco
+  rules/                   ← reglas path-scoped (legacy: hoy lo cubre `paths:` en las skills)
+  skills → .agents/skills
+.cursor/                   ← rules/*.mdc + hooks.json (mismos scripts que Claude)
+.codex/config.toml         ← config Codex (lee AGENTS.md directo; su gate es Anillo 1+3)
+
 scripts/agent-hooks/       ← UNA implementación de los gates, compartida por Claude+Cursor
-tools/                     ← check-drift, drift-ratchet, findings-ledger, secret-scan
-.agents/skills/            ← base de conocimiento (iOS + TDD ya rellenados como referencia)
-docs/process/              ← PRD template, lessons, execution map, ledger view
-.claude/rules/             ← reglas path-scoped NATIVAS de Claude (espejo de §11, sin re-lectura forzada)
-.claude-plugin/            ← (opcional) plugin.json + marketplace.json para distribuir el tooling
-enterprise/                ← (opcional) managed-settings.json: enforcement org-wide NO anulable
+  capture-review-verdict.sh  ← ⭐ SubagentStop: deriva el marker del veredicto REAL
+  post-edit-verify.sh        ← ⭐ verificación in-loop (nivel 1 de la pirámide)
+  post-compact.sh            ← reinyecta reglas tras compactar el contexto
+  canon-enforce.sh           ← reglas irrompibles (Stop, bloqueante)
+  track-failure.sh           ← detecta al agente atascado en un bucle de reintentos
+  inject-context.sh          ← estado vivo por turno (findings abiertos, árbol sucio)
+
+tools/
+  check-layers.sh + layers.conf  ← fitness function por grafo de imports (nivel 6)
+  semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2)
+  mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
+  check-review-marker.sh     ← verificación de review compartida por los 3 anillos
+  lesson-detector-link.sh    ← toda lección tiene detector (nivel 9)
+  metrics/escape-rate.sh     ← contención por fase: ¿puedo bajar la revisión humana?
+  drift-ratchet.json         ← trinquete de deuda — SOLO BAJA
+  tests/                     ← tests de shell de los propios gates
+
+ci/run-gates.sh + ci/ai-review.sh + ci/examples/ ← Anillo 3 (provider-agnóstico)
+lefthook.yml + .gitleaks.toml                    ← Anillo 1
+.agents/skills/            ← base de conocimiento (frontmatter con `paths:` = auto-carga)
+docs/process/              ← PRDs, lessons (con detector obligatorio), execution map, ledger
+.claude-plugin/            ← (opcional) plugin.json + marketplace.json
+enterprise/                ← (opcional) managed-settings.json: enforcement NO anulable
 ```
+
+## El invariante que sostiene todo
+
+```
+Agent(reviewer) ──► emite "VERDICT: GREEN"
+                        │
+              SubagentStop hook  ← el SISTEMA lee el mensaje final real
+                        │
+              escribe marker {verdict, head, sha256(diff staged), source: hook}
+                        │
+git commit ──► los 3 anillos exigen source: hook
+```
+
+Antes, el marker lo escribía un script que **el modelo** invocaba: un agente que quería
+commitear solo tenía que ejecutarlo. El gate de review era decorativo. Ahora la evidencia la
+produce el sistema a partir del veredicto real, y está ligada al hash del diff exacto que se
+va a commitear.
+
+### Qué garantiza y qué no
+
+**Defiende contra error de proceso** — el agente que se olvida de invocar al reviewer, que da
+por buena su propia revisión, o que pierde la regla tras compactar el contexto. Es el caso
+abrumadoramente común y antes no estaba cubierto.
+
+**No defiende contra intención.** Un agente con acceso a Bash puede escribir el archivo de
+marker a mano: `check-review-marker.sh` valida su *contenido*, no su *procedencia*. En una
+máquina de un solo usuario, un agente con shell puede hacer lo que puede hacer el usuario.
+
+**La defensa contra intención es el Anillo 3.** En CI el marker local no viaja, y
+`ci/ai-review.sh` corre una review independiente en una máquina que el agente no controla. Esa
+es la razón real de que existan tres anillos y no uno.
+
+> Este límite lo encontró el sub-agente `reviewer` revisando el commit que introdujo el
+> mecanismo, con un repro ejecutable. La versión inicial de este README decía "infalsificable".
+> Está en `docs/process/lessons_learned.md` y en el PRD 0001 §18 G9.
 
 ## Relación con spec-driven development (SDD)
 

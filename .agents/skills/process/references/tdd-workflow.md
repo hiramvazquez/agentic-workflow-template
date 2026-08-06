@@ -71,6 +71,87 @@ struct GreetingUseCase {
 //   greeting_atMidnight_saysGoodNight (0h), greeting_atNoon_saysHello (12h).
 ```
 
+## Aserciones / Design by Contract — el complemento obligatorio del TDD
+
+> Los tests comprueban los casos que **se te ocurrieron**. Las aserciones comprueban
+> los que no.
+
+Las reglas *Power of Ten* de la NASA/JPL (complemento de MISRA C, escritas para software
+que no puede fallar) fijan el estándar: **densidad media ≥ 2 aserciones por función**,
+sin efectos secundarios, y con **acción de recuperación explícita** cuando fallan.
+
+**Por qué importa especialmente con agentes:** un agente que escribe aserciones produce
+código que **falla ruidosamente en vez de silenciosamente**, y deja una especificación
+verificable por máquina para el siguiente agente que toque ese archivo. Es la forma más
+barata que existe de convertir intención en algo comprobable.
+
+Las tres formas, de la más fuerte a la más débil — **usa siempre la más fuerte posible**:
+
+```swift
+// 1. IMPOSIBLE POR TIPO (lo mejor: no hay nada que verificar en runtime).
+struct Percentage {                 // no puede existir un Percentage inválido
+    let value: Int
+    init?(_ v: Int) { guard (0...100).contains(v) else { return nil }; self.value = v }
+}
+
+// 2. PRECONDICIÓN + POSTCONDICIÓN (Design by Contract).
+func aplicarDescuento(_ precio: Decimal, _ pct: Percentage) -> Decimal {
+    precondition(precio >= 0, "precio negativo: invariante de dominio roto")
+    let out = precio * (1 - Decimal(pct.value) / 100)
+    assert(out <= precio, "un descuento nunca puede aumentar el precio")
+    return out
+}
+
+// 3. FALLO CON RECUPERACIÓN EXPLÍCITA (nunca silencioso — AGENTS.md §6).
+guard let user = try? repo.fetch(id: id) else {
+    logger.error("fetch falló para id (sin loguear el id: es PII)")
+    throw ProfileError.notFound          // ← acción explícita, no `return nil`
+}
+```
+
+❌ **Nunca** una aserción con efectos secundarios (`assert(contador.increment() > 0)`):
+en builds de release las aserciones desaparecen y el comportamiento cambia.
+
+## Property-based testing — para invariantes
+
+Cuando lo que quieres fijar es una **propiedad que debe valer siempre**, no tres ejemplos.
+El dato empírico: **un test property-based mata ~50× más mutantes que un test unitario
+promedio**. Y los agentes son mucho mejores generando propiedades que generando casos de
+ejemplo interesantes.
+
+```swift
+// En vez de 3 ejemplos de descuento, la propiedad que los cubre todos:
+@Test(arguments: (0...100))
+func descuento_nuncaAumentaElPrecio(pct: Int) {
+    let precio = Decimal(100)
+    let out = aplicarDescuento(precio, Percentage(pct)!)
+    #expect(out <= precio)              // ← invariante, no ejemplo
+    #expect(out >= 0)
+}
+```
+
+Herramientas por stack: SwiftCheck · Hypothesis (Python) · fast-check (TS) · jqwik (Java) · Kotest.
+**Regla:** toda invariante declarada en `domain/SKILL.md` §Invariantes tiene su property test.
+
+## Mutation score — cómo sabemos que los tests COMPRUEBAN algo
+
+La cobertura es un piso, no una meta: un test sin aserciones da 100% de cobertura y 0 de
+valor. La métrica real es el **mutation score** — se inyectan fallos en el código y se mide
+qué porcentaje matan los tests.
+
+> **Esto es lo que más importa con código escrito por IA.** La función objetivo de un
+> agente es "que los tests pasen", y la forma más barata de conseguirlo es escribir tests
+> que no comprueban nada. El mutation score es el único gate que distingue un test que
+> verifica de uno que solo pasa.
+
+```bash
+bash tools/mutation-score.sh --check     # ¿estamos por encima del piso?
+bash tools/mutation-score.sh --update    # sube el piso (SOLO sube)
+```
+
+**La pregunta de bolsillo** antes de dar un test por bueno:
+*si rompo a propósito la lógica que este test dice cubrir, ¿falla?* Si no, es decorativo.
+
 ## Anti-patrones
 
 - ❌ Escribir el test **después** de la implementación "para tener cobertura" — no es TDD y suele
@@ -78,10 +159,20 @@ struct GreetingUseCase {
 - ❌ Tests acoplados a detalles internos (privados, orden de llamadas) → se rompen al refactorizar.
 - ❌ Mocks que verifican "se llamó a X" en vez del **resultado observable**.
 - ❌ Lógica en la View/ViewModel que no se puede testear sin levantar UI → muévela a la capa pura.
+- ❌ **Tests que pasan con cualquier implementación** (`#expect(resultado != nil)`, `XCTAssertNoThrow`
+  como única aserción). Es el modo de fallo nº1 del código escrito por agentes: parece cobertura,
+  no lo es. Lo caza el mutation score.
+- ❌ **Un fake que no pasa la suite de conformidad del puerto** (`domain/SKILL.md`): tus tests
+  verifican una semántica inventada, no la real.
 
 ## Qué exige el enforcement (no es solo doc)
 
-- **`tester`** (sub-agente): escribe los tests siguiendo este loop.
-- **`reviewer`**: marca RED si una unidad de lógica nueva no trae test happy + ≥2 errores.
-- **`check-drift.sh`**: señala lógica nueva sin archivo de test espejo.
-- **DoD del PRD**: "tests (happy + errores) verdes" es checkbox obligatorio de cierre.
+| Gate | Qué comprueba |
+|---|---|
+| `tester` (sub-agente) | Escribe los tests siguiendo este loop |
+| `reviewer` | RED si una unidad nueva no trae happy + ≥2 errores, **y si los tests pasan con cualquier implementación** |
+| `check-drift.sh` | Señala lógica nueva sin archivo de test espejo (señal, no veredicto) |
+| `tools/mutation-score.sh` | **El veredicto real**: piso de mutation score con trinquete que solo sube |
+| DoD del PRD | "tests (happy + errores) verdes" es checkbox obligatorio de cierre |
+
+El contexto completo de dónde encaja cada uno: `verification-loop.md`.

@@ -1,7 +1,24 @@
 ---
 name: architecture
 description: Usar cuando la pregunta toca la arquitectura del código — patrón de pantalla/módulo, navegación, inyección de dependencias, capas, manejo de errores, acceso a datos. Es el HOW del código (no el WHAT del producto).
+when_to_use: Al editar cualquier View/Screen/ViewModel/Coordinator, al decidir dónde vive una responsabilidad nueva, al añadir una pantalla o un módulo, o al preguntar "¿esto en qué capa va?".
+paths:
+  - "**/*View*.swift"
+  - "**/*Screen*.swift"
+  - "**/*ViewModel*.swift"
+  - "**/*Coordinator*.swift"
+  - "**/ui/**"
+  - "**/UI/**"
+  - "**/*.tsx"
+  - "**/*Screen*.kt"
 ---
+
+<!-- `paths:` = activación AUTOMÁTICA por glob, nativa de Claude Code. Es la
+     versión declarativa de la matriz de AGENTS.md §11: cuando el agente trabaja
+     sobre un archivo que casa, la skill se carga sola, sin coste de re-lectura
+     forzada. El hook `skill-reminder` sigue siendo el gate DURO (bloquea si no
+     la leíste); esto es el camino feliz que hace que casi nunca se dispare. -->
+
 
 # Arquitectura — <PROJECT>
 

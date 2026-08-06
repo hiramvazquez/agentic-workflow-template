@@ -1,6 +1,14 @@
 ---
 name: domain
 description: Referencia de la capa de dominio — entidades, puertos de repositorio, casos de uso, invariantes y errores de dominio. Invocar al escribir lógica de dominio o de datos. El dominio NO depende de UI ni de infraestructura.
+when_to_use: Al crear o modificar una entidad, un puerto de repositorio, un caso de uso o un error de dominio. También al escribir un fake de repositorio — debe pasar la MISMA suite de conformidad que el adapter real.
+paths:
+  - "**/Domain/**"
+  - "**/domain/**"
+  - "**/Data/**"
+  - "**/*UseCase*"
+  - "**/*Logic*"
+  - "**/*Repository*"
 ---
 
 # Dominio — <PROJECT>
@@ -73,4 +81,63 @@ enum ProfileError: Error, Equatable {
 
 ## Invariantes (qué nunca debe pasar)
 
+Un invariante es una afirmación que debe ser cierta **siempre**. Tienen tres formas de
+existir, de menos a más fuerte — usa la más fuerte que puedas:
+
+1. **Imposible por tipo** (lo mejor): si el estado inválido no se puede construir, no
+   hay nada que verificar. Un `NonEmptyString` vence a cualquier validación.
+2. **Aserción en el borde** (Design by Contract): precondición al entrar, postcondición
+   al salir. Ver `process/references/tdd-workflow.md` §Aserciones.
+3. **Property-based test**: declaras la propiedad y la herramienta busca contraejemplos.
+
 <!-- FILL: invariantes que tests/CI deben proteger. Ej.: "un Profile con plan .pro siempre tiene método de pago". -->
+
+## Suite de conformidad puerto ↔ fake (regla dura)
+
+> **Todo fake debe pasar exactamente la misma suite de tests que el adapter real.**
+
+Es la técnica más barata del nivel 5 de `verification-loop.md`, y elimina de raíz la
+categoría de bug más frustrante del testing con puertos: *los tests pasan con el fake y
+explota en producción*, porque el fake se comporta como el agente **creyó** que se
+comportaba el real.
+
+Con agentes es especialmente valioso: un modelo que escribe un fake tiende a escribirlo
+para que sus tests pasen, no para que replique la semántica real.
+
+**El patrón:** escribes la suite UNA vez contra el protocolo, parametrizada por la
+implementación. Luego la corres N veces, una por implementación.
+
+```swift
+// Tests/DomainTests/ProfileRepositoryConformance.swift
+// UNA suite. Todas las implementaciones del puerto la pasan, o no son ese puerto.
+func assertProfileRepositoryConformance(
+    _ make: () -> ProfileRepository,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async throws {
+    // Contrato 1: un id inexistente lanza .notFound, NUNCA devuelve vacío ni nil.
+    let repo = make()
+    await #expect(throws: ProfileError.notFound) { try await repo.fetch(id: "no-existe") }
+
+    // Contrato 2: fetch es idempotente para el mismo id.
+    let a = try await repo.fetch(id: "u1")
+    let b = try await repo.fetch(id: "u1")
+    #expect(a == b)
+
+    // <!-- FILL: un caso por cada garantía que el puerto PROMETE. Si el adapter
+    //      real hace algo que el fake no, o es un bug del fake, o el contrato
+    //      estaba mal escrito. En ambos casos quieres saberlo aquí. -->
+}
+
+@Test func fakeRepository_cumpleElContrato() async throws {
+    try await assertProfileRepositoryConformance { FakeProfileRepository(seed: .standard) }
+}
+
+@Test(.tags(.integration))          // corre en CI, no en el loop local
+func realRepository_cumpleElContrato() async throws {
+    try await assertProfileRepositoryConformance { SupabaseProfileRepository(client: .test) }
+}
+```
+
+**Regla de mantenimiento:** cuando añadas una garantía al puerto, la añades a la suite de
+conformidad **en el mismo cambio**. Es la misma disciplina que la drift policy de
+`AGENTS.md §9`: el contrato y su verificación viajan juntos.

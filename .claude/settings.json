@@ -55,6 +55,8 @@
 
   "_comment_ratchets": "Los dos *-ratchet.json están en `deny` de Write/Edit a propósito: son TRINQUETES. Solo los actualiza su propio script (`--update`), que impone la dirección permitida. Si el modelo pudiera editarlos a mano, el trinquete sería una sugerencia.",
 
+  "_comment_marker_deny": "`.agents/state/**` y `Bash(*reviewer_run.txt*)` son mitigación PARCIAL, declarada como tal: frenan un `cat > marker` naive, pero una redirección construida dinámicamente las rodea (ver f-marker-spoof en tools/findings/). Efecto secundario conocido: los patrones de Bash no distinguen leer de escribir, así que también bloquean `cat marker`. Para INSPECCIONAR el marker usa la tool Read, que no está denegada. La defensa real contra un agente adversario no es esto: es el Anillo 3, donde el marker no viaja.",
+
   "_comment_plugins": "security-guidance revisa el código que Claude escribe en 3 profundidades (per-edit sin coste de tokens, fin de turno, y por commit) con un revisor de contexto FRESCO — no le pide al mismo modelo que se autoevalúe. Se extiende con .claude/claude-security-guidance.md y .claude/security-patterns.yaml. Instalar una vez: /plugin marketplace add anthropics/claude-plugins-official",
   "enabledPlugins": {
     "security-guidance@claude-plugins-official": true
