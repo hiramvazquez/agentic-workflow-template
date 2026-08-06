@@ -23,6 +23,7 @@ paths:
 | "¿Cómo lanzo sub-agentes? ¿En paralelo?" | `references/multi-agent-orchestration.md` |
 | "¿Cómo aplico TDD? ¿Cómo testeo en iOS?" | `references/tdd-workflow.md` |
 | "¿Dónde vive cada doc?" | `references/documentation-map.md` |
+| "¿Cómo funciona el backlog de historias / trabajo desatendido?" | `backlog/README.md` + `docs/EXAMPLES.md` §4 |
 
 ## Las 5 reglas de oro del proceso
 

@@ -10,10 +10,10 @@
 
 - **Fase:** template — pirámide de verificación + bucle de aprendizaje cerrados; pendiente de
   cablear a un stack real.
-- **En curso:** nada — PRD 0001 y PRD 0002 shipped.
-- **Último ship:** PRD 0002 · ledger operable sin Deno/Node (findings.sh), gates que registran
-  detecciones (escape-rate con datos), cola del process-judge, meta-detector de tests de FP,
-  DbC con mecanismo declarado, patrón N-jueces.
+- **En curso:** nada — PRDs 0001, 0002 y 0003 shipped.
+- **Último ship:** PRD 0003 · backlog runner: historias de usuario en `backlog/*.md` →
+  ramas `story/NNNN` trabajadas en headless con todos los gates, review humana antes de
+  merge, dependencias resueltas por el propio merge. + `docs/EXAMPLES.md` (4 escenarios iOS).
 
 ## Próximo paso
 

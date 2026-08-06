@@ -148,5 +148,16 @@ relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.
 - Las sesiones que tocan código quedan encoladas para el `process-judge` hasta que su
   veredicto las cierra (visible en cada turno).
 
+- **Trabajo desatendido**: escribe historias en `backlog/` (formato `_template.md`, con
+  criterios de aceptación Dado/cuando/entonces) y `bash tools/backlog/run.sh` las trabaja una
+  a una en ramas `story/NNNN` que TÚ revisas antes de mergear. Detalle: `backlog/README.md`.
+
+## 10. Cómo se ve el día a día (empieza por aquí)
+
+**`docs/EXAMPLES.md`** — 4 escenarios end-to-end en iOS con los prompts literales y qué hace
+cada gate: un bug con el flow corto, una feature mediana con PRD + design-review, un run
+autónomo con `/goal`, y el backlog de historias. Es la mejor forma de entender el método
+antes de escribir tu primera línea.
+
 Listo. El detalle conceptual de por qué cada pieza existe: 
 `.agents/skills/process/references/verification-loop.md`.

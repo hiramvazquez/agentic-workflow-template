@@ -12,6 +12,8 @@
 | Findings ledger | `tools/findings/ledger.jsonl` → `docs/process/findings-ledger.md` | inventario de hallazgos con estado terminal |
 | Reportes de calidad | `docs/process/reviews/<fecha>-*.{md,html}` | salidas del `process-judge` |
 | Sub-agentes | `.claude/agents/*.md` (↔ `.cursor/agents`) | roles especializados |
+| Backlog de historias | `backlog/NNNN-*.md` (template `_template.md`) | cola de trabajo declarativa — `tools/backlog/run.sh` las trabaja en ramas `story/NNNN` (PRD 0003) |
+| Ejemplos de uso | `docs/EXAMPLES.md` | 4 escenarios end-to-end (bug, feature+PRD, /goal, backlog) con prompts literales |
 
 ## Reglas de oro del mapa
 
