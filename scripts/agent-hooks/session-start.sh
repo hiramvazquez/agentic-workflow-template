@@ -49,6 +49,19 @@ grep -q '"min_score": 0' tools/mutation-ratchet.json 2>/dev/null \
 command -v gitleaks >/dev/null 2>&1 \
   || echo "⚠️  gitleaks no instalado — el scan de secretos del Anillo 1 no corre en local."
 
+# ── ¿El Anillo 1 está DORMIDO? ──────────────────────────────────────
+# lefthook.yml en el repo no significa nada si nadie corrió `lefthook install`:
+# los hooks de git simplemente no existen y TODO el anillo universal calla.
+# Nos pasó: el anillo estuvo mudo durante días y nadie lo notó, porque un
+# gate que nunca dispara y uno que no existe se ven igual desde fuera (G5).
+if [ -f lefthook.yml ] && [ -d .git ]; then
+  if [ ! -f .git/hooks/pre-commit ] || ! grep -q lefthook .git/hooks/pre-commit 2>/dev/null; then
+    echo "⚠️  ANILLO 1 DORMIDO: lefthook.yml existe pero los hooks de git NO están instalados."
+    echo "   Ningún gate corre en git commit/push. Actívalo:  lefthook install"
+    _health=0
+  fi
+fi
+
 [ "$_health" = "1" ] && echo "✓ Stack, código, matriz de skills y pirámide de verificación configurados."
 
 # ── Findings abiertos (AGENTS.md §10: el que toca, cierra) ──────────

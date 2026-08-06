@@ -1,5 +1,10 @@
 # OPCIONAL — ejemplo GitHub Actions. NO obligas a usar GitHub.
 # Copia a .github/workflows/gates.yml y bórrale el .example si lo usas.
+#
+# ⚠️  ci/run-gates.sh es FAIL-CLOSED: una herramienta ausente FALLA el job en
+# vez de aprobar en silencio. Este ejemplo instala lo obligatorio (gitleaks,
+# semgrep) y hace EXPLÍCITA la única renuncia (ai-review) para que el primer
+# run salga verde — y actives la review de IA cuando tengas la API key.
 name: Gates
 on: [push, pull_request]
 permissions: { contents: read }
@@ -9,11 +14,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }   # historial completo para gitleaks
+
       - name: Install gitleaks
         run: |
           curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz \
             | tar -xz -C /usr/local/bin gitleaks
+
+      # Nivel 2 de la pirámide (detectores AST). En CI su ausencia BLOQUEA.
+      - name: Install semgrep
+        run: pipx install semgrep || pip install semgrep
+
+      # Review de IA headless (cubre Codex y commits humanos con --no-verify).
+      # Para activarla: (1) añade el secret ANTHROPIC_API_KEY al repo,
+      # (2) descomenta la instalación, (3) borra AI_REVIEW_REQUIRED de abajo.
+      # - name: Install Claude Code
+      #   run: npm install -g @anthropic-ai/claude-code
+
       - name: Run gates
         run: bash ci/run-gates.sh
         env:
           GATES_SECRET_MODE: history
+          # Renuncia EXPLÍCITA (contrato fail-closed): sin esta línea, la
+          # ausencia del binario `claude` falla el job — a propósito. Bórrala
+          # cuando instales Claude Code y el secret de la API:
+          AI_REVIEW_REQUIRED: "0"
+          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

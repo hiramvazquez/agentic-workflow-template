@@ -1,4 +1,10 @@
 // OPCIONAL — ejemplo Jenkins (Declarative Pipeline). Copia a Jenkinsfile.
+//
+// ⚠️  ci/run-gates.sh es FAIL-CLOSED: instala también `semgrep` (pip) en el
+// runner, y decide EXPLÍCITAMENTE sobre la review de IA — exporta
+// AI_REVIEW_REQUIRED=0 para renunciar, o instala Claude Code + API key para
+// activarla. Sin decidir, la ausencia del binario FALLA el job (a propósito).
+// Ver ci/examples/github-actions.yml.example para el patrón completo.
 pipeline {
   agent any
   stages {

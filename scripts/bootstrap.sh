@@ -51,6 +51,7 @@ echo "    rm CLAUDE.md && ln -s AGENTS.md CLAUDE.md"
 
 echo ""
 echo "✅ Bootstrap listo. Siguientes pasos:"
-echo "   1. lefthook install"
+echo "   1. lefthook install                   ← sin esto el Anillo 1 está DORMIDO"
+echo "      brew install lefthook gitleaks semgrep   (o pip/apt equivalente)"
 echo "   2. grep -rn 'FILL:' .   ← rellena lo de tu stack"
 echo "   3. lee docs/ADOPTION.md"
