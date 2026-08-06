@@ -1,0 +1,4 @@
+{
+  "min_score": 0,
+  "_note": "Piso del mutation score (% de mutantes muertos por los tests). SOLO SUBE (tools/mutation-score.sh --update). Bajarlo a mano = esconder deuda (AGENTS.md §9). Arranca en 0 para no romper repos existentes; sube en cuanto tengas la primera medición real."
+}

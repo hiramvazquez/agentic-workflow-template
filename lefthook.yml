@@ -33,6 +33,21 @@ pre-commit:
     - name: check-layers
       run: bash tools/check-layers.sh
 
+    # ── Semgrep sobre lo STAGED (patrones AST, nivel 2) ──────────────
+    # Invocado DIRECTO, no vía check-drift: el agregador descarta el exit code
+    # por diseño, así que un semgrep roto o con reglas inválidas era invisible
+    # en los anillos locales y solo se cazaba en CI. Modo --staged para que
+    # siga siendo pre-commit (< 2s); el scan completo va en el Anillo 3.
+    # exit 1 = hallazgo real -> bloquea · exit 3 = el detector no pudo correr
+    # -> avisa y deja pasar. Bloquear en el caso 3 crearía un deadlock: un typo
+    # en las reglas impediría hasta el commit que lo arregla (AGENTS.md §4.4).
+    # El backstop del caso 3 es CI (GATES_REQUIRE_SEMGREP=1).
+    - name: semgrep-staged
+      run: |
+        bash tools/semgrep-scan.sh --staged; rc=$?
+        [ "$rc" = "3" ] && { echo "⚠️  semgrep no pudo correr — commit permitido, CI lo bloqueará."; exit 0; }
+        exit $rc
+
     # ── Review marker: ¿este cambio fue REALMENTE revisado? ──────────
     # Antes esto vivía SOLO en el Anillo 2 (hooks de Claude/Cursor), así que
     # no hacía falta `--no-verify` para saltárselo: bastaba commitear desde

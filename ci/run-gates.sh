@@ -10,28 +10,87 @@
 #   - commits humanos con `--no-verify`.
 #   - máquinas sin lefthook instalado.
 #
-# Variables opcionales:
-#   GATES_SECRET_MODE   history|range|all  (default: history en CI)
-#   GATES_SKIP_TESTS=1  salta el paso de tests (para pipelines de solo-lint)
+# Orden: de lo más barato y determinista a lo más caro y probabilístico.
+# Un fallo en un gate barato hace innecesario correr los caros.
+#
+# ⚠️  ESTE SCRIPT ES FAIL-CLOSED. Es el único anillo que no depende de que el
+# agente se porte bien, así que una herramienta ausente NO puede leerse como
+# "gate aprobado". En local los gates avisan; aquí bloquean.
+# (La versión inicial solo forzaba semgrep, mientras el PRD §7 prometía los tres.
+#  En un runner con gitleaks pero sin `claude`, reportaba "✅ TODOS los gates
+#  pasaron" para un commit de Codex que no había pasado por ninguna revisión.
+#  Lo cazó el `reviewer` revisando P1.)
+#
+# Variables (todas con default FAIL-CLOSED; ponlas a 0 para renunciar a un gate
+# de forma consciente y visible en la config de tu CI):
+#   GATES_SECRET_MODE         history|range|all   (default: history)
+#   GATES_BASE_REF            rama base           (default: origin/main)
+#   GATES_SKIP_TESTS=1        salta build+tests
+#   GATES_REQUIRE_SEMGREP     default 1
+#   GATES_REQUIRE_MUTATION    default: 1 si el piso > 0, si no 0 (durante el
+#                             rollout el piso arranca en 0 y el gate no dice nada;
+#                             en cuanto mides una vez, medir pasa a ser obligatorio)
+#   AI_REVIEW_REQUIRED        default 1
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 FAIL=0
 step() { echo ""; echo "━━━ $1 ━━━"; }
 
-# 1) Secretos — OBLIGATORIO en CI (a diferencia de local, aquí sí bloquea).
-step "1/4 secret-scan (gitleaks)"
+# ════════════════════════════════════════════════════════════════════
+# Nivel 0-2 — deterministas y baratos
+# ════════════════════════════════════════════════════════════════════
+
+# 1) Tests del propio HARNESS. Van PRIMERO: si los gates están rotos, nada
+#    de lo que diga el resto de este script significa algo.
+step "1/8 tests del harness"
+if [ -f tools/tests/run-tests.sh ]; then
+  bash tools/tests/run-tests.sh || FAIL=1
+else
+  echo "(sin tests de harness — tools/tests/run-tests.sh ausente)"
+fi
+
+# 2) Secretos — OBLIGATORIO en CI (a diferencia de local, aquí sí bloquea).
+step "2/8 secret-scan (gitleaks)"
 if command -v gitleaks >/dev/null 2>&1; then
   bash tools/secret-scan.sh "--${GATES_SECRET_MODE:-history}" || FAIL=1
 else
   echo "❌ gitleaks ausente en CI — instálalo en el runner (es obligatorio aquí)."; FAIL=1
 fi
 
-# 2) Drift ratchet — el conteo no puede haber subido.
-step "2/4 drift-ratchet"
+# 3) Patrones semánticos (Semgrep/AST) — reemplaza los greps frágiles.
+step "3/8 semgrep (patrones AST)"
+# En CI, exit 1 (hallazgo) y exit 3 (el detector no pudo correr) fallan IGUAL:
+# aquí sí es fail-closed. En local el 3 solo avisa, para no crear un deadlock
+# donde un typo en las reglas impide el commit que lo arregla.
+if [ -f tools/semgrep-scan.sh ]; then
+  bash tools/semgrep-scan.sh; _rc=$?
+  if [ "${GATES_REQUIRE_SEMGREP:-1}" = "1" ]; then
+    [ "$_rc" -ne 0 ] && FAIL=1
+  else
+    [ "$_rc" = "1" ] && FAIL=1   # opt-out: solo los hallazgos reales bloquean
+  fi
+else
+  echo "❌ tools/semgrep-scan.sh ausente — el nivel 2 de la pirámide no existe."; FAIL=1
+fi
+
+# ════════════════════════════════════════════════════════════════════
+# Nivel 3-6 — arquitectura, deuda y CALIDAD DE LOS TESTS
+# ════════════════════════════════════════════════════════════════════
+
+# 4) Capas: fitness function sobre el grafo de imports (AGENTS.md §3).
+step "4/8 check-layers (arquitectura)"
+if [ -f tools/check-layers.sh ]; then
+  bash tools/check-layers.sh || FAIL=1
+else
+  echo "(tools/check-layers.sh ausente — saltado)"
+fi
+
+# 5) Drift ratchet — el conteo no puede haber subido.
+step "5/8 drift-ratchet"
 bash tools/drift-ratchet.sh --check || FAIL=1
 
-# 3) Build + tests por-plataforma.
-step "3/4 build & tests"
+# 6) Build + tests por-plataforma.
+step "6/8 build & tests"
 if [ "${GATES_SKIP_TESTS:-0}" = "1" ]; then
   echo "(saltado por GATES_SKIP_TESTS=1)"
 else
@@ -39,13 +98,56 @@ else
   # ./gradlew testDebugUnitTest || FAIL=1
   # xcodebuild -scheme <Scheme> -destination '...' test || FAIL=1
   # npm ci && npm test || FAIL=1
-  echo "<!-- FILL: añade build/test de tu stack en ci/run-gates.sh paso 3 -->"
+  echo "<!-- FILL: añade build/test de tu stack en ci/run-gates.sh paso 6 -->"
 fi
 
-# 4) Contratos / lints específicos del proyecto (opcional).
-step "4/4 checks de proyecto"
-# <!-- FILL: contract checks, schema validation, etc. -->
-echo "(sin checks de proyecto configurados — opcional)"
+# 7) Mutation score — ¿los tests COMPRUEBAN algo?
+#    La cobertura es un piso; ESTA es la métrica real. Es el único gate que
+#    distingue un test que verifica de uno que solo pasa — el modo de fallo
+#    más común del código escrito por agentes.
+step "7/8 mutation-score (calidad de los tests)"
+if [ -f tools/mutation-score.sh ]; then
+  # Auto-escalada: mientras el piso sea 0 el gate no dice nada y no bloquea por
+  # falta de runner. En cuanto hay una medición real (piso > 0), medir pasa a
+  # ser obligatorio — si no, bastaría desinstalar el runner para "aprobar".
+  _floor="$(sed -nE 's/.*"min_score"[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p' tools/mutation-ratchet.json 2>/dev/null | head -1)"
+  : "${_floor:=0}"
+  _req="${GATES_REQUIRE_MUTATION:-}"
+  [ -z "$_req" ] && { [ "$_floor" -gt 0 ] && _req=1 || _req=0; }
+  GATES_REQUIRE_MUTATION="$_req" bash tools/mutation-score.sh --check || FAIL=1
+  [ "$_req" = "0" ] && echo "   (piso=0: gate informativo. Sube el piso y pasa a obligatorio automáticamente.)"
+else
+  echo "❌ tools/mutation-score.sh ausente — sin él nada distingue un test real de uno decorativo."; FAIL=1
+fi
+
+# ════════════════════════════════════════════════════════════════════
+# Nivel 7-9 — review independiente, evidencia y aprendizaje
+# ════════════════════════════════════════════════════════════════════
+step "8/8 review independiente + evidencia"
+
+# 8a) ¿Fue revisado? Cubre Codex y commits humanos, que nunca pasan por Anillo 2.
+if [ -f tools/check-review-marker.sh ]; then
+  bash tools/check-review-marker.sh --range \
+    || echo "   (sin marker válido en CI — la evidencia la aporta ai-review, abajo)"
+fi
+
+# 8b) Review de IA headless, con contexto FRESCO: el que revisa nunca es el que
+#     escribió. Es lo que cierra el hueco de Codex y de los commits humanos, así
+#     que es OBLIGATORIO por defecto: si fuera opt-in, un runner sin `claude`
+#     aprobaría en silencio justo los commits que este anillo existe para cubrir.
+if [ -f ci/ai-review.sh ]; then
+  AI_REVIEW_REQUIRED="${AI_REVIEW_REQUIRED:-1}" bash ci/ai-review.sh || FAIL=1
+else
+  echo "❌ ci/ai-review.sh ausente — sin él, Codex y los commits humanos no pasan por ninguna review."; FAIL=1
+fi
+
+# 8c) Toda lección aprendida debe tener un detector mecánico asociado. Es el
+#     mecanismo concreto por el que la necesidad de review humano DECRECE en
+#     vez de mantenerse plana (filosofía Tricorder: un comentario de review
+#     que se repite es un bug en tu tooling).
+if [ -f tools/lesson-detector-link.sh ]; then
+  bash tools/lesson-detector-link.sh || FAIL=1
+fi
 
 echo ""
 [ "$FAIL" -eq 0 ] && { echo "✅ run-gates: TODOS los gates pasaron."; exit 0; }

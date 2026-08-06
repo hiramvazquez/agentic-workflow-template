@@ -42,6 +42,25 @@ if [ -f tools/check-layers.sh ]; then
 Las capas son un contrato, no un estilo. Invierte la dependencia o mueve el archivo."
   fi
 fi
+# Semgrep sobre lo STAGED. Va aquí, y no solo dentro de `check-drift.sh`, porque
+# el agregador descarta el exit code por diseño: un semgrep roto o con reglas
+# inválidas era invisible en los Anillos 1 y 2 y solo se cazaba en CI. Eso
+# contradice §14 ("cázalo en la capa más barata") justo para el detector que
+# más barato es de correr. Lo cazó el `reviewer` revisando P1.
+if [ -f tools/semgrep-scan.sh ]; then
+  out="$(bash tools/semgrep-scan.sh --staged 2>&1)"; rc=$?
+  case "$rc" in
+    1)  # HALLAZGO real en el código → bloquea, sin excepción.
+        hook_block "$out"$'\n\n'"❌ reviewer-gate: commit BLOQUEADO por hallazgos de semgrep (patrones AST)." ;;
+    3)  # El DETECTOR falló (ausente, reglas rotas, crash). Avisa, no bloquea.
+        # Bloquear aquí crearía un deadlock: un typo en las reglas impediría
+        # incluso el commit que lo arregla (AGENTS.md §4.4). El backstop es CI,
+        # donde GATES_REQUIRE_SEMGREP=1 sí lo trata como fallo.
+        printf '%s\n' "$out" >&2
+        echo "⚠️  reviewer-gate: semgrep no pudo ejecutarse. Commit PERMITIDO (§4.4), pero el" >&2
+        echo "   nivel 2 de la pirámide está MUDO hasta que lo arregles. CI sí bloqueará." >&2 ;;
+  esac
+fi
 
 # ── 2. Marker de review (implementación compartida por los 3 anillos) ─
 # El preset lo aplica `check-review-marker.sh`, NO este hook. Cuando la lógica
