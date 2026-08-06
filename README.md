@@ -126,6 +126,9 @@ tools/
 ci/run-gates.sh + ci/ai-review.sh + ci/examples/ ← Anillo 3 (provider-agnóstico)
 lefthook.yml + .gitleaks.toml                    ← Anillo 1
 .agents/skills/            ← base de conocimiento (frontmatter con `paths:` = auto-carga)
+backlog/                   ← historias de usuario tipo Jira → tools/backlog/run.sh las
+                             trabaja una a una en ramas story/NNNN (PRD 0003; merge = humano)
+docs/EXAMPLES.md           ← 4 escenarios iOS end-to-end: bug, feature con PRD, /goal, backlog
 docs/process/              ← PRDs, lessons (con detector obligatorio), execution map, ledger
 .claude-plugin/            ← (opcional) plugin.json + marketplace.json
 enterprise/                ← (opcional) managed-settings.json: enforcement NO anulable

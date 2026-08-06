@@ -26,7 +26,7 @@ MODE="${1:---staged}"
 TTL="${REVIEWER_MARKER_TTL:-3600}"
 MARKER=".agents/state/markers/reviewer_run.txt"
 # <!-- FILL: ajusta los globs de "NO es código de producto" a tu repo. -->
-NON_PRODUCT='^(docs/|ci/|tools/|scripts/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|lefthook|\.gitleaks)'
+NON_PRODUCT='^(docs/|ci/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|lefthook|\.gitleaks)'
 
 fail() { echo "$1"; exit 1; }
 
