@@ -1,9 +1,13 @@
 {
   "version": 1,
   "_comment": "Anillo 2 (Cursor). Wrapper delgado: mapea eventos de Cursor (camelCase) a los MISMOS scripts compartidos que usa Claude. Paths relativos a la raíz del repo. failClosed solo en gates de seguridad.",
+  "_comment_paridad": "Cursor no expone los eventos SubagentStop, PostCompact ni PostToolUseFailure. Consecuencia: en Cursor el marker de review NO se puede derivar automáticamente del veredicto de un sub-agente. Por eso el backstop para Cursor (igual que para Codex) es el Anillo 1 (lefthook: check-review-marker + check-layers) y el Anillo 3 (ci/ai-review.sh). Es exactamente la razón de existir de los 3 anillos.",
   "hooks": {
     "sessionStart": [
       { "command": "bash scripts/agent-hooks/session-start.sh" }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "bash scripts/agent-hooks/inject-context.sh" }
     ],
     "preToolUse": [
       { "command": "bash scripts/agent-hooks/skill-reminder.sh" }
@@ -12,6 +16,7 @@
       { "command": "bash scripts/agent-hooks/reviewer-gate.sh", "failClosed": false }
     ],
     "postToolUse": [
+      { "command": "bash scripts/agent-hooks/post-edit-verify.sh" },
       { "command": "bash scripts/agent-hooks/track-reads.sh" },
       { "command": "bash scripts/agent-hooks/track-trajectory.sh" }
     ],

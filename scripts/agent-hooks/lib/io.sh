@@ -38,6 +38,13 @@ hook_tool()       { command -v jq >/dev/null 2>&1 && _hook_jq '.tool_name // emp
 hook_file_path()  { command -v jq >/dev/null 2>&1 && _hook_jq '.tool_input.file_path // .file_path // empty'; }
 hook_command()    { command -v jq >/dev/null 2>&1 && _hook_jq '.tool_input.command // .command // empty'; }
 hook_session_id() { command -v jq >/dev/null 2>&1 && _hook_jq '.session_id // .conversation_id // .generation_id // "unknown"'; }
+hook_event()      { command -v jq >/dev/null 2>&1 && _hook_jq '.hook_event_name // empty'; }
+
+# ── Campos de sub-agente (SubagentStart / SubagentStop) ─────────────
+hook_agent_type() { command -v jq >/dev/null 2>&1 && _hook_jq '.agent_type // empty'; }
+hook_agent_id()   { command -v jq >/dev/null 2>&1 && _hook_jq '.agent_id // empty'; }
+# El mensaje final del sub-agente: de aquí se DERIVA el veredicto (lib/verdict.sh).
+hook_last_message() { command -v jq >/dev/null 2>&1 && _hook_jq '.last_assistant_message // empty'; }
 
 # Ruta relativa al repo (los hooks razonan en rutas relativas).
 hook_rel_path() {
@@ -54,6 +61,39 @@ hook_block() {
 
 # PERMITIR: exit 0 silencioso.
 hook_allow() { exit 0; }
+
+# ── Salida JSON estructurada (solo Claude Code) ─────────────────────
+# Claude Code parsea stdout como JSON en exit 0. Cursor lo ignora sin romperse,
+# así que es seguro emitirlo siempre. Nos da dos cosas que `exit 2` no puede:
+#
+#   1. `additionalContext` — INYECTAR texto en el contexto del agente sin
+#      bloquearlo. Es el mecanismo del bucle de verificación in-loop: el
+#      linter falla → el agente lo lee en el mismo turno → lo corrige.
+#   2. `decision: block` con razón, sin depender del exit code.
+#
+# hook_context <evento> <texto>   → informa (no bloquea)
+hook_context() {
+  local ev="$1" ctx="$2"
+  if command -v jq >/dev/null 2>&1; then
+    jq -nc --arg e "$ev" --arg c "$ctx" \
+      '{hookSpecificOutput:{hookEventName:$e, additionalContext:$c}}'
+  else
+    # Sin jq: degradamos a stderr, que el agente también ve.
+    printf '%s\n' "$ctx" >&2
+  fi
+  exit 0
+}
+
+# hook_json_block <evento> <razón>  → bloquea vía JSON (equivalente a exit 2)
+hook_json_block() {
+  local ev="$1" why="$2"
+  if command -v jq >/dev/null 2>&1; then
+    jq -nc --arg e "$ev" --arg r "$why" \
+      '{hookSpecificOutput:{hookEventName:$e, decision:"block", reason:$r}}'
+    exit 0
+  fi
+  hook_block "$why"
+}
 
 # ── Marcadores de estado compartidos (ambos clientes) ───────────────
 # Viven en .agents/state/ (gitignored) para que Claude y Cursor compartan.

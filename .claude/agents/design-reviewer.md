@@ -24,11 +24,26 @@ decisiones de approach malas cuando cambiarlas cuesta un párrafo, no un refacto
 7. **Seguridad/privacy**: ¿maneja datos sensibles? ¿authz? (si sí, exige checklist de `security`).
 8. **Capas/boundaries**: ¿respeta el patrón de `architecture/SKILL.md`?
 
-## Salida
+## Salida — CONTRATO OBLIGATORIO
+
+Por cada problema: `[severidad] descripción → arreglo PROPUESTO AL PRD (no al código)`.
+Más las Open Questions que el owner debe resolver antes de implementar.
+
+Tu mensaje final **debe terminar** con estas tres líneas, cada una en su propia línea
+(el hook `SubagentStop` las parsea para dejar registro del design-review):
 
 ```
-DESIGN VERDICT: OK | NEEDS-REVISION
-- Por cada problema: [severidad] descripción → arreglo PROPUESTO AL PRD (no al código).
-- Open Questions que el owner debe resolver antes de implementar.
+VERDICT: GREEN
+FINDINGS: 0
+SCOPE: PRD 0001 — hardening de la pirámide de verificación
 ```
-**No apruebas tú** — recomiendas. El owner decide el `Approved`. Tú y el owner sois gates distintos.
+
+| Veredicto | Equivale a | Significa |
+|---|---|---|
+| `GREEN` | OK | La solución es sana; el PRD puede pasar a `Approved` (lo decide el owner) |
+| `AMBER` | OK con reservas | Entra, pero el PRD debe anotar los riesgos señalados |
+| `RED` | NEEDS-REVISION | El approach tiene un problema de fondo: **arregla el PRD, no el código** |
+
+**No apruebas tú** — recomiendas. El owner decide el `Approved`. Tú y el owner sois gates
+distintos (`AGENTS.md §12`), y tu veredicto queda registrado como evidencia de que el gate
+de diseño se ejecutó, no solo de que alguien dijo que sí.

@@ -35,17 +35,44 @@ _src=0; for d in ios android web src; do [ -d "$d" ] && _src=1; done
 [ "$_src" = "0" ] && { echo "⚠️  Sin carpetas de código (ios/android/web/src) — check-drift inactivo."; _health=0; }
 grep -qE '\*View\*|\*\.swift|\*\.kt|\*\.ts' scripts/agent-hooks/skill-reminder.sh 2>/dev/null \
   || { echo "⚠️  skill-reminder sin globs concretos — gate leer-skill MUDO (configura AGENTS.md §11)."; _health=0; }
-[ "$_health" = "1" ] && echo "✓ Stack, código y matriz de skills configurados."
+
+# ── Niveles de la pirámide que están MUDOS (verification-loop.md) ────
+# Un gate no configurado es peor que ausente si el harness lo anuncia como
+# activo: da falsa confianza. Aquí se declara explícitamente qué NO cubre.
+command -v semgrep >/dev/null 2>&1 \
+  || { echo "⚠️  Nivel 2 MUDO: semgrep no instalado (\`brew install semgrep\`) — sin detectores AST."; _health=0; }
+grep -q '<!-- FILL' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
+  && grep -qE '^\s*\*\)\s*:\s*;;' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
+  && { echo "⚠️  Nivel 1 PARCIAL: post-edit-verify sin lint/typecheck de tu stack (§FILL) — el agente no recibe señal in-loop."; _health=0; }
+grep -q '"min_score": 0' tools/mutation-ratchet.json 2>/dev/null \
+  && { echo "⚠️  Nivel 4 MUDO: mutation score en 0 — NADA distingue un test real de uno decorativo."; _health=0; }
+command -v gitleaks >/dev/null 2>&1 \
+  || echo "⚠️  gitleaks no instalado — el scan de secretos del Anillo 1 no corre en local."
+
+[ "$_health" = "1" ] && echo "✓ Stack, código, matriz de skills y pirámide de verificación configurados."
+
+# ── Findings abiertos (AGENTS.md §10: el que toca, cierra) ──────────
+if [ -f tools/findings/ledger.jsonl ]; then
+  _open="$(grep -c '"status":"open"' tools/findings/ledger.jsonl 2>/dev/null || echo 0)"
+  [ "${_open:-0}" -gt 0 ] && { echo ""; echo "── Findings abiertos: $_open (si tocas su área, ciérralos o actualízalos) ──"; }
+fi
 
 echo ""
 echo "── Guardrails activos ──"
+echo "• Anillo 0 (permissions): --no-verify, --amend, --force, lectura de .env y edición"
+echo "  de los trinquetes están DENEGADOS de forma nativa. No dependen del modelo."
 if [ "$PRESET" = "lite" ]; then
   echo "• Edit/Write: AVISA si no leíste la skill (skill-reminder) — preset lite."
-  echo "• git commit: AVISA sin review; el drift-ratchet SÍ bloquea (reviewer-gate)."
+  echo "• git commit: AVISA sin review; trinquete y capas SÍ bloquean (reviewer-gate)."
 else
   echo "• Edit/Write: BLOQUEA si no leíste la skill requerida (skill-reminder)."
-  echo "• git commit: BLOQUEA sin review reciente o si sube el drift-ratchet (reviewer-gate)."
+  echo "• git commit: BLOQUEA sin marker de review válido, o si sube el trinquete, o si"
+  echo "  se violan las capas (reviewer-gate + lefthook + CI: los 3 anillos)."
 fi
+echo "• PostToolUse Edit/Write: lint+typecheck del archivo tocado → de vuelta al agente."
+echo "• SubagentStop: el marker de review lo escribe el SISTEMA a partir del VERDICT"
+echo "  real del sub-agente. Un marker escrito a mano se RECHAZA."
 echo "• Stop: BLOQUEA si introdujiste violaciones/errores nuevos (canon-enforce + drift-stop)."
+echo "• PostCompact: reinyecta el digest de reglas + findings tras compactar el contexto."
 echo "• Markers se borran cada sesión → re-leer requerido."
 exit 0

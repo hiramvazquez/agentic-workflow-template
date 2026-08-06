@@ -23,6 +23,22 @@ file_path="$(hook_file_path)"
 [ -z "$file_path" ] && hook_allow
 rel="$(hook_rel_path "$file_path")"
 
+# ── Exclusiones: DOCUMENTACIÓN no es CÓDIGO ─────────────────────────
+# Sin esto, editar `.agents/skills/domain/SKILL.md` casa con el glob `*/domain/*`
+# y exige leer las skills de dominio para editar… la propia skill de dominio.
+# Es un falso positivo, y un gate con falsos positivos se acaba desactivando
+# entero (ley del 10%, ver verification-loop.md nivel 2). La matriz de §11 habla
+# de código de producto; estas rutas nunca lo son.
+case "$rel" in
+  .agents/*|.claude/*|.cursor/*|docs/*|tools/*|scripts/*|ci/*|enterprise/*|*.md)
+      # Excepción: los PRDs numerados SÍ tienen su propia regla más abajo.
+      case "$rel" in
+        docs/process/prds/[0-9]*.md) : ;;
+        *) hook_allow ;;
+      esac
+      ;;
+esac
+
 # ── Matriz path → lectura obligatoria ───────────────────────────────
 # FILL: mapea TUS paths reales → skill references. Edita SOLO los globs de
 # los `case` de abajo (deben ser patrones glob válidos de bash, NO comentarios).

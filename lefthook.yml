@@ -27,6 +27,20 @@ pre-commit:
     - name: drift-ratchet
       run: bash tools/drift-ratchet.sh --check
 
+    # ── Capas: el dominio no depende de UI ni de infraestructura (§3) ──
+    # Fitness function sobre el grafo de imports. Determinista, 0 falsos
+    # positivos por comentarios/strings — por eso puede bloquear.
+    - name: check-layers
+      run: bash tools/check-layers.sh
+
+    # ── Review marker: ¿este cambio fue REALMENTE revisado? ──────────
+    # Antes esto vivía SOLO en el Anillo 2 (hooks de Claude/Cursor), así que
+    # no hacía falta `--no-verify` para saltárselo: bastaba commitear desde
+    # otra terminal, o desde Codex (que no tiene hooks). Ahora está aquí, que
+    # es la única capa que ve TODOS los commits.
+    - name: review-marker
+      run: bash tools/check-review-marker.sh --staged
+
     # ── Lint / format por-plataforma (rápido, solo staged) ──
     # <!-- FILL: descomenta/añade el linter de tu stack. Mantenlo < 2s. -->
     # - name: lint-ios

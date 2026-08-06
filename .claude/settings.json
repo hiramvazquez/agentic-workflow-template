@@ -1,25 +1,112 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "_comment": "Anillo 2 (Claude Code). Wrapper delgado: mapea eventos de Claude a los scripts COMPARTIDOS en scripts/agent-hooks/. La lógica vive una sola vez; Cursor usa los mismos scripts vía .cursor/hooks.json.",
+  "_comment": "Anillo 2 (Claude Code). Dos partes: (1) `permissions` = enforcement NATIVO, evaluado antes de que la tool corra — más fuerte y más barato que cualquier hook; (2) `hooks` = wrapper delgado sobre los scripts COMPARTIDOS de scripts/agent-hooks/. La lógica vive una sola vez; Cursor usa los mismos scripts vía .cursor/hooks.json.",
+
+  "_comment_permissions": "AGENTS.md §7 dice 'jamás --no-verify, --force a main, ni push sin aprobación'. Como TEXTO eso es advisory: el modelo puede ignorarlo o perderlo tras una compactación. Aquí es determinista — la tool ni siquiera llega a ejecutarse. Regla: si una prohibición se puede expresar como patrón, va aquí, no en prosa.",
+  "permissions": {
+    "deny": [
+      "Bash(git commit:*--no-verify*)",
+      "Bash(git commit:*--amend*)",
+      "Bash(git push:*--force*)",
+      "Bash(git push:*-f*)",
+      "Bash(git reset:*--hard*)",
+      "Bash(git clean:*-f*)",
+      "Bash(rm:*-rf /*)",
+      "Bash(chmod:*777*)",
+      "Bash(sudo:*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.p12)",
+      "Read(./**/*.keystore)",
+      "Read(./secrets/**)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Write(./secrets/**)",
+      "Write(./tools/drift-ratchet.json)",
+      "Write(./tools/mutation-ratchet.json)",
+      "Edit(./tools/drift-ratchet.json)",
+      "Edit(./tools/mutation-ratchet.json)",
+      "Write(./.agents/state/**)",
+      "Edit(./.agents/state/**)",
+      "Bash(*reviewer_run.txt*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh release:*)",
+      "Bash(npm publish:*)",
+      "Write(./AGENTS.md)",
+      "Write(./lefthook.yml)",
+      "Edit(./AGENTS.md)",
+      "Edit(./lefthook.yml)"
+    ],
+    "allow": [
+      "Bash(bash tools/check-drift.sh)",
+      "Bash(bash tools/check-layers.sh)",
+      "Bash(bash tools/tests/run-tests.sh:*)",
+      "Bash(bash tools/drift-ratchet.sh:*)",
+      "Bash(bash ci/run-gates.sh)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  },
+
+  "_comment_ratchets": "Los dos *-ratchet.json están en `deny` de Write/Edit a propósito: son TRINQUETES. Solo los actualiza su propio script (`--update`), que impone la dirección permitida. Si el modelo pudiera editarlos a mano, el trinquete sería una sugerencia.",
+
+  "_comment_plugins": "security-guidance revisa el código que Claude escribe en 3 profundidades (per-edit sin coste de tokens, fin de turno, y por commit) con un revisor de contexto FRESCO — no le pide al mismo modelo que se autoevalúe. Se extiende con .claude/claude-security-guidance.md y .claude/security-patterns.yaml. Instalar una vez: /plugin marketplace add anthropics/claude-plugins-official",
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true
+  },
+
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/session-start.sh", "timeout": 5 }] }
     ],
+
+    "_comment_UserPromptSubmit": "Estado VIVO (findings abiertos, árbol sucio) inyectado cada turno, en vez de vivir congelado en CLAUDE.md inflándolo.",
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/inject-context.sh", "timeout": 5 }] }
+    ],
+
     "PreToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/skill-reminder.sh", "timeout": 5 }] },
       { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/reviewer-gate.sh", "timeout": 20 }] }
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/reviewer-gate.sh", "timeout": 30 }] }
     ],
+
+    "_comment_PostToolUse": "post-edit-verify es el bucle de verificación IN-LOOP: lint/typecheck del archivo recién tocado, con el resultado de vuelta al agente vía additionalContext en el MISMO turno. Es el gate de mayor ROI del harness: sin él, un error del turno 3 se descubre en el turno 40.",
     "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/post-edit-verify.sh", "timeout": 15 }] },
       { "matcher": "Read",
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-reads.sh", "timeout": 3 }] },
       { "matcher": "Read|Edit|Write|MultiEdit|Bash|Grep|Glob|Task|WebFetch|WebSearch|mcp__.*",
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-trajectory.sh", "timeout": 3 }] }
     ],
+
+    "_comment_PostToolUseFailure": "Detecta el bucle de reintentos: 4 fallos del mismo comando no son mala suerte, son una hipótesis equivocada.",
+    "PostToolUseFailure": [
+      { "matcher": "Bash|Edit|Write",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-failure.sh", "timeout": 5 }] }
+    ],
+
+    "_comment_SubagentStop": "EL INVARIANTE Nº1 DEL HARNESS: el marker de review lo escribe el SISTEMA a partir del veredicto real del sub-agente, nunca el modelo. Sin esto, el reviewer-gate es decorativo.",
+    "SubagentStop": [
+      { "matcher": "reviewer|security-reviewer|design-reviewer",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/capture-review-verdict.sh", "timeout": 10 }] }
+    ],
+
+    "_comment_PostCompact": "Tras compactar, el agente conserva el resumen pero pierde el detalle de las reglas — y no sabe que las perdió, así que no las relee. Se reinyecta el digest irrenunciable.",
+    "PostCompact": [
+      { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/post-compact.sh", "timeout": 10 }] }
+    ],
+
     "Stop": [
       { "hooks": [
-          { "type": "command", "command": "bash scripts/agent-hooks/canon-enforce.sh", "timeout": 10 },
+          { "type": "command", "command": "bash scripts/agent-hooks/canon-enforce.sh", "timeout": 20 },
           { "type": "command", "command": "bash scripts/agent-hooks/drift-stop.sh", "timeout": 30 }
       ] }
     ]

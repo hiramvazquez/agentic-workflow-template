@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
-# Hook PreToolUse Bash (Claude) / beforeShellExecution (Cursor) — BLOQUEANTE.
-# Gate de `git commit`: bloquea si (a) el drift-ratchet subió, o (b) no hay
-# marker reciente del sub-agente `reviewer` ligado al HEAD + diff actuales.
+# ════════════════════════════════════════════════════════════════════
+# reviewer-gate.sh — hook PreToolUse Bash (Claude) / beforeShellExecution (Cursor)
+# ════════════════════════════════════════════════════════════════════
+# Gate de `git commit`. Orden DELIBERADO — no lo reordenes sin actualizar
+# `tools/tests/test_ratchets.sh`, que fija estos invariantes:
+#
+#   1. Detectores mecánicos (drift-ratchet, capas)  → DUROS SIEMPRE.
+#      Ni el preset `lite` ni REVIEWER_OVERRIDE los relajan. Un número que
+#      se puede aflojar no es un trinquete: es una sugerencia.
+#   2. Preset `lite` (uso personal)                 → el marker AVISA.
+#   3. Marker de review (tools/check-review-marker) → DURO en `full`,
+#      con override AUDITADO.
+#
+# La lógica de verificación del marker vive en `tools/check-review-marker.sh`
+# para que la compartan los 3 anillos (antes solo existía aquí → bastaba
+# commitear desde otra terminal para saltárselo).
 set -uo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=lib/io.sh
 . "$PROJECT_ROOT/scripts/agent-hooks/lib/io.sh"
 cd "$PROJECT_ROOT" || exit 0
 
@@ -12,71 +26,32 @@ CMD="$(hook_command)"
 # Solo gateamos `git commit`.
 printf '%s' "$CMD" | grep -qE '(^|[^a-z-])git commit' || hook_allow
 
-# Override de emergencia (auditado).
-if [ "${REVIEWER_OVERRIDE:-0}" = "1" ]; then
-  mkdir -p "$(hook_state_dir)/markers"
-  printf '[%s] override: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${REVIEWER_OVERRIDE_REASON:-(sin razón)}" \
-    >> "$(hook_state_dir)/markers/override_log.txt"
-  echo "⚠️  reviewer-gate: override activo — commit permitido." >&2
-  hook_allow
-fi
-
-# (a) Drift ratchet — el conteo solo baja.
-if [ -x tools/drift-ratchet.sh ]; then
+# ── 1. Detectores mecánicos — DUROS, sin excepción ──────────────────
+# Van ANTES del override y del preset a propósito: son objetivos, no opinables.
+# Si el conteo subió, subió.
+if [ -f tools/drift-ratchet.sh ]; then
   if ! out="$(bash tools/drift-ratchet.sh --check 2>&1)"; then
-    hook_block "$out"$'\n\n'"❌ reviewer-gate: commit BLOQUEADO por drift-ratchet. Baja la deuda que subiste, o usa REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON=\"...\"."
+    hook_block "$out"$'\n\n'"❌ reviewer-gate: commit BLOQUEADO por drift-ratchet.
+El trinquete NO se puede saltar (ni con preset lite ni con REVIEWER_OVERRIDE).
+Baja la deuda que introdujiste, o compénsala en otro lado."
+  fi
+fi
+if [ -f tools/check-layers.sh ]; then
+  if ! out="$(bash tools/check-layers.sh 2>&1)"; then
+    hook_block "$out"$'\n\n'"❌ reviewer-gate: commit BLOQUEADO por violación de capas (AGENTS.md §3).
+Las capas son un contrato, no un estilo. Invierte la dependencia o mueve el archivo."
   fi
 fi
 
-# Preset lite (uso personal): el reviewer es RECOMENDADO, no obligatorio → no bloquea por marker.
-# (El drift-ratchet de arriba SÍ sigue duro en ambos presets.)
-if [ "$(hook_preset)" = "lite" ]; then
-  echo "⚠️  [lite] reviewer-gate: review recomendada pero no obligatoria. Considera correr \`reviewer\`." >&2
-  hook_allow
+# ── 2. Marker de review (implementación compartida por los 3 anillos) ─
+# El preset lo aplica `check-review-marker.sh`, NO este hook. Cuando la lógica
+# de preset vivía aquí, lefthook (Anillo 1) llamaba al script directo y bloqueaba
+# igual en `lite`: el Anillo 2 daba luz verde y el commit fallaba después.
+# Una regla implementada en dos sitios diverge — vive en uno solo.
+if ! out="$(bash tools/check-review-marker.sh --staged 2>&1)"; then
+  hook_block "$out"
 fi
+printf '%s\n' "$out" | grep -q '^⚠️' && { printf '%s\n' "$out" >&2; hook_allow; }
 
-# ¿Hay cambios staged en código de producto? (si solo docs/tooling → pasa)
-CHANGED="$(git diff --cached --name-only 2>/dev/null || echo "")"
-[ -z "$CHANGED" ] && hook_allow
-# <!-- FILL: ajusta los globs de "código de producto" de tu repo. -->
-CRITICAL="$(printf '%s\n' "$CHANGED" | grep -vE '^(docs/|ci/|tools/|scripts/|README|\.gitignore|lefthook|\.gitleaks)' || true)"
-[ -z "$CRITICAL" ] && hook_allow
-
-# (b) Marker del reviewer.
-MARKER="$(hook_state_dir)/markers/reviewer_run.txt"
-if [ ! -f "$MARKER" ]; then
-  hook_block "❌ reviewer-gate: commit BLOQUEADO. Cambios críticos sin review:
-$(echo "$CRITICAL" | sed 's/^/  - /')
-
-Invoca el sub-agente \`reviewer\`, atiende RED/AMBER, y marca:
-  bash scripts/mark-reviewer-run.sh \"scope: <descripción>\"
-Override: REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON=\"...\" git commit ..."
-fi
-
-# Edad (TTL 60 min).
-NOW=$(date +%s)
-MTIME=$(stat -f %m "$MARKER" 2>/dev/null || stat -c %Y "$MARKER" 2>/dev/null || echo 0)
-if [ $((NOW - MTIME)) -gt 3600 ]; then
-  hook_block "❌ reviewer-gate: marker EXPIRADO (>60 min). Re-corre \`reviewer\` y re-marca."
-fi
-
-# Binding a HEAD (si commiteaste entremedio, el review es stale).
-MARKED_HEAD="$(grep -E '^head:' "$MARKER" | awk '{print $2}')"
-CUR_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
-if [ -n "$MARKED_HEAD" ] && [ -n "$CUR_HEAD" ] && [ "$MARKED_HEAD" != "no-repo" ] && [ "$MARKED_HEAD" != "$CUR_HEAD" ]; then
-  hook_block "❌ reviewer-gate: marker STALE (HEAD cambió $MARKED_HEAD→$CUR_HEAD). Re-corre \`reviewer\` y re-marca."
-fi
-
-# Binding al DIFF STAGED: lo que se revisó debe ser exactamente lo que se commitea.
-# (mark-reviewer-run.sh guarda staged_sha; si añadiste/quitaste cambios staged tras la
-#  review, el marker es stale aunque HEAD no haya cambiado. Cierra el hueco real.)
-MARKED_STAGED="$(grep -E '^staged_sha:' "$MARKER" | awk '{print $2}')"
-CUR_STAGED="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
-if [ -n "$MARKED_STAGED" ] && [ -n "$CUR_STAGED" ] && [ "$MARKED_STAGED" != "$CUR_STAGED" ]; then
-  hook_block "❌ reviewer-gate: el diff STAGED cambió desde la review (revisado=${MARKED_STAGED:0:12}… actual=${CUR_STAGED:0:12}…).
-Lo que se revisó ya no es lo que vas a commitear. Re-corre \`reviewer\` y re-marca,
-o usa REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON=\"...\" git commit ..."
-fi
-
-echo "✅ reviewer-gate: marker válido, commit permitido." >&2
+echo "✅ reviewer-gate: detectores verdes + marker válido. Commit permitido." >&2
 hook_allow
