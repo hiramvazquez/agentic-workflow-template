@@ -2,15 +2,27 @@
 # Hook SessionStart (Claude) / sessionStart (Cursor).
 # Tabula rasa por sesión: borra markers de skills leídos + baseline de drift,
 # e imprime el estado del proyecto. Observe-only (no bloquea nunca).
+#
+#   sin args    → reset + reporte   (lo que invoca el hook)
+#   --report    → SOLO reporte, sin efectos secundarios
+#
+# El modo --report existe porque observar no puede modificar: ejecutar este
+# script "para ver el estado" borraba los markers de skills leídas a mitad de
+# sesión y el siguiente Edit quedaba bloqueado — nos pasó (f-session-start-fx).
+# Un script que un humano ejecuta para inspeccionar necesita un modo puro.
 set -uo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT" || exit 0
 
+MODE="${1:---reset}"
+
 state_dir=".agents/state"
 mkdir -p "$state_dir/skills-read" "$state_dir/markers" "$state_dir/trajectory"
-# Reset: obliga a re-leer las skills requeridas en cada sesión nueva.
-find "$state_dir/skills-read" -mindepth 1 -delete 2>/dev/null || true
-rm -f "$state_dir/drift-baseline.txt" "$state_dir/drift-baseline.head" 2>/dev/null || true
+if [ "$MODE" != "--report" ]; then
+  # Reset: obliga a re-leer las skills requeridas en cada sesión nueva.
+  find "$state_dir/skills-read" -mindepth 1 -delete 2>/dev/null || true
+  rm -f "$state_dir/drift-baseline.txt" "$state_dir/drift-baseline.head" 2>/dev/null || true
+fi
 
 echo "═══ <PROJECT> — estado del proyecto ═══"
 if command -v git >/dev/null 2>&1; then

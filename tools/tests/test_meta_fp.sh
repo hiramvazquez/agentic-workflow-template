@@ -27,9 +27,14 @@ scripts/agent-hooks/skill-reminder.sh        :: test_skill_reminder.sh
 scripts/agent-hooks/canon-enforce.sh         :: test_canon_enforce.sh
 scripts/agent-hooks/reviewer-gate.sh         :: test_ratchets.sh
 scripts/agent-hooks/session-end.sh           :: test_judge_queue.sh
+scripts/agent-hooks/post-edit-verify.sh      :: test_post_edit_verify.sh
+scripts/agent-hooks/drift-stop.sh            :: test_drift_stop.sh
+scripts/agent-hooks/session-start.sh         :: test_session_start.sh
 tools/check-layers.sh                        :: test_layers.sh
 tools/check-drift.sh                         :: test_drift_aggregation.sh
 tools/check-review-marker.sh                 :: test_review_marker_preset.sh
+tools/drift-ratchet.sh                       :: test_ratchets.sh
+tools/secret-scan.sh                         :: test_secret_scan.sh
 tools/semgrep-scan.sh                        :: test_fail_closed.sh
 tools/mutation-score.sh                      :: test_fail_closed.sh
 tools/lesson-detector-link.sh                :: test_lessons.sh
@@ -72,5 +77,24 @@ test_todo_detector_tiene_tests_de_falso_positivo() {
 test_el_manifiesto_no_esta_vacio() {
   local n
   n="$(printf '%s\n' "$MANIFEST" | grep -c '::' || true)"
-  [ "${n:-0}" -ge 8 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥8) — ¿se rompió el formato?"; return 1; }
+  [ "${n:-0}" -ge 14 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥14) — ¿se rompió el formato?"; return 1; }
+}
+
+# ── FALSO POSITIVO guard del propio meta-detector (f-meta-fp-self) ──
+# El parser hace strip de comentarios y líneas vacías. Si ese strip se rompe,
+# hay dos modos de fallo: contar un comentario como entrada (FP: exigiría un
+# test a un detector inexistente) o tragarse entradas reales (FN silencioso).
+# Ambos se fijan aquí contra un manifiesto de fixture.
+test_el_parser_del_manifiesto_ignora_comentarios() {
+  local fixture="
+# comentario a línea completa :: no-es-entrada.sh
+tools/check-layers.sh :: test_layers.sh   # comentario al final
+"
+  local n=0
+  while IFS= read -r line; do
+    line="$(printf '%s' "$line" | sed 's/#.*//')"
+    [ -z "${line// /}" ] && continue
+    printf '%s' "$line" | grep -q '::' && n=$((n+1))
+  done <<< "$fixture"
+  [ "$n" = "1" ] || { echo "    el parser contó $n entradas en el fixture (esperaba 1: los comentarios no son entradas)"; return 1; }
 }

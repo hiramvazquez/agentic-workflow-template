@@ -166,6 +166,37 @@ es la razón real de que existan tres anillos y no uno.
 > mecanismo, con un repro ejecutable. La versión inicial de este README decía "infalsificable".
 > Está en `docs/process/lessons_learned.md` y en el PRD 0001 §18 G9.
 
+## Battle-tested against itself
+
+Este harness **se construyó bajo sus propias reglas**, y el historial de git es la demo — cada
+afirmación de abajo es un commit que puedes leer:
+
+- **Los gates bloquearon a su propio autor.** El agente que implementó el harness dio el
+  trabajo por terminado **seis veces**, y en las seis una capa de verificación encontró fallos
+  reales: el sub-agente `reviewer` acumuló **17 hallazgos en 7 rondas** (entre ellos, refutar
+  con un repro ejecutable la afirmación de que el marker era "infalsificable" — `3b66e7e`), y
+  `canon-enforce` bloqueó un cierre de turno en vivo.
+- **Los detectores se detectaron a sí mismos.** Tres veces: `skill-reminder` bloqueó editar la
+  documentación de su propia área, el detector de secretos marcó como secreto al archivo que
+  define qué es un secreto, y el linter de shell matcheó sus propios comentarios. De ahí la
+  regla mecanizada en `test_meta_fp.sh`: *el primer falso positivo de un detector casi siempre
+  aparece en el repo del propio detector* — y por eso ~⅓ de los 119 tests son casos de falso
+  positivo.
+- **El fail-closed encontró reglas muertas.** La primera vez que semgrep corrió de verdad,
+  reveló que **ninguna de las 6 reglas había cargado jamás** (3 errores que `--validate` no
+  detecta) — y el contrato de exit codes recién introducido lo convirtió en aviso en vez de en
+  silencio (`90621c4`).
+- **Arreglar un hallazgo introdujo uno peor, tres veces** — incluido un deadlock donde un typo
+  en las reglas habría bloqueado hasta el commit que lo arreglaba (`4f48c49`, resuelto con la
+  distinción exit 1 "tu código falla" vs exit 3 "no pude mirar"), y un `grep` sin `-F` que
+  trataba datos como patrones (`9060635`, con test verificado por mutación manual).
+- **El ledger está en cero abiertos con 11 findings en estado terminal** — 7 arreglados con
+  test, 4 aceptados con su razón escrita. Las **13 lecciones** de `lessons_learned.md` tienen
+  todas su detector (lo exige `lesson-detector-link.sh` en CI).
+
+Ningún proceso produce cero errores. Este produce errores **que se detectan, se cierran y se
+vuelven imposibles de repetir** — que es la única promesa honesta que un harness puede hacer.
+
 ## Relación con spec-driven development (SDD)
 
 Este template es **un harness SDD hecho a medida** con governance mecánica encima: su flujo
