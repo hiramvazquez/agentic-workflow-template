@@ -107,6 +107,20 @@ _case_otro_sid_si_encola() {
 }
 test_dedup_es_por_match_exacto() { _jq_sandbox _case_otro_sid_si_encola; }
 
+_case_sid_con_metacaracteres() {
+  # FALSO POSITIVO guard del dedup, capa 2: los DATOS no son PATRONES.
+  # El grep usa como PATRÓN el SID de la sesión QUE CIERRA. Sin -F, un `.` en
+  # ese SID actúa de comodín contra el guardado: con "s-aXc" juzgada, el
+  # cierre de "s-a.c" (distinta, SIN juzgar) matcheaba y se saltaba el
+  # encolado en silencio. Repro del reviewer, dirección exacta.
+  mkdir -p src; echo "x" > src/App.swift
+  printf '%s' '{"session_id":"s-aXc","agent_type":"process-judge","last_assistant_message":"VERDICT: GREEN\nFINDINGS: 0\nSCOPE: lote"}' \
+    | bash scripts/agent-hooks/capture-review-verdict.sh >/dev/null 2>&1
+  _end_session "s-a.c"
+  grep -qF "s-a.c" "$QUEUE" 2>/dev/null || { echo "    el SID se interpretó como regex: una sesión sin juzgar se saltó el encolado"; return 1; }
+}
+test_el_sid_es_dato_no_patron() { _jq_sandbox _case_sid_con_metacaracteres; }
+
 # ── el juez NO desbloquea el gate del reviewer ──────────────────────
 _case_juez_no_escribe_marker_de_reviewer() {
   printf '%s' '{"agent_type":"process-judge","last_assistant_message":"VERDICT: GREEN\nFINDINGS: 0\nSCOPE: x"}' \

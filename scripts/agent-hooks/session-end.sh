@@ -38,7 +38,11 @@ DIRTY="$(git status --porcelain 2>/dev/null | grep -vE '^\?\? \.agents/state/' |
 # SID en el SCOPE (hallazgo del reviewer). Dedup best-effort: si falla, la
 # cola tolera entradas de más (PRD 0002 §7); nunca bloquea nada.
 JUDGE_MARKER="$(hook_state_dir)/markers/process-judge_run.txt"
-if [ -f "$JUDGE_MARKER" ] && grep -qx "session: ${SID}" "$JUDGE_MARKER" 2>/dev/null; then
+# -F además de -x: sin él, el SID se interpreta como regex BRE y un `.` en el
+# id actúa de comodín (reproducido por el reviewer: "s-a.c" matcheaba
+# "s-aXc"). -x da match de línea completa; -F, match LITERAL. Los datos nunca
+# son patrones.
+if [ -f "$JUDGE_MARKER" ] && grep -qxF "session: ${SID}" "$JUDGE_MARKER" 2>/dev/null; then
   exit 0
 fi
 

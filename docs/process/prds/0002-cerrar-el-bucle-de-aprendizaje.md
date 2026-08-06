@@ -1,6 +1,6 @@
 # PRD — Cerrar el bucle de aprendizaje (el harness que aprende)
 
-> **Tipo:** Forward · **Status:** Approved
+> **Tipo:** Forward · **Status:** Shipped
 > **Autor:** Hiram (owner) · **Fecha:** 2026-08-06 · **Tracking:** PRD 0002 · commits `feat(findings)`, `feat(process)`
 > **Design-review:** OK (2026-08-06) — la solución sale del audit post-PRD-0001: se verificó
 > qué niveles de la pirámide están vivos y qué flujos de datos están desconectados, en vez de
@@ -231,7 +231,38 @@ abiertos · N-jueces como workflow ejecutable · fuzzing/DST/SBOM (PRD 0001 §16
 | Fecha | Cambio | Quién |
 |---|---|---|
 | 2026-08-06 | Draft + Approved (audit-driven) · arranca implementación | Hiram/Claude |
+| 2026-08-06 | Shipped: commits 6454f69 (findings) + 44d319f (process) + fix -F. 105 tests | Claude |
 
-## 18. Gaps detectados (llenar post-ship)
+## 18. Gaps detectados (durante la implementación)
 
-_Pendiente._
+### G1 — Un test verde por el motivo equivocado
+El dedup de la cola grepeaba el SID en un marker que **nunca lo contenía** — código muerto.
+Su test pasaba porque el fixture metía el SID en el `SCOPE:` del mensaje simulado: el test
+verificaba el artefacto del fixture, no el contrato. Lo cazó el `reviewer` trazando el flujo,
+no ejecutando los tests (los 102 estaban verdes).
+- **Fix:** campo `session:` explícito en el marker + match exacto + 2 tests del contrato real.
+- **Lección transferible:** cuando un test necesita fabricar un dato para pasar, pregúntate si
+  el sistema real produce ese dato. Si no, el test verifica tu fixture.
+
+### G2 — Los datos no son patrones (grep sin -F)
+`grep -qx "session: ${SID}"` interpreta el SID como regex BRE: con "s-aXc" juzgada, el cierre
+de "s-a.c" (distinta, sin juzgar) matcheaba y se saltaba el encolado en silencio. Reproducido
+por el reviewer en la verificación del fix anterior — **un hallazgo encontrado revisando la
+corrección de otro hallazgo**, tercera vez que pasa en este repo (PRD 0001 §18 "arreglar un
+hallazgo introdujo uno peor").
+- **Fix:** `grep -qxF`. Test `test_el_sid_es_dato_no_patron`, verificado por mutación manual:
+  revertir el `-F` lo hace fallar. Un test que no mata su mutante es decorativo.
+- **Lección transferible:** todo `grep`/`sed` cuyo patrón venga de una VARIABLE debe usar
+  match literal (`-F`) salvo intención explícita. Candidata a regla de `test_shell_hygiene`
+  (registrada como ampliación futura, no implementada: detectarlo sin FPs requiere distinguir
+  patrones intencionales, y un detector ruidoso se descarta entero).
+
+### G3 — El typo cirílico
+Al editar `reviewer.md` se coló "входe" (cirílico) por "entrada". Sin consecuencia mecánica
+(prosa), pero ilustra el mismo modo de fallo que G14 del PRD 0001: texto no-ASCII donde no se
+espera. Detectado a ojo — ningún gate mira la prosa, y está bien que así sea.
+
+### Validación del propio bucle
+Los 2 hallazgos registrables de esta implementación (`f-meta-fp-manifiesto`, `f-meta-fp-self`)
+se registraron **con el CLI construido en este PRD**, y el criterio bloqueante-vs-registrable
+del patrón N-jueces se aplicó en su propia review. El bucle se usó para cerrarse a sí mismo.
