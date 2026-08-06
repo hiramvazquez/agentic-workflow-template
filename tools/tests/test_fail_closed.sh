@@ -61,6 +61,8 @@ _case_regla_invalida_no_contamina_conteo() {
 }
 test_error_de_reglas_no_infla_el_trinquete() { _fc_sandbox _case_regla_invalida_no_contamina_conteo; }
 
+# FALSO POSITIVO guard: un scan legítimamente limpio pasa — el fail-closed
+# es para evidencia ausente/corrupta, no para la buena.
 _case_semgrep_limpio_pasa() {
   _fake_semgrep '{"results":[],"errors":[]}'
   bash tools/semgrep-scan.sh >/dev/null 2>&1
@@ -100,6 +102,8 @@ _case_piso_corrupto_falla() {
 }
 test_trinquete_corrupto_no_es_piso_cero() { _fc_sandbox _case_piso_corrupto_falla; }
 
+# FALSO POSITIVO guard: trinquete AUSENTE = sin inicializar (legítimo), no
+# corrupto. Confundirlos bloquearía a todo adoptante nuevo del template.
 _case_ratchet_ausente_es_piso_cero() {
   # Ausente SÍ es piso 0: es el estado legítimo de "aún sin inicializar".
   rm -f tools/mutation-ratchet.json

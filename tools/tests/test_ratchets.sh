@@ -94,6 +94,8 @@ test_marker_manual_es_rechazado() {
   _harness_sandbox _case_marker_manual_no_vale
 }
 
+# FALSO POSITIVO guard: el marker LEGÍTIMO del hook debe pasar — un gate que
+# rechaza también la evidencia buena no distingue nada.
 _case_marker_de_hook_si_vale() {
   mkdir -p src .agents/state/markers; echo "let x = 1" > src/App.swift; git add src/App.swift
   cat > .agents/state/markers/reviewer_run.txt <<EOF
@@ -155,6 +157,8 @@ test_full_bloquea_sin_marker() {
   _harness_sandbox _case_full_bloquea_sin_marker
 }
 
+# FALSO POSITIVO guard: un cambio solo-docs NO es código de producto y no
+# puede exigir review — bloquearlo haría que el equipo desactivara el gate.
 _case_solo_docs_no_requiere_gate() {
   printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
   mkdir -p docs; echo "# hola" > docs/x.md; git add docs/x.md

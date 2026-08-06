@@ -39,6 +39,37 @@ build concurrente que corrompe artefactos, drift de schema/codegen (un solo agen
 > lento por unidad pero produce ~cero bugs de coordinación. Usa paralelo solo con scopes 100%
 > disjuntos y aprobación explícita del owner.
 
+## Review adversarial con N jueces (diffs de ALTO riesgo)
+
+Un solo reviewer tiene una sola lente, y tiende a encontrar un tipo de problema a la vez.
+El dato empírico de este mismo repo: cinco rondas de review de UN reviewer sobre el PRD 0001
+produjeron 13 hallazgos reales — y los de cada ronda eran de una categoría que la ronda
+anterior no miró. Para cambios donde un fallo es caro (auth, pagos, PHI, los propios gates),
+lanza **N jueces con lentes DISTINTAS**, no N copias del mismo:
+
+| Juez | Lente | Prompt-semilla |
+|---|---|---|
+| 1 | Corrección | "Intenta REFUTAR que esto funciona. ¿Qué input lo rompe?" |
+| 2 | Seguridad | "¿Qué puede hacer un adversario con este cambio?" |
+| 3 | Reproducibilidad | "Ejecuta las verificaciones. ¿La evidencia sostiene lo afirmado?" |
+
+Reglas del patrón:
+
+1. **Contexto fresco cada uno** — ven el diff, no el razonamiento que lo produjo, ni los
+   veredictos de los otros (evita anclaje).
+2. **Prompt a REFUTAR, no a validar.** "¿Está bien?" produce confirmación; "rómpelo" produce
+   hallazgos.
+3. **Cada juez emite el contrato `VERDICT:`** — el hook SubagentStop registra cada veredicto.
+4. **Decisión por severidad, no por mayoría simple:** un RED de seguridad no se compensa con
+   dos GREEN de corrección. Los gates son independientes, como reviewer vs security-reviewer.
+5. **Coste:** ~3× una review normal. Resérvalo para lo que lo justifica; para el diff diario,
+   un reviewer + los detectores mecánicos es la relación correcta.
+
+⚠️ El sesgo del juez aplica ×N: un revisor al que pides hallazgos casi siempre reporta alguno.
+Instruye a cada juez a reportar SOLO lo que afecta a la corrección o a una regla explícita, y
+clasifica sus hallazgos en **bloqueante** vs **registrable** (va al ledger) — el bucle de
+review tiene que terminar, y el mecanismo para eso es el ledger, no una ronda más.
+
 ## Modelo por tarea (orientativo)
 
 - **Razonamiento alto** (PRD, design-review, refactor cross-cutting, auditoría) → el modelo más capaz.

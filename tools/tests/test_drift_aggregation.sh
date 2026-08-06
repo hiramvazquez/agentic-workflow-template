@@ -17,7 +17,7 @@ _drift_sandbox() {
 
 summary() { bash tools/check-drift.sh 2>/dev/null | grep '^DRIFT_SUMMARY'; }
 
-# ── el borde crítico: infraestructura ausente ≠ deuda ───────────────
+# ── el borde crítico (FALSO POSITIVO): infraestructura ausente ≠ deuda ──
 _case_infra_ausente_no_cuenta() {
   # Sin semgrep instalado (o sin reglas), el aviso va a stderr y NO debe
   # aparecer en el conteo. Este fue un bug real de la primera versión.

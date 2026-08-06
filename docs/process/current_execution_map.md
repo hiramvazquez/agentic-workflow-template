@@ -8,10 +8,12 @@
 > ⚠️ Este bloque describe el estado del **template en sí**. Cuando lo clones para un proyecto
 > real, sustitúyelo por el estado de TU proyecto.
 
-- **Fase:** template — pirámide de verificación implementada, pendiente de cablear a un stack.
-- **En curso:** PRD 0001 (hardening de la pirámide de verificación) — P0 y P1 implementados.
-- **Último ship:** PRD 0001 · veredicto derivado por el sistema, verificación in-loop,
-  detectores AST, fitness function de capas, trinquete de mutación, lección→detector.
+- **Fase:** template — pirámide de verificación + bucle de aprendizaje cerrados; pendiente de
+  cablear a un stack real.
+- **En curso:** nada — PRD 0001 y PRD 0002 shipped.
+- **Último ship:** PRD 0002 · ledger operable sin Deno/Node (findings.sh), gates que registran
+  detecciones (escape-rate con datos), cola del process-judge, meta-detector de tests de FP,
+  DbC con mecanismo declarado, patrón N-jueces.
 
 ## Próximo paso
 

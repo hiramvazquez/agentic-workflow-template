@@ -52,8 +52,11 @@ EV="SubagentStop"
 AGENT="$(hook_agent_type)"
 
 # Solo nos importan los sub-agentes que emiten veredicto.
+# process-judge también emite el contrato: su veredicto vacía la cola de
+# juicio (judge-queue) y deja su propio marker — pero NUNCA el canónico del
+# reviewer (guardado más abajo): juzgar el proceso no desbloquea commits.
 case "$AGENT" in
-  reviewer|security-reviewer|design-reviewer) : ;;
+  reviewer|security-reviewer|design-reviewer|process-judge) : ;;
   *) hook_allow ;;
 esac
 
@@ -77,6 +80,34 @@ Termina tu mensaje final con estas tres líneas, cada una en su propia línea:
 
 GREEN = sin hallazgos bloqueantes · AMBER = hallazgos menores, atendibles ·
 RED = no puede entrar. No uses GREEN por defecto: el veredicto es atribuible."
+fi
+
+# ── Telemetría: cada review es un dato de contención (nivel 9) ──────
+# Registra CUÁNTO encontró la fase de review — la fuente principal del bucket
+# `review` de escape-rate. Best-effort: jamás afecta al flujo.
+_N="$FINDINGS"; case "$_N" in ''|'?'|*[!0-9]*) [ "$VERDICT" = "GREEN" ] && _N=0 || _N=1 ;; esac
+[ "${_N:-0}" -gt 0 ] && hook_log_detection "$AGENT" "verdict-$VERDICT" "$SCOPE" "$_N"
+
+# ── process-judge: camino propio, y TERMINA aquí ────────────────────
+# Un juicio es un juicio con cualquier veredicto (un RED del juez significa
+# "el proceso fue malo", no "el juicio no ocurrió"): escribe su marker y vacía
+# la cola SIEMPRE. Y jamás sigue hacia el camino del marker del reviewer —
+# juzgar el proceso no desbloquea commits.
+if [ "$AGENT" = "process-judge" ]; then
+  DIR="$(hook_state_dir)/markers"; mkdir -p "$DIR"
+  {
+    printf 'ts: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'agent: process-judge\nverdict: %s\nfindings: %s\nscope: %s\nsource: hook\n' \
+      "$VERDICT" "$FINDINGS" "$SCOPE"
+    # session: la usa session-end.sh para no re-encolar la sesión ya juzgada.
+    # Sin este campo el dedup era código muerto: grepeaba el SID en un marker
+    # que nunca lo contenía (hallazgo del reviewer en la review de este diff).
+    printf 'session: %s\n' "$(hook_session_id)"
+  } > "$DIR/process-judge_run.txt"
+  : > "$(hook_state_dir)/judge-queue.txt" 2>/dev/null || true
+  hook_context "$EV" "⚖️  Juicio de proceso registrado: $VERDICT (${FINDINGS} hallazgos) — «${SCOPE}».
+Cola de juicio vaciada. Si el juez reportó hallazgos, van al ledger
+(\`bash tools/findings/findings.sh add ...\`), no solo a la prosa (AGENTS.md §10)."
 fi
 
 # ── RED → sin marker, y el agente principal se entera ──────────────

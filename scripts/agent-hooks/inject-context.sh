@@ -38,6 +38,14 @@ fi
 DIRTY="$(git status --porcelain 2>/dev/null | grep -vE '^\?\? \.agents/state/' | wc -l | tr -d ' ')"
 [ "${DIRTY:-0}" -gt 0 ] && add "· Árbol SUCIO: $DIRTY archivos sin commitear en $(git rev-parse --abbrev-ref HEAD 2>/dev/null)."
 
+# ── Sesiones pendientes de juicio de proceso ────────────────────────
+# La cola la llena session-end.sh y la vacía el veredicto real del juez.
+QUEUE="$(hook_state_dir 2>/dev/null)/judge-queue.txt"
+if [ -s "$QUEUE" ]; then
+  NQ="$(wc -l < "$QUEUE" | tr -d ' ')"
+  add "· Sesiones pendientes de \`process-judge\`: $NQ — invoca el sub-agente para cerrar el ciclo (su VERDICT vacía la cola)."
+fi
+
 # ── Deuda técnica al límite del trinquete ───────────────────────────
 if [ -f tools/drift-ratchet.json ] && [ -f tools/check-drift.sh ]; then
   CEIL_E="$(sed -nE 's/.*"errors"[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p' tools/drift-ratchet.json | head -1)"

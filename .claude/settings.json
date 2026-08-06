@@ -95,10 +95,15 @@
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-failure.sh", "timeout": 5 }] }
     ],
 
-    "_comment_SubagentStop": "EL INVARIANTE Nº1 DEL HARNESS: el marker de review lo escribe el SISTEMA a partir del veredicto real del sub-agente, nunca el modelo. Sin esto, el reviewer-gate es decorativo.",
+    "_comment_SubagentStop": "EL INVARIANTE Nº1 DEL HARNESS: el marker de review lo escribe el SISTEMA a partir del veredicto real del sub-agente, nunca el modelo. Sin esto, el reviewer-gate es decorativo. process-judge incluido: su veredicto vacía la cola de juicio (y NUNCA escribe el marker canónico del reviewer).",
     "SubagentStop": [
-      { "matcher": "reviewer|security-reviewer|design-reviewer",
+      { "matcher": "reviewer|security-reviewer|design-reviewer|process-judge",
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/capture-review-verdict.sh", "timeout": 10 }] }
+    ],
+
+    "_comment_SessionEnd": "Si la sesión tocó código y nadie corrió el process-judge, la sesión queda ENCOLADA (judge-queue) y visible cada turno hasta que un juicio real la cierre. Un juez al que nadie llama es un juez que no existe.",
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/session-end.sh", "timeout": 5 }] }
     ],
 
     "_comment_PostCompact": "Tras compactar, el agente conserva el resumen pero pierde el detalle de las reglas — y no sabe que las perdió, así que no las relee. Se reinyecta el digest irrenunciable.",

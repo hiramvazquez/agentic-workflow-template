@@ -37,6 +37,12 @@
 - **Lint/format:** `<!-- FILL -->`
 - **Backend/DB:** <!-- FILL: ej. Supabase / Postgres / Firebase / propio -->
 - **Idiomas de la app (i18n):** <!-- FILL: ej. ES + EN. Afecta reglas de §3. -->
+- **Modo estricto (nivel 0 — OBLIGATORIO):** `<!-- FILL: los flags de tu stack. Ej.:
+  Swift: -warnings-as-errors + StrictConcurrency=complete · TS: "strict": true +
+  noUncheckedIndexedAccess · Kotlin: allWarningsAsErrors · Python: mypy --strict -->`
+  El compilador es el primer reviewer y el único que no se cansa: un agente que **no puede
+  expresar** el estado inválido no lo escribe. Ningún gate posterior compensa una API donde el
+  mal uso compila. Prioriza hacer el error imposible por tipo antes que detectarlo después.
 
 ## 3. Arquitectura (capas + límites)
 
@@ -76,6 +82,10 @@ sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/
   ≥2 aserciones por función (regla *Power of Ten*, NASA/JPL). Sin efectos secundarios, y con
   **acción de recuperación explícita** al fallar. Prioriza siempre hacer el estado inválido
   **imposible por tipo** antes que verificarlo en runtime.
+  *Mecanismo (declarado, no implícito):* la valida el **checklist del `reviewer`** (ítem DbC) y
+  la mide indirectamente el **mutation score** — una precondición ausente deja mutantes vivos.
+  NO hay detector por grep a propósito: contar aserciones sin un parser real por lenguaje
+  produciría ruido, y un detector ruidoso se descarta entero (ley del 10%, §14).
 - **Invariantes → property-based tests.** Si la regla vale para todos los valores, no la
   compruebes con tres ejemplos.
 - **Todo fake pasa la MISMA suite de conformidad que el adapter real** (`domain/SKILL.md`).

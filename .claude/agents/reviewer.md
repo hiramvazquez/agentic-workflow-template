@@ -28,6 +28,11 @@ proyecto. **No modificas código. No commiteas. Solo reportas.**
 - **Calidad del test, no solo su existencia** (§5): ¿el test FALLA si rompes la lógica que
   dice cubrir? Un test que pasa con cualquier implementación es decorativo. Comprueba que
   hay aserciones sobre el resultado, no solo sobre "no lanzó excepción".
+- **Aserciones / DbC** (§5): las funciones públicas NUEVAS validan sus precondiciones (objetivo
+  ≥2 aserciones, sin efectos secundarios, con recuperación explícita al fallar). Tú eres el
+  mecanismo de esta regla — no existe detector automático a propósito (sería ruido): si una
+  función pública nueva acepta cualquier entrada sin validar, repórtalo. Pregunta guía: ¿qué
+  input rompería esto en silencio?
 
 ## Verificaciones mecánicas que DEBES correr
 

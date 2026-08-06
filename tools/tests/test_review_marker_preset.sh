@@ -38,6 +38,8 @@ _anillo2() {
 }
 
 # ── LA REGRESIÓN: los dos caminos deben coincidir ───────────────────
+# FALSO POSITIVO guard: en preset lite el marker AVISA, no bloquea — y debe
+# ser así en LOS DOS anillos, o el agente recibe luz verde y el commit falla.
 _case_lite_coherente() {
   local a1 a2; a1="$(_anillo1 lite)"; a2="$(_anillo2 lite)"
   # lite: ambos permiten (0 en el script, 0 = allow en el hook).

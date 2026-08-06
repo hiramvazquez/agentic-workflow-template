@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **5** · Cerrados: 4 · Total: 9
+Abiertos: **7** · Cerrados: 4 · Total: 11
 
 ## Abiertos
 
@@ -13,7 +13,9 @@ Abiertos: **5** · Cerrados: 4 · Total: 9
 | `f-harness-no-autogate` | medium | owner-decision | `tools/check-review-marker.sh` | El harness no se auto-aplica: NON_PRODUCT excluye tools/ y scripts/, que en ESTE repo son el producto |
 | `f-ratchet-corrompible` | medium | owner-decision | `tools/mutation-ratchet.json, tools/drift-ratchet.json` | Los *-ratchet.json son corrompibles via Bash, y ahora corromperlos desactiva un gate |
 | `f-deny-bloquea-lectura` | low | owner-decision | `.claude/settings.json` | permissions.deny Bash(*reviewer_run.txt*) tambien bloquea LEER el marker |
+| `f-meta-fp-manifiesto` | low | owner-decision | `tools/tests/test_meta_fp.sh` | El manifiesto de test_meta_fp no cubre todos los detectores del repo |
 | `f-session-start-fx` | low | owner-decision | `scripts/agent-hooks/session-start.sh` | session-start.sh mezcla informar con resetear estado |
+| `f-meta-fp-self` | info | auto-fix | `tools/tests/test_meta_fp.sh` | test_meta_fp no valida su propio parsing del manifiesto |
 
 ## Cerrados
 
