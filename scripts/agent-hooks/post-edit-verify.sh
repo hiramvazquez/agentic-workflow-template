@@ -110,6 +110,10 @@ esac
 
 [ -z "$OUT" ] && hook_allow   # todo limpio → silencio
 
+# Telemetría (nivel 9): la señal in-loop encontró algo — es el bucket más
+# barato de escape-rate. Best-effort, jamás afecta al flujo.
+hook_log_detection "post-edit-verify" "in-loop" "$REL" 1
+
 hook_context "$EV" "🔧 Verificación automática de \`$REL\` (no bloquea, pero arréglalo AHORA — cuesta 10× menos que en el review):
 
 $OUT"

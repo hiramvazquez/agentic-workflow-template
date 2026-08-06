@@ -38,6 +38,8 @@ Baja la deuda que introdujiste, o compénsala en otro lado."
 fi
 if [ -f tools/check-layers.sh ]; then
   if ! out="$(bash tools/check-layers.sh 2>&1)"; then
+    hook_log_detection "check-layers" "pre-commit" "staged" \
+      "$(printf '%s' "$out" | sed -nE 's/.*LAYERS_SUMMARY errors=([0-9]+).*/\1/p')"
     hook_block "$out"$'\n\n'"❌ reviewer-gate: commit BLOQUEADO por violación de capas (AGENTS.md §3).
 Las capas son un contrato, no un estilo. Invierte la dependencia o mueve el archivo."
   fi
@@ -51,6 +53,8 @@ if [ -f tools/semgrep-scan.sh ]; then
   out="$(bash tools/semgrep-scan.sh --staged 2>&1)"; rc=$?
   case "$rc" in
     1)  # HALLAZGO real en el código → bloquea, sin excepción.
+        hook_log_detection "semgrep" "pre-commit" "staged" \
+          "$(printf '%s' "$out" | sed -nE 's/.*SEMGREP_SUMMARY errors=([0-9]+).*/\1/p')"
         hook_block "$out"$'\n\n'"❌ reviewer-gate: commit BLOQUEADO por hallazgos de semgrep (patrones AST)." ;;
     3)  # El DETECTOR falló (ausente, reglas rotas, crash). Avisa, no bloquea.
         # Bloquear aquí crearía un deadlock: un typo en las reglas impediría

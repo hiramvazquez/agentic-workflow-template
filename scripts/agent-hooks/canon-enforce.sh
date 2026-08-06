@@ -129,6 +129,10 @@ fi
 # ── Veredicto ───────────────────────────────────────────────────────
 [ ${#VIOLATIONS[@]} -eq 0 ] && exit 0
 
+# Telemetría (nivel 9): cada bloqueo de este gate es un dato de contención en
+# fase `gate` — barata. Best-effort, jamás afecta al veredicto.
+hook_log_detection "canon-enforce" "stop-check" "working-tree" "${#VIOLATIONS[@]}"
+
 MSG=""
 for v in "${VIOLATIONS[@]}"; do MSG+="$v"$'\n'; done
 

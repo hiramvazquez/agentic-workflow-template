@@ -114,3 +114,33 @@ hook_block_or_warn() {
   if [ "$(hook_preset)" = "lite" ]; then printf '⚠️  [lite] %s\n' "$1" >&2; exit 0; fi
   printf '%s\n' "$1" >&2; exit 2
 }
+
+# ── Telemetría de detecciones (alimenta escape-rate) ────────────────
+# hook_log_detection <source> <rule> <area> [n]
+#
+# El eslabón que faltaba en el bucle de aprendizaje: los gates DETECTABAN y
+# todo se descartaba — cuatro scripts leían el ledger, cero lo escribían, así
+# que escape-rate.sh nunca iba a tener datos (PRD 0002 §2).
+#
+# Es un EVENTO de métrica, no un finding curado: va a un canal local separado
+# (.agents/state/, gitignored, como la trayectoria) para no ahogar el ledger.
+#
+# CONTRATO DURO: best-effort TOTAL. La telemetría JAMÁS puede romper al gate
+# que la llama — siempre devuelve 0, pase lo que pase (sin python3, sin disco,
+# sin git). Fijado por test_telemetria_rota_jamas_rompe_al_gate.
+hook_log_detection() {
+  (
+    set +e
+    local src="${1:-?}" rule="${2:-?}" area="${3:-?}" n="${4:-1}"
+    local dir="${PROJECT_ROOT:-$(pwd)}/.agents/state/metrics"
+    mkdir -p "$dir" 2>/dev/null || exit 0
+    case "$n" in ''|*[!0-9]*) n=1 ;; esac
+    # JSON a mano con saneo mínimo: sin dependencia de python3/jq a propósito.
+    src="${src//\"/}"; rule="${rule//\"/}"; area="${area//\"/}"
+    printf '{"ts":"%s","source":"%s","rule":"%s","area":"%s","n":%s}\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo '?')" \
+      "$src" "$rule" "$area" "$n" >> "$dir/detections.jsonl" 2>/dev/null
+    exit 0
+  ) 2>/dev/null
+  return 0
+}

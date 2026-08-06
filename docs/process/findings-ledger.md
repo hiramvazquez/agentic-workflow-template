@@ -1,16 +1,25 @@
-# Findings Ledger (vista generada — NO editar a mano)
+# Findings Ledger — vista humana
 
-> Regenera con: `findings.ts render`. Fuente: `tools/findings/ledger.jsonl`.
-> Total: 1 · abiertos: 1 · cerrados: 0
+> **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
+> Regenerar: `bash tools/findings/findings.sh render`.
 
-## 🔴 Requieren TU decisión (owner-decision, abiertos)
+Abiertos: **5** · Cerrados: 4 · Total: 9
 
-| id | sev | tier | status | título | área |
-|---|---|---|---|---|---|
-| `f-8145599c` | low | owner-decision | open | Falta test de shell del invariante drift-ratchet-antes-de-bypass-lite | scripts/agent-hooks/reviewer-gate.sh |
+## Abiertos
 
-## Todos los abiertos
+| id | sev | tier | área | título |
+|---|---|---|---|---|
+| `f-marker-spoof` | high | owner-decision | `tools/check-review-marker.sh:69-77` | El marker de review valida contenido, no procedencia: falsificable por un agente con Bash |
+| `f-harness-no-autogate` | medium | owner-decision | `tools/check-review-marker.sh` | El harness no se auto-aplica: NON_PRODUCT excluye tools/ y scripts/, que en ESTE repo son el producto |
+| `f-ratchet-corrompible` | medium | owner-decision | `tools/mutation-ratchet.json, tools/drift-ratchet.json` | Los *-ratchet.json son corrompibles via Bash, y ahora corromperlos desactiva un gate |
+| `f-deny-bloquea-lectura` | low | owner-decision | `.claude/settings.json` | permissions.deny Bash(*reviewer_run.txt*) tambien bloquea LEER el marker |
+| `f-session-start-fx` | low | owner-decision | `scripts/agent-hooks/session-start.sh` | session-start.sh mezcla informar con resetear estado |
 
-| id | sev | tier | status | título | área |
-|---|---|---|---|---|---|
-| `f-8145599c` | low | owner-decision | open | Falta test de shell del invariante drift-ratchet-antes-de-bypass-lite | scripts/agent-hooks/reviewer-gate.sh |
+## Cerrados
+
+| id | estado | resolución |
+|---|---|---|
+| `f-8145599c` | fixed | PRD 0001: cubierto por tools/tests/test_ratchets.sh::test_ratchet_duro_incluso_en_preset_lite y ::te |
+| `f-hook-payload` | fixed | CONFIRMADO END-TO-END en el commit 3b66e7e (P0). Una invocacion real del sub-agente reviewer con VER |
+| `f-semgrep-validate` | fixed | RESUELTO en el commit de cierre del PRD 0001. Las reglas tenian TRES errores y ninguna habia cargado |
+| `f-semgrep-latencia` | fixed | MEDIDO: `bash tools/semgrep-scan.sh --staged` tarda 1.32s reales sobre un commit tipico de este repo |

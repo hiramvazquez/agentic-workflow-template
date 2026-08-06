@@ -27,11 +27,34 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 LEDGER="${FINDINGS_LEDGER:-tools/findings/ledger.jsonl}"
+DETECTIONS="${DETECTIONS_LOG:-.agents/state/metrics/detections.jsonl}"
 MODE="${1:---text}"
 
-[ -f "$LEDGER" ] || { echo "Sin ledger en $LEDGER — nada que medir todavía."; exit 0; }
+[ -f "$LEDGER" ] || [ -f "$DETECTIONS" ] || { echo "Sin ledger ni eventos — nada que medir todavía."; exit 0; }
 
-count_source() { grep -c "\"source\":\"$1\"" "$LEDGER" 2>/dev/null || echo 0; }
+# Dos fuentes que se SUMAN:
+#   ledger      → findings curados y durables (committeado)
+#   detections  → eventos de los gates en ESTA máquina (gitignored, como la
+#                 trayectoria). Los escriben los propios gates vía
+#                 hook_log_detection — el eslabón que faltaba: antes cuatro
+#                 scripts leían el ledger y cero lo escribían.
+count_source() {
+  local a b
+  a="$(grep -c "\"source\": *\"$1\"" "$LEDGER" 2>/dev/null | head -1)"; : "${a:=0}"
+  case "$a" in ''|*[!0-9]*) a=0 ;; esac
+  b=0
+  if [ -f "$DETECTIONS" ]; then
+    # Suma los `n` de cada evento del source (no cuenta líneas: un evento
+    # puede agrupar N hallazgos).
+    b="$(awk -F'"source":"' -v s="$1" '
+      index($0, "\"source\":\""s"\"") {
+        n=1; if (match($0, /"n":[0-9]+/)) n=substr($0, RSTART+4, RLENGTH-4)+0
+        total+=n }
+      END { print total+0 }' "$DETECTIONS" 2>/dev/null)"
+    case "$b" in ''|*[!0-9]*) b=0 ;; esac
+  fi
+  echo $((a + b))
+}
 
 # <!-- FILL: mapea los `source` de TU ledger a estas fases. Los de abajo son
 #      los que produce el harness por defecto. -->
