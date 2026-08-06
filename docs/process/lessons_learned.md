@@ -110,6 +110,24 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   MUDOS en cada arranque
 - **Área:** scripts/agent-hooks/canon-enforce.sh
 
+### [2026-08-06] Las reglas de semgrep nunca habían cargado, y `--validate` decía que sí
+- **Qué pasó:** `tools/semgrep/rules/universal.yaml` tenía **tres** errores distintos y ninguna
+  de sus 6 reglas se había ejecutado jamás. Se descubrió cuando el gate corrió por primera vez
+  con semgrep instalado, en un `git commit` real.
+  1. `- pattern: rejectUnauthorized: false` → el `:` del patrón hace que YAML lo lea como
+     mapping anidado. Hay que citarlo.
+  2. `$X === "..."` en una regla que declara `csharp` → `===` no existe en C#.
+  3. `pattern-inside: def $F(...):` en una regla que declara `java` → sintaxis Python.
+- **Causa raíz doble:** (a) `semgrep --validate` solo valida el **YAML**, no el parseo de cada
+  patrón contra cada lenguaje declarado; (b) un patrón inválido para **uno** de los `languages`
+  de una regla **rompe la carga del archivo entero**, no solo de esa regla.
+- **Regla:** `--validate` no es suficiente. La única verificación real de una regla de semgrep
+  es **ejecutarla**. Y al escribir una regla multi-lenguaje, sepárala por familia sintáctica:
+  un solo patrón incompatible tumba todo el fichero.
+- **Detector:** `tools/tests/test_shell_hygiene.sh::test_las_reglas_de_semgrep_cargan` (ejecuta
+  el scan real y falla con exit 3, que es "el detector no pudo correr")
+- **Área:** tools/semgrep/rules/universal.yaml
+
 ### [2026-08-05] Escribir el harness en español rompió tres scripts en silencio
 - **Qué pasó:** `fail "STALE (HEAD cambió $MARKED_HEAD→$CUR_HEAD)"`. Bash consume los bytes de
   `→` como parte del nombre de variable, expande `$MARKED_HEAD→` (inexistente) y con `set -u`

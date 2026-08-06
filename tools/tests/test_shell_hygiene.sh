@@ -84,6 +84,24 @@ test_los_hooks_no_dependen_del_cwd() {
   printf '%s' "$bad"; return 1
 }
 
+# ── Las reglas de semgrep CARGAN de verdad ──────────────────────────
+# `semgrep --validate` solo comprueba el YAML. Un patrón inválido para UNO de
+# los `languages` que la regla declara (p.ej. `===` en C#, o `def $F(...):` en
+# Java) pasa la validación y revienta la carga del ARCHIVO ENTERO al ejecutar.
+# Las 6 reglas de universal.yaml tuvieron tres errores de este tipo, ninguno
+# detectado hasta la primera ejecución real (PRD 0001 §18 G15).
+test_las_reglas_de_semgrep_cargan() {
+  command -v semgrep >/dev/null 2>&1 || return 0   # sin semgrep, no aplica
+  local out rc
+  out="$(cd "$PROJECT_ROOT" && bash tools/semgrep-scan.sh 2>&1)"; rc=$?
+  # 3 = fallo del propio detector (reglas rotas o crash). 0 y 1 son válidos:
+  # el repo puede tener hallazgos legítimos y eso no es un fallo de las reglas.
+  [ "$rc" != "3" ] && return 0
+  echo "    las reglas de semgrep NO cargan — el nivel 2 está mudo:"
+  printf '%s\n' "$out" | sed 's/^/      /'
+  return 1
+}
+
 # ── Los detectores respetan su contrato de stdout ───────────────────
 # El conteo del trinquete se parsea de estas líneas: si un detector deja de
 # emitirlas, el trinquete lee 0 y aprueba en silencio (mismo patrón que G2).

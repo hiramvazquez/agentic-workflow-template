@@ -65,17 +65,31 @@ rules:
   # ── Ramificar sobre texto en lenguaje natural (rompe i18n, §3) ────
   # Esta es la versión AST del grep frágil que había en check-drift.sh:
   # aquí solo matchea comparaciones REALES, no strings ni comentarios.
+  # Separada por familia de lenguaje a propósito: `===` no existe en C#/Java/Go
+  # y una regla con un patrón inválido para UNO de sus `languages` hace fallar
+  # la carga de TODO el archivo. `--validate` no lo detecta (solo valida el
+  # YAML); solo se ve ejecutando semgrep de verdad.
   - id: branch-sobre-texto-natural
-    languages: [javascript, typescript, python, go, java, kotlin, csharp]
+    languages: [python, go, java, kotlin, csharp]
     severity: WARNING
     message: >-
       Comparación de lógica contra un literal de texto en lenguaje natural.
       Esto se rompe en cuanto añadas otro idioma o el backend cambie la
       redacción (AGENTS.md §3). Clasifica con un enum o una clave i18n.
-    patterns:
-      - pattern-either:
-          - pattern: $X == "=~/^[a-záéíóúñ]{4,}( [a-záéíóúñ]+)+$/"
-          - pattern: $X === "=~/^[a-záéíóúñ]{4,}( [a-záéíóúñ]+)+$/"
+    pattern: $X == "=~/^[a-záéíóúñ]{4,}( [a-záéíóúñ]+)+$/"
+    paths:
+      include: ["**/domain/**", "**/Domain/**", "**/logic/**", "**/usecases/**", "**/UseCases/**"]
+
+  - id: branch-sobre-texto-natural-js
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Comparación de lógica contra un literal de texto en lenguaje natural.
+      Esto se rompe en cuanto añadas otro idioma o el backend cambie la
+      redacción (AGENTS.md §3). Clasifica con un enum o una clave i18n.
+    pattern-either:
+      - pattern: $X === "=~/^[a-záéíóúñ]{4,}( [a-záéíóúñ]+)+$/"
+      - pattern: $X == "=~/^[a-záéíóúñ]{4,}( [a-záéíóúñ]+)+$/"
     paths:
       include: ["**/domain/**", "**/Domain/**", "**/logic/**", "**/usecases/**", "**/UseCases/**"]
 
@@ -89,8 +103,8 @@ rules:
       de confianza.
     pattern-either:
       - pattern: verify=False
-      - pattern: rejectUnauthorized: false
-      - pattern: InsecureSkipVerify: true
+      - pattern: "rejectUnauthorized: false"
+      - pattern: "InsecureSkipVerify: true"
 
   # ── Aleatoriedad no criptográfica para material de seguridad ──────
   - id: random-no-criptografico
@@ -100,13 +114,12 @@ rules:
       Generador pseudoaleatorio no criptográfico usado para material de
       seguridad (token, salt, id de sesión). Es predecible. Usa el CSPRNG
       de la plataforma (secrets, crypto.randomBytes, SecureRandom).
-    patterns:
-      - pattern-either:
-          - pattern: random.random()
-          - pattern: Math.random()
-      - pattern-inside: |
-          def $F(...):
-            ...
+    # Sin `pattern-inside: def $F(...)`: era sintaxis Python en una regla que
+    # también declara Java/JS/TS, y eso rompía la carga del archivo entero.
+    # El acotado real lo hace `paths.include`, que es lo que se pretendía.
+    pattern-either:
+      - pattern: random.random()
+      - pattern: Math.random()
     paths:
       include: ["**/auth/**", "**/security/**", "**/crypto/**", "**/token*/**"]
 
