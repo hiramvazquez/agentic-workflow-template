@@ -22,12 +22,35 @@ Triage en 3 buckets (`tier`):
 
 ```
 tools/findings/
-  findings.ts     CLI + librería (portable Deno/Node, sin deps)
+  findings.sh     CLI PORTABLE (bash+python3) — el camino por defecto
+  findings.ts     CLI alternativo (Deno/Node) — mismo esquema, mismos ids
   ledger.jsonl    ← FUENTE DE VERDAD (1 hallazgo = 1 línea JSON)
   README.md       este archivo
 docs/process/
   findings-ledger.md  ← VISTA HUMANA generada (NO editar a mano)
+.agents/state/metrics/
+  detections.jsonl    ← EVENTOS de los gates (local, gitignored — telemetría,
+                        no findings curados; los agrega tools/metrics/escape-rate.sh)
 ```
+
+> **¿Por qué dos CLIs?** `findings.ts` exigía Deno/Node y hubo máquinas sin ellos → el ledger
+> era inoperable y los hallazgos se acumulaban en archivos sueltos. `findings.sh` usa lo que el
+> repo ya asume (bash+python3). Ambos comparten esquema, hash de ids y el **invariante clave**:
+> `add`/`import` jamás resucitan un estado terminal — cerrar es explícito.
+
+## Uso diario
+
+```bash
+bash tools/findings/findings.sh add --title "..." --area "file:line" \
+     --severity high|medium|low --tier auto-fix|owner-decision --source reviewer
+bash tools/findings/findings.sh close f-xxxx --resolution "commit abc123"
+bash tools/findings/findings.sh list --status open
+bash tools/findings/findings.sh render      # regenera la vista humana
+bash tools/metrics/escape-rate.sh           # contención por fase (ledger + eventos)
+```
+
+Los gates escriben **eventos** solos (`hook_log_detection`); al ledger curado se añade con el
+CLI — normalmente lo hace el agente al cerrar una review o un juicio (AGENTS.md §10).
 
 ## Invariante clave (auto-flow)
 

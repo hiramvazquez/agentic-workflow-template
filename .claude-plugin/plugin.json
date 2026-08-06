@@ -1,8 +1,8 @@
 {
   "name": "agentic-workflow-template",
   "displayName": "Agentic Workflow Template",
-  "description": "Governance para desarrollo con agentes IA: skills (arquitectura/dominio/proceso/seguridad), sub-agentes (reviewer, design-reviewer, tester TDD, security-reviewer, process-judge, prd-writer) y reglas path-scoped. iOS de referencia, TDD-first.",
-  "version": "0.1.0",
+  "description": "Governance para desarrollo con agentes IA: pirámide de verificación de 9 niveles (veredictos derivados por el sistema, detectores AST, trinquetes, mutación, lección→detector), skills, sub-agentes con contrato VERDICT y hooks en 3 anillos. iOS de referencia, TDD-first.",
+  "version": "0.3.0",
   "author": { "name": "<PROJECT>" },
   "keywords": ["agents", "governance", "tdd", "ios"],
   "agents": "./.claude/agents/",

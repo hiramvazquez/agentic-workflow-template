@@ -13,9 +13,16 @@
 | `git` | todo | sí |
 | [`lefthook`](https://github.com/evilmartians/lefthook) | Anillo 1 (git hooks) | sí |
 | [`gitleaks`](https://github.com/gitleaks/gitleaks) | secret-scan | sí |
-| `deno` **o** `node` | findings-ledger CLI | sí (elige uno) |
-| `jq` | hooks de IA (parsing JSON) | recomendada |
+| [`semgrep`](https://semgrep.dev) | detectores AST (nivel 2 de la pirámide) | sí — sin él el nivel 2 está MUDO (local avisa, CI bloquea) |
+| `python3` | `tools/findings/findings.sh` (ledger) + utilidades | sí (viene en macOS/Linux) |
+| `jq` | hooks de IA (parsing JSON) | sí para el Anillo 2 |
+| `deno` **o** `node` | `findings.ts` (CLI alternativo del ledger) | no — `findings.sh` cubre lo mismo con python3 |
+| Runner de mutación (muter/Stryker/PIT/mutmut) | nivel 4: calidad real de los tests | recomendada — sin él nada distingue un test real de uno decorativo |
 | Tu CI (GitHub/GitLab/…) | Anillo 3 | opcional |
+
+> `bash scripts/agent-hooks/session-start.sh` (o abrir cualquier sesión de Claude/Cursor) te
+> dice **qué niveles de la pirámide están MUDOS** en tu máquina. Confía en ese reporte, no en
+> tu memoria: un gate anunciado y no operativo es peor que uno ausente.
 
 ## 1. Clonar y renombrar
 
@@ -52,12 +59,24 @@ Busca todos los marcadores y resuélvelos:
 grep -rn "FILL:" . --include="*.md" --include="*.yml" --include="*.toml" --include="*.sh"
 ```
 
-Prioridad de relleno:
-1. `AGENTS.md` §Stack, §Comandos, §Convenciones — sin esto el agente vuela a ciegas.
-2. `.agents/skills/architecture/SKILL.md` + `platforms/<tu-plataforma>.md` — arquitectura, navegación, DI.
-3. `.agents/skills/domain/SKILL.md` — entidades/puertos de tu dominio.
-4. `tools/check-drift.sh` — los checks mecánicos de TUS convenciones.
-5. `docs/process/current_execution_map.md` — estado del proyecto.
+Prioridad de relleno (en orden de impacto — es la pirámide de
+`.agents/skills/process/references/verification-loop.md` de abajo arriba):
+
+1. `AGENTS.md` §2 — stack, build, tests, lint **y el modo estricto (nivel 0)**. Sin esto el
+   agente vuela a ciegas y el compilador no te defiende de nada.
+2. `scripts/agent-hooks/post-edit-verify.sh` §FILL — **el gate de mayor ROI**: lint/typecheck
+   del archivo tocado, de vuelta al agente en el mismo turno. Media hora de trabajo, cambia
+   el bucle entero.
+3. `tools/mutation-score.sh` §FILL — el runner de mutación de tu stack, y una primera
+   medición (`--update` fija el piso, que a partir de ahí SOLO sube). Es lo único que
+   distingue un test que verifica de uno escrito para pasar.
+4. `.agents/skills/architecture/SKILL.md` + `platforms/<tu-plataforma>.md` + `domain/SKILL.md`.
+5. `tools/layers.conf` — las reglas de capas de TUS rutas (grafo de imports).
+6. `tools/semgrep/rules/` — tus anti-patrones como reglas AST. **Ejecuta el scan una vez**
+   (`bash tools/semgrep-scan.sh`): `--validate` solo valida el YAML, no el parseo por
+   lenguaje — nos pasó (PRD 0001 §18 G15).
+7. `docs/process/current_execution_map.md` — estado del proyecto.
+8. `CODEOWNERS` — sustituye los `@owner`.
 
 > Mi opinión por defecto vive en `<!-- OPINIÓN: ... -->`. Acéptala o cámbiala; no es ley.
 
@@ -100,4 +119,34 @@ git add leak.txt && git commit -m "test"   # debe FALLAR por gitleaks
 rm leak.txt
 ```
 
-Si el commit se bloquea, el Anillo 1 está vivo. Listo.
+Si el commit se bloquea, el Anillo 1 está vivo.
+
+## 8. Entender el flujo de review (el corazón del harness)
+
+Con preset `full`, un commit de código de producto exige que el sub-agente `reviewer` haya
+revisado **ese diff exacto**:
+
+1. El agente (o tú) invoca el sub-agente `reviewer` sobre el diff staged.
+2. El reviewer termina con `VERDICT: GREEN|AMBER|RED` — y **el hook** `SubagentStop` escribe el
+   marker a partir de ese veredicto real, ligado al `sha256` del diff. El modelo no puede
+   escribirlo (un marker manual se rechaza; `source: hook` es obligatorio).
+3. `git commit` pasa los gates del Anillo 1 (capas, semgrep, secretos, trinquete, marker).
+4. Si cambias lo staged después de la review, el marker caduca. Re-revisa.
+
+Escape auditado para emergencias: `REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..."` —
+relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.
+
+## 9. El bucle que hace que esto mejore solo
+
+- Los gates registran cada detección → `bash tools/metrics/escape-rate.sh` te dice en qué
+  fase se caza cada defecto. **La tendencia de ese número es la única evidencia real de que
+  puedes bajar la revisión humana.**
+- Todo hallazgo va al ledger: `bash tools/findings/findings.sh add|close|list`.
+- Toda lección de `docs/process/lessons_learned.md` exige su campo `Detector:` (verificado en
+  CI): error cometido → lección → detector → **imposible repetirlo**. Ese es el mecanismo
+  completo; sin el tercer paso, las lecciones son prosa.
+- Las sesiones que tocan código quedan encoladas para el `process-judge` hasta que su
+  veredicto las cierra (visible en cada turno).
+
+Listo. El detalle conceptual de por qué cada pieza existe: 
+`.agents/skills/process/references/verification-loop.md`.

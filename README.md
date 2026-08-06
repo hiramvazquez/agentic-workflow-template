@@ -107,17 +107,21 @@ scripts/agent-hooks/       ← UNA implementación de los gates, compartida por 
   post-compact.sh            ← reinyecta reglas tras compactar el contexto
   canon-enforce.sh           ← reglas irrompibles (Stop, bloqueante)
   track-failure.sh           ← detecta al agente atascado en un bucle de reintentos
-  inject-context.sh          ← estado vivo por turno (findings abiertos, árbol sucio)
+  inject-context.sh          ← estado vivo por turno (findings abiertos, cola de juicio)
+  session-end.sh             ← encola la sesión para el process-judge si tocó código
+  lib/io.sh                  ← normalización Claude/Cursor + hook_log_detection (telemetría)
 
 tools/
   check-layers.sh + layers.conf  ← fitness function por grafo de imports (nivel 6)
-  semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2)
+  semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación de review compartida por los 3 anillos
   lesson-detector-link.sh    ← toda lección tiene detector (nivel 9)
+  findings/findings.sh       ← CLI del ledger (bash+python3; findings.ts para Deno/Node)
   metrics/escape-rate.sh     ← contención por fase: ¿puedo bajar la revisión humana?
   drift-ratchet.json         ← trinquete de deuda — SOLO BAJA
-  tests/                     ← tests de shell de los propios gates
+  tests/                     ← 105 tests de shell de los propios gates
+                               (⅓ son casos de FALSO POSITIVO; test_meta_fp lo exige)
 
 ci/run-gates.sh + ci/ai-review.sh + ci/examples/ ← Anillo 3 (provider-agnóstico)
 lefthook.yml + .gitleaks.toml                    ← Anillo 1
