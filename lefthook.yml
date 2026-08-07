@@ -40,7 +40,7 @@ pre-commit:
     # siga siendo pre-commit (< 2s); el scan completo va en el Anillo 3.
     # exit 1 = hallazgo real -> bloquea · exit 3 = el detector no pudo correr
     # -> avisa y deja pasar. Bloquear en el caso 3 crearía un deadlock: un typo
-    # en las reglas impediría hasta el commit que lo arregla (AGENTS.md §4.4).
+    # en las reglas impediría hasta el commit que lo arregla (AGENTS.md §14.3).
     # El backstop del caso 3 es CI (GATES_REQUIRE_SEMGREP=1).
     - name: semgrep-staged
       run: |

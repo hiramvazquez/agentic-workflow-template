@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════
-# track-failure.sh — hook PostToolUseFailure
+# track-failure.sh — hook PostToolUse (matcher Bash|Edit|Write|MultiEdit)
 # ════════════════════════════════════════════════════════════════════
 # Detecta al agente ATASCADO. Un agente que falla el mismo comando 4 veces
 # seguidas no está progresando: está reintentando variaciones de una hipótesis
 # equivocada, quemando contexto y consolidando el error en el historial.
 #
-# Un humano se da cuenta al tercer intento. El agente no, porque cada intento
-# le parece nuevo. Este hook lleva la cuenta y le dice explícitamente que pare
-# y cambie de estrategia — que es exactamente lo que un senior haría.
+# NOTA DE HISTORIA: esto vivió registrado en un evento "PostToolUseFailure"
+# que NO EXISTE en Claude Code — jamás disparó (gate mudo). Ahora corre en
+# PostToolUse (que dispara siempre) y deriva éxito/fallo del payload real.
+# Ventaja inesperada del cambio: ahora también VE los éxitos, así que la racha
+# se resetea sola cuando el agente desbloquea. Antes solo veía fallos y una
+# racha vieja podía disparar un falso "atasco" días después.
+# Fijado por tools/tests/test_hook_events.sh.
 #
-# No bloquea (PostToolUseFailure no puede): informa. Pero informar en el momento
-# correcto es la mitad del trabajo.
+# No bloquea: informa. Pero informar en el momento correcto es la mitad
+# del trabajo.
 set -uo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=lib/io.sh
@@ -24,9 +28,32 @@ COUNTER="$STATE/failure-streak.txt"
 
 TOOL="$(hook_tool)"
 CMD="$(hook_command)"
+
+# ── ¿La tool FALLÓ? Derivado del payload de PostToolUse ─────────────
+# El shape del tool_response varía por tool y versión; probamos las señales
+# conocidas en orden y, si ninguna aparece, asumimos ÉXITO (fail-open: un
+# hook de aviso no debe inventar atascos).
+FAILED=0
+if command -v jq >/dev/null 2>&1; then
+  _resp_success="$(_hook_jq '.tool_response.success // empty')"
+  _resp_iserr="$(_hook_jq '.tool_response.is_error // empty')"
+  _resp_exit="$(_hook_jq '.tool_response.exit_code // .tool_response.exitCode // empty')"
+  if [ "$_resp_success" = "false" ] || [ "$_resp_iserr" = "true" ]; then
+    FAILED=1
+  elif [ -n "$_resp_exit" ] && [ "$_resp_exit" != "0" ] 2>/dev/null; then
+    FAILED=1
+  fi
+fi
+
 # Firma del fallo: la herramienta + los 2 primeros tokens del comando.
 # Suficiente para agrupar reintentos de "lo mismo" sin ser sensible a flags.
 SIG="$TOOL:$(printf '%s' "$CMD" | awk '{print $1, $2}')"
+
+if [ "$FAILED" -eq 0 ]; then
+  # Éxito → la racha muere. Solo tocamos disco si había racha (coste ~0).
+  [ -f "$COUNTER" ] && rm -f "$COUNTER" 2>/dev/null
+  hook_allow
+fi
 
 PREV_SIG=""; PREV_N=0
 if [ -f "$COUNTER" ]; then
@@ -44,7 +71,7 @@ printf '%s\n%s\n' "$SIG" "$N" > "$COUNTER"
 printf '[%s] atasco: %s × %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIG" "$N" \
   >> "$STATE/stuck-log.txt" 2>/dev/null || true
 
-hook_context "PostToolUseFailure" "🔁 ATASCO DETECTADO: \`$SIG\` ha fallado $N veces seguidas.
+hook_context "PostToolUse" "🔁 ATASCO DETECTADO: \`$SIG\` ha fallado $N veces seguidas.
 
 Reintentar variaciones de la misma hipótesis es el modo de fallo más caro que existe:
 quema contexto y consolida el error. Para y haz UNA de estas, en este orden:

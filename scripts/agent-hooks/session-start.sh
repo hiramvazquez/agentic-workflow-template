@@ -1,20 +1,40 @@
 #!/usr/bin/env bash
-# Hook SessionStart (Claude) / sessionStart (Cursor).
+# Hook SessionStart, matcher startup|clear (Claude). Con `--report`, matcher resume.
 # Tabula rasa por sesión: borra markers de skills leídos + baseline de drift,
 # e imprime el estado del proyecto. Observe-only (no bloquea nunca).
 #
-#   sin args    → reset + reporte   (lo que invoca el hook)
-#   --report    → SOLO reporte, sin efectos secundarios
+#   sin args    → reset + reporte   (lo que invoca el hook en startup|clear)
+#   --report    → SOLO reporte, sin efectos secundarios (resume, o humano mirando)
 #
 # El modo --report existe porque observar no puede modificar: ejecutar este
 # script "para ver el estado" borraba los markers de skills leídas a mitad de
 # sesión y el siguiente Edit quedaba bloqueado — nos pasó (f-session-start-fx).
 # Un script que un humano ejecuta para inspeccionar necesita un modo puro.
+#
+# DEFENSA EN PROFUNDIDAD sobre `source`: aunque settings.json ya enruta por
+# matcher (startup|clear → reset · resume → --report · compact → post-compact),
+# este script re-verifica el `source` del payload. Si un wrapper mal configurado
+# lo invoca en `compact`, resetear aquí re-basearía el drift INCLUYENDO los
+# errores que el agente acabara de introducir — pasarían a baseline y jamás se
+# bloquearían. Fijado por tools/tests/test_session_start.sh.
 set -uo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT" || exit 0
 
 MODE="${1:---reset}"
+
+# El payload del hook llega por stdin; un humano invocando a mano no lo tiene.
+# Solo leemos stdin si NO es un TTY (evita colgar la invocación manual).
+HOOK_SOURCE=""
+if [ ! -t 0 ]; then
+  _input="$(cat 2>/dev/null || true)"
+  if [ -n "$_input" ] && command -v jq >/dev/null 2>&1; then
+    HOOK_SOURCE="$(printf '%s' "$_input" | jq -r '.source // empty' 2>/dev/null || true)"
+  fi
+fi
+case "$HOOK_SOURCE" in
+  compact|resume) MODE="--report" ;;
+esac
 
 state_dir=".agents/state"
 mkdir -p "$state_dir/skills-read" "$state_dir/markers" "$state_dir/trajectory"
@@ -45,8 +65,27 @@ _health=1
 grep -qE 'Plataformas:\*\* <!-- FILL' AGENTS.md 2>/dev/null && { echo "⚠️  AGENTS.md §2 (Stack) SIN rellenar — build/test/lenguaje desconocidos."; _health=0; }
 _src=0; for d in ios android web src; do [ -d "$d" ] && _src=1; done
 [ "$_src" = "0" ] && { echo "⚠️  Sin carpetas de código (ios/android/web/src) — check-drift inactivo."; _health=0; }
-grep -qE '\*View\*|\*\.swift|\*\.kt|\*\.ts' scripts/agent-hooks/skill-reminder.sh 2>/dev/null \
-  || { echo "⚠️  skill-reminder sin globs concretos — gate leer-skill MUDO (configura AGENTS.md §11)."; _health=0; }
+# La matriz path→skill vive en tools/skill-matrix.conf (fuente única).
+# El check honesto no es "¿hay globs?" sino "¿los globs cubren TU código?":
+# los globs iOS de fábrica en un repo Python son un gate que jamás dispara
+# pero que un grep ingenuo reporta como 'configurado' — falsa confianza.
+if [ -f tools/skill-matrix.conf ]; then
+  _uncovered=""
+  for _ext in swift kt ts tsx py go java rb; do
+    _n="$(find ios android web src app lib Sources -type f -name "*.${_ext}" 2>/dev/null | head -1)"
+    [ -z "$_n" ] && continue
+    grep -v '^\s*#' tools/skill-matrix.conf 2>/dev/null | grep -q "\.${_ext}\|/\*\*" \
+      || _uncovered="${_uncovered} .${_ext}"
+  done
+  [ -n "$_uncovered" ] && { echo "⚠️  skill-matrix.conf NO cubre extensiones presentes en el repo:${_uncovered} — gate leer-skill MUDO para esos archivos (edita tools/skill-matrix.conf)."; _health=0; }
+else
+  echo "⚠️  tools/skill-matrix.conf ausente — skill-reminder usa solo sus globs de fábrica."; _health=0
+fi
+# La suite del harness aprueba el conjunto vacío si no hay archivos de test:
+# "0 tests, 0 fallos, ✅" es exactamente el gate mudo que este harness combate.
+_ntests="$(find tools/tests -name 'test_*.sh' 2>/dev/null | wc -l | tr -d ' ')"
+[ "${_ntests:-0}" = "0" ] \
+  && { echo "⚠️  Suite del harness VACÍA (0 archivos test_*.sh) — canon-enforce CHECK 4 y CI paso 1 pasan en vacuo."; _health=0; }
 
 # ── Niveles de la pirámide que están MUDOS (verification-loop.md) ────
 # Un gate no configurado es peor que ausente si el harness lo anuncia como
@@ -78,7 +117,10 @@ fi
 
 # ── Findings abiertos (AGENTS.md §10: el que toca, cierra) ──────────
 if [ -f tools/findings/ledger.jsonl ]; then
-  _open="$(grep -c '"status":"open"' tools/findings/ledger.jsonl 2>/dev/null || echo 0)"
+  # Tolerante a ambos formatos JSON ('"status":"open"' y '"status": "open"'):
+  # findings.sh (python) y findings antiguos difieren en el espaciado, y un grep
+  # rígido reportaba 0 abiertos SIEMPRE — silenciosamente (lección L-json-espacios).
+  _open="$(grep -cE '"status": ?"open"' tools/findings/ledger.jsonl 2>/dev/null || true)"
   [ "${_open:-0}" -gt 0 ] && { echo ""; echo "── Findings abiertos: $_open (si tocas su área, ciérralos o actualízalos) ──"; }
 fi
 
@@ -98,6 +140,6 @@ echo "• PostToolUse Edit/Write: lint+typecheck del archivo tocado → de vuelt
 echo "• SubagentStop: el marker de review lo escribe el SISTEMA a partir del VERDICT"
 echo "  real del sub-agente. Un marker escrito a mano se RECHAZA."
 echo "• Stop: BLOQUEA si introdujiste violaciones/errores nuevos (canon-enforce + drift-stop)."
-echo "• PostCompact: reinyecta el digest de reglas + findings tras compactar el contexto."
-echo "• Markers se borran cada sesión → re-leer requerido."
+echo "• SessionStart(compact): reinyecta el digest de reglas + findings tras compactar."
+echo "• Markers se borran en cada sesión NUEVA (startup|clear) → re-leer requerido."
 exit 0

@@ -107,3 +107,25 @@ _case_evento_jamas_rompe() {
   [ "$?" = "0" ] || { echo "    la telemetría rota devolvió error (rompería el gate que la llama)"; return 1; }
 }
 test_telemetria_rota_jamas_rompe_al_gate() { _fcli_sandbox _case_evento_jamas_rompe; }
+
+# ── formato byte-idéntico entre emisores (L-json-espacios) ──────────
+# El bug real: findings.sh (python, json.dumps con espacios) y los greps de
+# los hooks ('"status":"open"', sin espacio) → "findings abiertos: 0" SIEMPRE,
+# en silencio. Regla doble: el emisor escribe compacto Y los consumidores son
+# tolerantes. Este test fija la mitad del emisor.
+_case_formato_compacto() {
+  _cli add --id f-fmt --title "Formato" --area x --source test >/dev/null 2>&1
+  grep -q '"status":"open"' tools/findings/ledger.jsonl \
+    || { echo "    el ledger no se escribe en formato compacto (sin espacios): $(head -1 tools/findings/ledger.jsonl)"; return 1; }
+}
+test_ledger_se_escribe_compacto() { _fcli_sandbox _case_formato_compacto; }
+
+# …y la mitad de los consumidores: el grep tolerante de los hooks debe contar
+# abiertos en AMBOS formatos (ledgers viejos con espacio incluidos).
+_case_grep_tolerante() {
+  mkdir -p tools/findings
+  printf '{"id":"a","status":"open"}\n{"id": "b", "status": "open"}\n' > tools/findings/ledger.jsonl
+  local n; n="$(grep -cE '"status": ?"open"' tools/findings/ledger.jsonl || true)"
+  [ "$n" = "2" ] || { echo "    el grep tolerante contó $n de 2 abiertos"; return 1; }
+}
+test_grep_tolerante_cuenta_ambos_formatos() { _fcli_sandbox _case_grep_tolerante; }

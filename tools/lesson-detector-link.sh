@@ -76,7 +76,22 @@ while IFS= read -r line; do
         'n/a-manual'*)
           HAS_DETECTOR=1 ;;          # excepción justificada y explícita
         *)
-          HAS_DETECTOR=1 ;;
+          # El detector citado tiene que EXISTIR. Validar solo que el campo
+          # esté relleno dejaba pasar detectores fantasma: una lección citaba
+          # un grep de check-drift que ya había sido eliminado, y este script
+          # daba el ✅ igual. Si el valor referencia un archivo del repo
+          # (token con extensión conocida), comprobamos que existe; la parte
+          # `::test_x` de un test se recorta antes de mirar el disco.
+          DET_FILE="$(printf '%s' "$VAL" \
+            | grep -oE '[A-Za-z0-9_./-]+\.(sh|bash|yaml|yml|conf|toml|json)' \
+            | head -1 || true)"
+          DET_FILE="${DET_FILE%%::*}"
+          if [ -n "$DET_FILE" ] && [ ! -e "$DET_FILE" ]; then
+            HAS_DETECTOR=0
+            CURRENT="${CURRENT} — detector citado NO existe: ${DET_FILE}"
+          else
+            HAS_DETECTOR=1
+          fi ;;
       esac
       ;;
   esac

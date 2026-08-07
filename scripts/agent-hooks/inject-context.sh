@@ -24,11 +24,16 @@ add() { LINES="${LINES}$1"$'\n'; }
 # ── Findings abiertos: "el que toca, cierra" (AGENTS.md §10) ────────
 LEDGER="tools/findings/ledger.jsonl"
 if [ -f "$LEDGER" ]; then
-  N="$(grep -c '"status":"open"' "$LEDGER" 2>/dev/null || echo 0)"
+  # Tolerante a ambos espaciados JSON (lección L-json-espacios): findings.sh
+  # (python) emitía '"status": "open"' y este grep buscaba '"status":"open"'
+  # → el contador reportaba 0 SIEMPRE, en silencio. `|| true` en vez de
+  # `|| echo 0`: grep -c ya imprime 0 al no matchear, y el echo extra producía
+  # "0\n0" y un [: integer expression expected.
+  N="$(grep -cE '"status": ?"open"' "$LEDGER" 2>/dev/null || true)"; : "${N:=0}"
   if [ "${N:-0}" -gt 0 ]; then
     add "· Findings ABIERTOS: $N — si tocas su área, los cierras o los actualizas (§10):"
-    grep '"status":"open"' "$LEDGER" 2>/dev/null \
-      | sed -E 's/.*"id":"([^"]+)".*"title":"([^"]+)".*"area":"([^"]+)".*/    [\1] \3 — \2/' \
+    grep -E '"status": ?"open"' "$LEDGER" 2>/dev/null \
+      | sed -E 's/.*"id": ?"([^"]+)".*"title": ?"([^"]+)".*"area": ?"([^"]+)".*/    [\1] \3 — \2/' \
       | head -5 | while IFS= read -r l; do printf '%s\n' "$l"; done > /tmp/.ic_$$ 2>/dev/null
     [ -f /tmp/.ic_$$ ] && { LINES="${LINES}$(cat /tmp/.ic_$$)"$'\n'; rm -f /tmp/.ic_$$; }
   fi

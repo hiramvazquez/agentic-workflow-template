@@ -20,6 +20,13 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT" || exit 0
 
 hook_read_input
+
+# ── El juicio de proceso es cosa de EQUIPO (preset full) ────────────
+# En `lite` (una persona) la cola era ruido perpetuo: "N sesiones pendientes"
+# que nadie iba a juzgar jamás, y una señal que siempre grita se deja de leer.
+# El judge sigue disponible manualmente en lite; solo no se encola solo.
+[ "$(hook_preset)" = "lite" ] && exit 0
+
 SID="$(hook_session_id)"
 [ -z "$SID" ] || [ "$SID" = "unknown" ] && SID="s-$(date +%s)"
 

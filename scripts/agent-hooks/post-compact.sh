@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════
-# post-compact.sh — hook PostCompact
+# post-compact.sh — hook SessionStart con matcher `compact`
 # ════════════════════════════════════════════════════════════════════
+# NOTA DE HISTORIA: esto vivió registrado en un evento "PostCompact" que NO
+# EXISTE en Claude Code — el hook jamás disparó y nadie lo notó (gate mudo).
+# El patrón correcto es SessionStart con source=compact, que sí dispara tras
+# cada compactación. Fijado por tools/tests/test_hook_events.sh.
+#
+# Claude Code re-inyecta solo el CLAUDE.md raíz tras compactar; lo que se
+# pierde es el resto: estado vivo, findings, fase del proyecto. Eso es esto.
 # Causa silenciosa nº1 de degradación en sesiones largas: tras compactar,
 # el agente conserva un RESUMEN de la conversación pero pierde el detalle de
 # las reglas. Sigue "recordando" que hay reglas, ya no cuáles. Y como no sabe
@@ -46,10 +53,11 @@ fi
 # ── Findings abiertos (lo que NO se puede volver a olvidar) ─────────
 LEDGER="tools/findings/ledger.jsonl"
 if [ -f "$LEDGER" ]; then
-  OPEN="$(grep '"status":"open"' "$LEDGER" 2>/dev/null \
-          | sed -E 's/.*"id":"([^"]+)".*"title":"([^"]+)".*"area":"([^"]+)".*/  - [\1] \2 (\3)/' \
+  # Tolerante a ambos espaciados JSON (lección L-json-espacios).
+  OPEN="$(grep -E '"status": ?"open"' "$LEDGER" 2>/dev/null \
+          | sed -E 's/.*"id": ?"([^"]+)".*"title": ?"([^"]+)".*"area": ?"([^"]+)".*/  - [\1] \2 (\3)/' \
           | head -8 || true)"
-  N="$(grep -c '"status":"open"' "$LEDGER" 2>/dev/null || echo 0)"
+  N="$(grep -cE '"status": ?"open"' "$LEDGER" 2>/dev/null || true)"; : "${N:=0}"
   [ -n "$OPEN" ] && CTX="$CTX
 ## Findings ABIERTOS ($N) — si tocas su área, los cierras o los actualizas
 $OPEN
@@ -66,4 +74,4 @@ branch=$BRANCH · archivos modificados=$DIRTY · preset=$(hook_preset)
 Antes de seguir editando: si no recuerdas la skill del área que estás tocando
 (AGENTS.md §11), reléela. El hook \`skill-reminder\` te la exigirá igualmente."
 
-hook_context "PostCompact" "$CTX"
+hook_context "SessionStart" "$CTX"

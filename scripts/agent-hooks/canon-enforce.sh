@@ -26,7 +26,13 @@ warn() { VIOLATIONS+=("⚠️  $1"); }
 
 # Solo miramos lo que cambió en el árbol de trabajo: un turno no debe pagar
 # por deuda preexistente (para eso está el ledger).
-CHANGED="$(git status --porcelain 2>/dev/null | awk '{print $NF}' | grep -vE '^\.agents/state/' || true)"
+# Parsing del porcelain SIN awk '{print $NF}': ese tomaba el último token, que
+# rompe con espacios en el nombre ("mi archivo.swift" → "archivo.swift") y con
+# renames ("R a -> b": correcto por accidente, pero frágil). Aquí: quita los 3
+# chars de status, toma el destino del rename, y desquota nombres con espacios.
+CHANGED="$(git status --porcelain 2>/dev/null \
+  | sed -E 's/^...//; s/^.* -> //; s/^"(.*)"$/\1/' \
+  | grep -vE '^\.agents/state/' || true)"
 
 # ── Los archivos que DEFINEN los detectores se excluyen ─────────────
 # Un archivo que declara "esto parece un secreto" contiene, por necesidad, algo

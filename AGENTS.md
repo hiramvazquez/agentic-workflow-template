@@ -147,8 +147,11 @@ plana. Excepción legítima y explícita: `n/a-manual — <razón>`.
 
 ## 11. Skills enforcement — matriz path → lectura obligatoria
 
-Antes de editar un archivo, debes haber leído la referencia que aplica. El hook
-`skill-reminder` (Anillo 2) lo bloquea automáticamente; esta tabla es el fallback humano.
+Antes de editar un archivo, debes haber leído la referencia que aplica. La **fuente única**
+de la matriz es `tools/skill-matrix.conf` — el hook `skill-reminder` (Anillo 2) la lee en
+runtime y bloquea. Esta tabla es la **vista humana** de ese conf: si cambias el conf,
+actualiza la tabla en el mismo commit (antes la matriz vivía en cinco sitios y divergía;
+`test_skill_matrix.sh` fija que toda ref citada exista).
 
 <!-- iOS de referencia. Ajusta los globs a tus carpetas reales si difieren. -->
 
@@ -161,9 +164,11 @@ Antes de editar un archivo, debes haber leído la referencia que aplica. El hook
 | `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |
 | `tools/**`, `ci/**`, `scripts/agent-hooks/**` | `process/references/verification-loop.md` (y §8: requiere aprobación del owner) |
 
-> Las skills declaran además `paths:` en su frontmatter, así que Claude Code las carga **sola**
-> al trabajar sobre un archivo que casa. El hook `skill-reminder` sigue siendo el gate duro; el
-> `paths:` es el camino feliz que hace que casi nunca se dispare.
+> El **gate duro** es el hook `skill-reminder` (lee `tools/skill-matrix.conf`). Como camino
+> feliz, `.claude/rules/*.md` puede inyectar recordatorios por path en Claude Code. Nota
+> honesta: la carga automática por `paths:` en el frontmatter de una skill NO es parte del
+> estándar portable de skills (agentskills) — no dependas de ella para clientes distintos
+> de Claude Code; el conf + el hook son lo que de verdad se cumple.
 
 ## 12. PRD obligatorio para features medianas/grandes
 
@@ -183,8 +188,12 @@ real. `tools/check-review-marker.sh` solo acepta markers con `source: hook`; un 
 mano se rechaza. (`scripts/mark-reviewer-run.sh` existe solo como fallback para clientes sin
 hooks, y queda auditado.)
 
-Lo verifican los **tres anillos**: `lefthook` (Anillo 1, cubre humanos y Codex), `reviewer-gate`
-(Anillo 2) y `ci/run-gates.sh` + `ci/ai-review.sh` (Anillo 3). Override de emergencia auditado:
+Lo verifican los **tres anillos**: `lefthook` (Anillo 1, cubre humanos y cualquier cliente),
+`reviewer-gate` (Anillo 2 — en Claude Code nativo; en Cursor y Codex vía
+`scripts/agent-hooks/adapters/gate-adapter.sh`) y `ci/run-gates.sh` + `ci/ai-review.sh`
+(Anillo 3). **Flujo que el gate exige:** stagea → invoca al `reviewer` → commitea en un
+comando aparte. El marker liga `sha256(diff staged)`: `git add X && git commit` en una línea
+o `commit -a/-am` evaden esa validación y el gate los rechaza. Override de emergencia auditado:
 `REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...` — **relaja el marker, nunca
 un trinquete** (§9).
 
@@ -210,15 +219,24 @@ Dos principios que gobiernan todo lo demás:
 0 Imposibilitar (tipos)
 ```
 
-**La ley del 10%:** un detector con más de ~10% de falsos positivos se descarta — y un agente
-además aprende a evadirlo. Por eso los patrones van en Semgrep (AST) y no en `grep`. Prefiere
-5 reglas exactas a 50 ruidosas.
+**La ley del 10% (§14.2):** un detector con más de ~10% de falsos positivos se descarta — y un
+agente además aprende a evadirlo. Por eso los patrones van en Semgrep (AST) y no en `grep`.
+Prefiere 5 reglas exactas a 50 ruidosas.
+
+**El contrato de exit codes de los detectores (§14.3):** `0` = limpio · `1` = tu código tiene
+un problema (bloquea, sin excepción) · `3` = **el detector no pudo mirar** (ausente, reglas
+rotas, crash). El 3 AVISA en local y BLOQUEA en CI (`GATES_REQUIRE_*=1`): bloquear en local
+crearía un deadlock — un typo en las reglas impediría hasta el commit que lo arregla — pero
+tratarlo como éxito convertiría un scanner roto en luz verde permanente. Corolario: **un bug
+del hook nunca debe trabar el commit en local; un gate que no corrió nunca debe parecer un
+gate que pasó.**
 
 ## 15. Cómo entrar a una sesión nueva
 
 1. Lee este archivo. 2. Lee `docs/process/current_execution_map.md`. 3. Carga la skill del área (§11).
 4. Abre el PRD/ADR relevante. 5. **Verifica los hechos contra el código/DB antes de editar.**
 
-> Si estás retomando tras una compactación de contexto: el hook `PostCompact` te reinyecta el
-> digest de reglas y los findings abiertos. Si algo de §11 no lo recuerdas con precisión, reléelo
-> — el `skill-reminder` te lo exigirá de todas formas.
+> Si estás retomando tras una compactación de contexto: el hook `SessionStart(source: compact)`
+> te reinyecta el digest de reglas y los findings abiertos (Claude re-inyecta solo el CLAUDE.md
+> raíz; el resto lo repone `post-compact.sh`). Si algo de §11 no lo recuerdas con precisión,
+> reléelo — el `skill-reminder` te lo exigirá de todas formas.

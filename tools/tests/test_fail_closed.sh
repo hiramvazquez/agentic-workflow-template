@@ -143,7 +143,7 @@ EOF
 test_salida_no_json_no_pasa_por_limpia() { _fc_sandbox _case_semgrep_json_basura; }
 
 # ════════════════════════════════════════════════════════════════════
-# 3. Un detector ROTO no puede trabar al dev (AGENTS.md §4.4)
+# 3. Un detector ROTO no puede trabar al dev (AGENTS.md §14.3)
 # ════════════════════════════════════════════════════════════════════
 # El deadlock que casi introduzco: enganchar el exit code crudo de
 # semgrep-scan en reviewer-gate hacía que un typo en las reglas bloqueara

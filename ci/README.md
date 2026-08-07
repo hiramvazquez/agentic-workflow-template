@@ -47,7 +47,7 @@ Este es el único anillo que no depende de que el agente se porte bien, así que
 ausente **no** se lee como "gate aprobado". Renunciar a un gate es explícito y visible en la
 config del CI: `AI_REVIEW_REQUIRED=0`, `GATES_REQUIRE_SEMGREP=0`, `GATES_SKIP_TESTS=1`.
 (En local la política es la inversa para los fallos del propio detector — exit 3 avisa sin
-bloquear — porque un typo en las reglas no puede impedir el commit que lo arregla: §4.4.)
+bloquear — porque un typo en las reglas no puede impedir el commit que lo arregla: §14.3.)
 
 `ci/ai-review.sh` necesita el binario `claude` + `ANTHROPIC_API_KEY` en el runner, y emite el
 mismo contrato `VERDICT:` que el sub-agente local: GREEN/AMBER pasan, RED falla el job.

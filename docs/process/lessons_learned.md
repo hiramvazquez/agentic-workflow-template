@@ -156,7 +156,7 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Regla:** todo detector debe distinguir **hallazgo** de **fallo del propio detector**. Un
   hallazgo bloquea siempre; un fallo de infraestructura avisa en local y bloquea en CI. Si los
   confundes, eliges entre dos desastres: pasar por limpio lo que no miraste, o trabar al equipo
-  con un bug del tooling (`AGENTS.md §4.4`). Contrato adoptado: `0` limpio · `1` hallazgo ·
+  con un bug del tooling (`AGENTS.md §14.3`). Contrato adoptado: `0` limpio · `1` hallazgo ·
   `3` el detector no pudo correr.
 - **Detector:** `tools/tests/test_fail_closed.sh::test_reglas_rotas_no_bloquean_el_commit` +
   `::test_hallazgo_real_da_exit_1_no_3` (fijan las dos mitades del contrato)
@@ -233,6 +233,62 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** n/a-manual — el fix (separar `--report` de `--reset`) requiere decisión del
   owner y quedó fuera del scope del PRD 0001 (§8). Registrado en §18 G6.
 - **Área:** scripts/agent-hooks/session-start.sh
+
+---
+
+### [2026-08-07] Hooks registrados sobre eventos que NO existen
+- **Qué pasó:** `PostCompact` y `PostToolUseFailure` estuvieron semanas en `settings.json` — no
+  son eventos de Claude Code, así que `post-compact.sh` y `track-failure.sh` **jamás dispararon**.
+  En Cursor, tres hooks más usaban nombres inventados (`sessionStart`/`preToolUse`/`postToolUse`).
+  Peor aún: `SessionStart` sin matcher disparaba también en `source: compact` y **borraba el
+  baseline de drift a mitad de sesión** — los errores recién introducidos pasaban a baseline.
+- **Causa raíz:** asumir el esquema de eventos de memoria en vez de verificarlo contra la doc
+  del cliente — y no tener NINGÚN check que compare lo registrado contra lo que existe.
+- **Regla:** todo hook nuevo se registra SOLO con eventos de la lista blanca del cliente, y
+  ningún gate cuenta como existente hasta verlo bloquear algo una vez (`tools/validate-harness.sh`
+  tras cada update del cliente).
+- **Detector:** tools/tests/test_hook_events.sh
+- **Área:** .claude/settings.json · .cursor/hooks.json · .codex/hooks.json
+
+---
+
+### [2026-08-07] Dos emisores del "mismo" JSON con espaciado distinto
+- **Qué pasó:** `findings.sh` escribía `"status": "open"` (json.dumps, con espacio) y los hooks
+  grepeaban `"status":"open"` (formato JSON.stringify del CLI anterior). Resultado: "findings
+  abiertos: 0" SIEMPRE — en el estado vivo, el post-compact y el session-start. Silenciosamente.
+- **Causa raíz:** tratar un formato de serialización como detalle sin contrato. Dos emisores
+  del mismo archivo deben ser byte-idénticos, o todos los consumidores deben ser tolerantes.
+- **Regla:** ambas cosas a la vez — el emisor escribe compacto (`separators=(',',':')`) Y los
+  consumidores grepean tolerante (`'"status": ?"open"'`). Y `grep -c X || echo 0` está prohibido:
+  grep -c ya imprime 0 al no matchear; el echo extra produce `0\n0`.
+- **Detector:** tools/tests/test_findings_cli.sh::test_ledger_se_escribe_compacto
+- **Área:** tools/findings/findings.sh · scripts/agent-hooks/inject-context.sh
+
+---
+
+### [2026-08-07] El fallback de `stat` que nunca corría (y solo rompía en CI)
+- **Qué pasó:** `stat -f %m || stat -c %Y` funcionaba en macOS… y en Linux `stat -f` NO falla:
+  imprime datos del *filesystem* con exit 0, el fallback jamás corría, el TTL del marker se
+  corrompía y **un marker válido se rechazaba siempre en el runner de CI**.
+- **Causa raíz:** un fallback solo existe si el primer comando FALLA de verdad en la otra
+  plataforma. "Funciona en mi máquina" + fallback no ejercitado = bug latente en CI.
+- **Regla:** orden GNU-primero (`stat -c %Y || stat -f %m`) + guard numérico del resultado. Y
+  la suite del harness corre en Linux (CI) además de macOS: la diferencia de plataforma ES el test.
+- **Detector:** tools/tests/test_ratchets.sh::test_marker_de_hook_es_aceptado (en CI Linux)
+- **Área:** tools/check-review-marker.sh
+
+---
+
+### [2026-08-07] Un trinquete cuyo propio script podía aflojarlo
+- **Qué pasó:** `drift-ratchet.sh --update` reescribía el techo con el conteo actual SIN
+  comparar dirección, y además estaba en `permissions.allow` — un agente podía legalizar la
+  deuda nueva con un solo comando permitido. El deny de Write/Edit sobre el JSON era teatro.
+- **Causa raíz:** proteger el ARCHIVO pero no el CAMINO AUTORIZADO de escritura. La dirección
+  de un trinquete se impone donde se escribe, no donde se lee.
+- **Regla:** todo `--update` de un trinquete compara y rehúsa en la dirección prohibida (espejo
+  de `mutation-score.sh`); en `allow` va solo `--check`.
+- **Detector:** tools/tests/test_ratchets.sh::test_drift_update_nunca_sube_el_techo
+- **Área:** tools/drift-ratchet.sh · .claude/settings.json
 
 ---
 

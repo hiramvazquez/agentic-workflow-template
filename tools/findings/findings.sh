@@ -44,9 +44,14 @@ def load():
 
 def save(items):
     os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
+    # separators SIN espacios: el mismo byte-formato que JSON.stringify emitía.
+    # Con el default de json.dumps ('"status": "open"', CON espacio) los greps
+    # de los hooks ('"status":"open"') contaban 0 abiertos SIEMPRE, en silencio.
+    # Los hooks ya son tolerantes a ambos ('"status": ?"open"'), pero dos
+    # emisores del mismo formato deben ser byte-idénticos (L-json-espacios).
     with open(LEDGER, "w", encoding="utf-8") as f:
         for i in items:
-            f.write(json.dumps(i, ensure_ascii=False) + "\n")
+            f.write(json.dumps(i, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 def fhash(s):
     # Mismo hash que findings.ts (h*31+ord, int32, unsigned hex) para que los

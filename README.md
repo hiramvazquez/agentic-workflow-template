@@ -64,16 +64,22 @@ El corazón del template. Detalle completo en
 |---|---|---|---|
 | **0 — permisos nativos** | `permissions` de `.claude/settings.json` | Claude Code, antes de ejecutar la tool | Prohibiciones deterministas: `--no-verify`, `--force`, leer `.env`, editar trinquetes. **Ni siquiera llega a ejecutarse.** |
 | **1 — git-nativo** | `lefthook.yml` | Cursor, Claude, Codex, **humano**, todo `git commit` | Secretos, trinquete de drift, capas, **marker de review**, lint. **La única capa universal.** |
-| **2 — hooks de IA** | `.claude/settings.json` + `.cursor/hooks.json` → `scripts/agent-hooks/` | Claude Code / Cursor | Gates *AI-aware*: verificación in-loop, skill-antes-de-editar, reviewer-gate, **derivación del veredicto**, reinyección post-compactación. |
-| **3 — CI (opcional, BYO)** | `ci/run-gates.sh` + `ci/ai-review.sh` desde *tu* CI | server, cada push/PR + nocturno | Backstop independiente del cliente: mutación, semgrep, **review de IA headless**. Cubre Codex (sin hooks) y commits humanos. |
+| **2 — hooks de IA** | `.claude/settings.json` + `.cursor/hooks.json` + `.codex/hooks.json` → `scripts/agent-hooks/` | Claude Code (completo) / Cursor y Codex (parcial, vía `gate-adapter`) | Gates *AI-aware*: verificación in-loop, skill-antes-de-editar, reviewer-gate, **derivación del veredicto** (solo Claude), reinyección post-compactación (solo Claude). |
+| **3 — CI (opcional, BYO)** | `ci/run-gates.sh` + `ci/ai-review.sh` desde *tu* CI | server, cada push/PR + nocturno | Backstop independiente del cliente: mutación, semgrep, **review de IA headless**. Cubre commits humanos y todo lo que los hooks de cada cliente no alcanzan. |
 
 > **Anillo 0 es nuevo y es el más barato:** una prohibición expresable como patrón va en
 > `permissions.deny`, no en prosa de `AGENTS.md`. El texto es advisory —el modelo puede
 > ignorarlo o perderlo tras una compactación—; el permiso es determinista.
 
-> **Por qué 3 anillos:** Codex no tiene hooks → su enforcement vive en CI. Los hooks de IA
-> bloquean rápido y local pero solo en su cliente. Los git hooks nativos disparan para *todos*
+> **Por qué 3 anillos:** los hooks de IA bloquean rápido y local pero cada cliente cubre un
+> subconjunto distinto (Claude Code: todo; Codex: PreToolUse/PostToolUse vía `gate-adapter`;
+> Cursor: shell/stop, sin derivación de marker). Los git hooks nativos disparan para *todos*
 > los clientes y humanos, pero se pueden saltar con `--no-verify` → por eso CI es el backstop final.
+>
+> **Regla operativa de confianza:** ningún gate cuenta como existente hasta que lo has visto
+> bloquear algo una vez. `bash tools/validate-harness.sh` verifica lo estático (eventos,
+> permisos, scripts, matriz) e imprime el checklist EN VIVO — córrelo tras cada update de
+> Claude Code / Cursor / Codex.
 >
 > **CI es "bring your own".** No imponemos GitHub. El Anillo 3 es un único script
 > (`ci/run-gates.sh`) que corre los mismos gates; lo invocas desde GitHub Actions, GitLab CI,
@@ -96,12 +102,15 @@ ios|android|web/AGENTS.md  ← overrides por plataforma (el más cercano gana)
   agents/                  ← sub-agentes; todos emiten el contrato VERDICT:
   security-patterns.yaml   ← reglas de seguridad per-edit (coste 0 tokens)
   claude-security-guidance.md ← threat model para el revisor de contexto fresco
-  rules/                   ← reglas path-scoped (legacy: hoy lo cubre `paths:` en las skills)
+  rules/                   ← recordatorios cortos path-scoped (el gate duro es skill-matrix.conf)
   skills → .agents/skills
-.cursor/                   ← rules/*.mdc + hooks.json (mismos scripts que Claude)
-.codex/config.toml         ← config Codex (lee AGENTS.md directo; su gate es Anillo 1+3)
+.claude/commands/goal.md   ← /goal: objetivo con condiciones verificables (nivel 8)
+.cursor/                   ← rules/*.mdc + hooks.json (eventos REALES de Cursor + gate-adapter)
+.codex/config.toml         ← config Codex (lee AGENTS.md directo)
+.codex/hooks.json          ← hooks Codex (2026): reviewer-gate vía gate-adapter
 
-scripts/agent-hooks/       ← UNA implementación de los gates, compartida por Claude+Cursor
+scripts/agent-hooks/       ← UNA implementación de los gates, compartida por Claude+Cursor+Codex
+  adapters/gate-adapter.sh   ← traduce exit-2 al JSON de deny de Cursor/Codex
   capture-review-verdict.sh  ← ⭐ SubagentStop: deriva el marker del veredicto REAL
   post-edit-verify.sh        ← ⭐ verificación in-loop (nivel 1 de la pirámide)
   post-compact.sh            ← reinyecta reglas tras compactar el contexto
@@ -117,10 +126,13 @@ tools/
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación de review compartida por los 3 anillos
   lesson-detector-link.sh    ← toda lección tiene detector (nivel 9)
-  findings/findings.sh       ← CLI del ledger (bash+python3; findings.ts para Deno/Node)
+  skill-matrix.conf          ← FUENTE ÚNICA de la matriz path→skill (la lee skill-reminder)
+  validate-harness.sh        ← ¿los gates EXISTEN de verdad? estático + checklist en vivo
+  findings/findings.sh       ← CLI del ledger (bash+python3, único runtime)
   metrics/escape-rate.sh     ← contención por fase: ¿puedo bajar la revisión humana?
   drift-ratchet.json         ← trinquete de deuda — SOLO BAJA
-  tests/                     ← 105 tests de shell de los propios gates
+  tests/                     ← la suite de shell de los propios gates (163 hoy — el número
+                               real lo da run-tests.sh; un conteo hardcodeado aquí ya se pudrió dos veces)
                                (⅓ son casos de FALSO POSITIVO; test_meta_fp lo exige)
 
 ci/run-gates.sh + ci/ai-review.sh + ci/examples/ ← Anillo 3 (provider-agnóstico)
@@ -183,7 +195,7 @@ afirmación de abajo es un commit que puedes leer:
   documentación de su propia área, el detector de secretos marcó como secreto al archivo que
   define qué es un secreto, y el linter de shell matcheó sus propios comentarios. De ahí la
   regla mecanizada en `test_meta_fp.sh`: *el primer falso positivo de un detector casi siempre
-  aparece en el repo del propio detector* — y por eso ~⅓ de los 119 tests son casos de falso
+  aparece en el repo del propio detector* — y por eso ~⅓ de la suite son casos de falso
   positivo.
 - **El fail-closed encontró reglas muertas.** La primera vez que semgrep corrió de verdad,
   reveló que **ninguna de las 6 reglas había cargado jamás** (3 errores que `--validate` no

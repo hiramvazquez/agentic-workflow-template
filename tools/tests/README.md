@@ -1,7 +1,8 @@
 # tools/tests — los tests del propio harness
 
 > Los gates son código, y código con lógica de decisión sin test es deuda (AGENTS.md §5).
-> Esta suite (119 tests, `bash tools/tests/run-tests.sh`) fija el COMPORTAMIENTO de los gates:
+> Esta suite (`bash tools/tests/run-tests.sh` imprime el conteo real — no lo hardcodees aquí,
+> ya se pudrió dos veces) fija el COMPORTAMIENTO de los gates:
 > corre los scripts reales en repos git desechables y verifica exit codes, salidas y archivos
 > producidos — nunca detalles de implementación.
 

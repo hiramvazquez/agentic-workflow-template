@@ -42,8 +42,12 @@ OUT_DIR="${AI_REVIEW_OUT:-.agents/state/ci}"; mkdir -p "$OUT_DIR"
 PROMPT="Eres el sub-agente \`reviewer\` de este repositorio (ver .claude/agents/reviewer.md).
 
 Revisa el diff de \`$BASE...HEAD\` contra las reglas duras de AGENTS.md.
-Corre las verificaciones mecánicas (tools/check-layers.sh, tools/check-drift.sh,
-tools/drift-ratchet.sh --check, tools/tests/run-tests.sh) y reporta su salida REAL.
+
+NO ejecutes los gates mecánicos: corres en modo solo-lectura (plan) y esos gates
+(check-layers, drift-ratchet, semgrep, run-tests) ya los ejecutó \`ci/run-gates.sh\`
+en un paso ANTERIOR del pipeline. Tu valor añadido es lo que un detector mecánico
+NO ve: lógica incorrecta, contratos rotos entre capas, seguridad no-patrón,
+tests que no verifican nada.
 
 Reporta solo lo que afecta a la corrección o a una regla explícita del proyecto.
 No reportes preferencias de estilo: un revisor que señala todo se ignora entero.
@@ -56,10 +60,13 @@ SCOPE: <qué revisaste>"
 echo "━━━ ai-review sobre $BASE...HEAD ($(printf '%s\n' "$DIFF_FILES" | wc -l | tr -d ' ') archivos) ━━━"
 
 set +e
+# --permission-mode plan = SOLO LECTURA, coherente con el prompt de arriba
+# (antes el prompt exigía ejecutar scripts que plan-mode prohibía: el revisor
+# no podía cumplir su propio prompt). Los gates mecánicos son de run-gates.sh.
 claude -p "$PROMPT" \
   --output-format json \
   --permission-mode plan \
-  --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(bash tools/*)" \
+  --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*)" \
   ${AI_REVIEW_MODEL:+--model "$AI_REVIEW_MODEL"} \
   > "$OUT_DIR/ai-review.json" 2>"$OUT_DIR/ai-review.err"
 RC=$?

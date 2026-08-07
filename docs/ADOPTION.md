@@ -16,7 +16,6 @@
 | [`semgrep`](https://semgrep.dev) | detectores AST (nivel 2 de la pirámide) | sí — sin él el nivel 2 está MUDO (local avisa, CI bloquea) |
 | `python3` | `tools/findings/findings.sh` (ledger) + utilidades | sí (viene en macOS/Linux) |
 | `jq` | hooks de IA (parsing JSON) | sí para el Anillo 2 |
-| `deno` **o** `node` | `findings.ts` (CLI alternativo del ledger) | no — `findings.sh` cubre lo mismo con python3 |
 | Runner de mutación (muter/Stryker/PIT/mutmut) | nivel 4: calidad real de los tests | recomendada — sin él nada distingue un test real de uno decorativo |
 | Tu CI (GitHub/GitLab/…) | Anillo 3 | opcional |
 
@@ -37,16 +36,32 @@ bash scripts/bootstrap.sh        # reemplaza <PROJECT>, plataformas, y elige pre
 ```bash
 lefthook install                 # Anillo 1 — activa pre-commit / pre-push
 gitleaks version                 # verifica que está en PATH
+bash tools/validate-harness.sh   # ¿los gates EXISTEN de verdad? (estático + checklist en vivo)
 ```
+
+> **Regla de confianza:** ningún gate cuenta como existente hasta que lo has visto bloquear
+> algo una vez. `validate-harness` verifica eventos, permisos, scripts y matriz en estático,
+> e imprime el checklist de lo que solo una sesión real puede probar. Repítelo tras cada
+> update de Claude Code / Cursor / Codex — sus contratos de hooks versionan rápido.
 
 ## 3. Elegir tu(s) cliente(s) de IA
 
 Todos leen `AGENTS.md` (la fuente canónica). Solo activas el adaptador de los que uses:
 
-- **Cursor** — ya lee `AGENTS.md` + `.cursor/rules/*.mdc`. Activa hooks: deja `.cursor/hooks.json`.
-- **Claude Code** — `CLAUDE.md` (importa `AGENTS.md`) + `.claude/settings.json` (hooks) + `.claude/agents/` (sub-agentes) + `.claude/rules/` (reglas path-scoped nativas).
-- **Codex** — lee `AGENTS.md` directo. No tiene hooks → su enforcement es el **Anillo 3 (CI)**.
-- **Gemini CLI** — NO lee `AGENTS.md` por defecto: añade `context.fileName: ["AGENTS.md", "GEMINI.md"]` en su `settings.json`.
+- **Claude Code** — el cliente de primera clase (único con la historia completa): `CLAUDE.md`
+  (importa `AGENTS.md`) + `.claude/settings.json` (Anillo 0 + hooks) + `.claude/agents/`
+  (sub-agentes) + `.claude/commands/goal.md` + `.claude/rules/`.
+- **Codex** — lee `AGENTS.md` directo, y desde 2026 **sí tiene hooks** (PreToolUse/PostToolUse):
+  `.codex/hooks.json` conecta el reviewer-gate vía `gate-adapter.sh` (requiere
+  `[features] codex_hooks = true`, ver `.codex/config.toml`). Sin Stop/SubagentStop: el marker
+  de review se genera con `scripts/mark-reviewer-run.sh` (auditado) o preset `lite`; el
+  backstop es Anillo 1 + 3.
+- **Cursor** — lee `AGENTS.md` + `.cursor/rules/*.mdc`; `.cursor/hooks.json` da
+  reviewer-gate (vía adapter), verificación in-loop y canon-enforce. Sin evento pre-edición
+  denegable ni SubagentStop: skill-reminder es instrucción ahí, y el marker igual que en Codex.
+- **Gemini CLI** — NO lee `AGENTS.md` por defecto: añade `context.fileName: ["AGENTS.md", "GEMINI.md"]`
+  en su `settings.json`. (Tiene hooks desde v0.26 con contrato similar a Claude; wrapper
+  pendiente — si lo usas, calca el patrón de `.codex/hooks.json`.)
 
 > Puedes borrar los directorios de los clientes que NO uses. El `AGENTS.md` y el Anillo 1
 > siguen funcionando igual.
@@ -124,14 +139,17 @@ Si el commit se bloquea, el Anillo 1 está vivo.
 ## 8. Entender el flujo de review (el corazón del harness)
 
 Con preset `full`, un commit de código de producto exige que el sub-agente `reviewer` haya
-revisado **ese diff exacto**:
+revisado **ese diff exacto**. El orden importa — el marker liga `sha256(diff staged)`:
 
-1. El agente (o tú) invoca el sub-agente `reviewer` sobre el diff staged.
-2. El reviewer termina con `VERDICT: GREEN|AMBER|RED` — y **el hook** `SubagentStop` escribe el
+1. **Stagea primero** (`git add …`). Lo que no está staged no queda ligado al marker.
+2. El agente (o tú) invoca el sub-agente `reviewer` sobre el diff staged.
+3. El reviewer termina con `VERDICT: GREEN|AMBER|RED` — y **el hook** `SubagentStop` escribe el
    marker a partir de ese veredicto real, ligado al `sha256` del diff. El modelo no puede
    escribirlo (un marker manual se rechaza; `source: hook` es obligatorio).
-3. `git commit` pasa los gates del Anillo 1 (capas, semgrep, secretos, trinquete, marker).
-4. Si cambias lo staged después de la review, el marker caduca. Re-revisa.
+4. `git commit` **en un comando aparte** pasa los gates (capas, semgrep, secretos, trinquete,
+   marker). `git add X && git commit` en una línea o `commit -a/-am` se RECHAZAN: stagean
+   después de la validación y se commitearía contenido distinto del revisado.
+5. Si cambias lo staged después de la review, el marker caduca. Re-revisa.
 
 Escape auditado para emergencias: `REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..."` —
 relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.

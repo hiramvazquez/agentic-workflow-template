@@ -40,7 +40,7 @@ Para el ciclo automático, tres opciones según tu setup:
 |---|---|---|
 | **cron** clásico | `0 6-20/2 * * 1-5 cd /ruta/repo && bash tools/backlog/run.sh >> .agents/state/backlog.log 2>&1` | servidor/mac siempre encendido |
 | **Claude Code scheduled tasks** | en una sesión: *"crea una tarea programada que corra `bash tools/backlog/run.sh` cada 2 horas en días laborables"* | ya vives en Claude Code |
-| **`/loop` en una sesión abierta** | `/loop 30m bash tools/backlog/run.sh` | ráfagas supervisadas (tú delante) |
+| **bucle supervisado** | `while bash tools/backlog/run.sh; do sleep 60; done` | ráfagas supervisadas (tú delante) |
 
 Config útil: `BACKLOG_MAX_TURNS=40` acota el coste por historia ·
 `BACKLOG_CLAUDE_FLAGS="--model sonnet"` para historias mecánicas baratas.
@@ -56,7 +56,7 @@ todo", no "el modelo dice que terminó".
 **Lo pendiente de validar en vivo** (misma transparencia que `tools/tests/README.md`): un run
 headless completo de principio a fin con una historia real — los guards y el selector están
 testeados, el interior del run está validado en sesiones interactivas pero no aún vía
-`claude -p` desatendido. Primera historia real: lánzala con `/loop` mirando, no con cron a
+`claude -p` desatendido. Primera historia real: lánzala con el bucle supervisado mirando, no con cron a
 ciegas. Y arranca con historias PEQUEÑAS (tipo 0001, no tipo 0002) hasta calibrar.
 
 **La calidad de salida es proporcional a la historia.** Criterios de aceptación vagos →

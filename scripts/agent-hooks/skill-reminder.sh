@@ -40,26 +40,47 @@ case "$rel" in
 esac
 
 # ── Matriz path → lectura obligatoria ───────────────────────────────
-# FILL: mapea TUS paths reales → skill references. Edita SOLO los globs de
-# los `case` de abajo (deben ser patrones glob válidos de bash, NO comentarios).
+# FUENTE ÚNICA: tools/skill-matrix.conf (formato `glob|ref1,ref2`).
+# Antes esta matriz vivía en CINCO sitios (aquí, AGENTS.md §11, frontmatter
+# de las skills, .claude/rules/, .cursor/rules/) y "Nada se duplica" era
+# mentira: cambiar una carpeta exigía tocar cinco archivos, y el primero en
+# divergir era justo este — el que bloquea. Ahora este hook LEE el conf en
+# runtime; AGENTS.md §11 es la vista humana del mismo conf.
 declare -a required=()
-# UI / pantallas:
-case "$rel" in
-  *View*.swift|*.tsx|*Screen*.kt|*/ui/*)
-      required+=(".agents/skills/architecture/SKILL.md") ;;
-esac
-# Lógica / casos de uso (TDD obligatorio: leer el playbook antes de tocar lógica):
-case "$rel" in
-  *Logic*.swift|*UseCase*.swift|*UseCase*.kt|*/services/*.ts|*/domain/*|*/Domain/*)
-      required+=(".agents/skills/architecture/SKILL.md" ".agents/skills/domain/SKILL.md" \
-                 ".agents/skills/process/references/tdd-workflow.md") ;;
-esac
-# PRDs:
-case "$rel" in
-  docs/process/prds/[0-9]*.md)
-      required+=(".agents/skills/process/references/prd-lifecycle.md" \
-                 ".agents/skills/process/references/feature-workflow.md") ;;
-esac
+MATRIX="$PROJECT_ROOT/tools/skill-matrix.conf"
+if [ -f "$MATRIX" ]; then
+  while IFS='|' read -r glob refs; do
+    # comentarios y vacías fuera
+    case "$glob" in ''|'#'*) continue ;; esac
+    glob="$(printf '%s' "$glob" | sed -E 's/[[:space:]]+$//')"
+    # shellcheck disable=SC2254  # el glob DEBE expandirse como patrón
+    case "$rel" in
+      $glob)
+        _oldIFS="$IFS"; IFS=','
+        for r in $refs; do
+          r="$(printf '%s' "$r" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+          [ -n "$r" ] && required+=("$r")
+        done
+        IFS="$_oldIFS" ;;
+    esac
+  done < "$MATRIX"
+else
+  # Fallback de fábrica si el conf no existe (repo recién clonado a medias).
+  case "$rel" in
+    *View*.swift|*.tsx|*Screen*.kt|*/ui/*)
+        required+=(".agents/skills/architecture/SKILL.md") ;;
+  esac
+  case "$rel" in
+    *Logic*.swift|*UseCase*.swift|*UseCase*.kt|*/services/*.ts|*/domain/*|*/Domain/*)
+        required+=(".agents/skills/architecture/SKILL.md" ".agents/skills/domain/SKILL.md" \
+                   ".agents/skills/process/references/tdd-workflow.md") ;;
+  esac
+  case "$rel" in
+    docs/process/prds/[0-9]*.md)
+        required+=(".agents/skills/process/references/prd-lifecycle.md" \
+                   ".agents/skills/process/references/feature-workflow.md") ;;
+  esac
+fi
 
 [ ${#required[@]} -eq 0 ] && hook_allow
 

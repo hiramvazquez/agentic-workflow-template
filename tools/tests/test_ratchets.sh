@@ -211,3 +211,41 @@ _case_mutacion_update_si_sube() {
 test_mutacion_update_sube_el_piso() {
   _harness_sandbox _case_mutacion_update_si_sube
 }
+
+# ════════════════════════════════════════════════════════════════════
+# Drift ratchet — --update TAMBIÉN impone la dirección (espejo de mutación).
+# El bug real: --update reescribía el techo con el conteo actual SIN comparar
+# — y estaba en allow de permissions: el agente podía legalizar deuda nueva
+# con un solo comando. Un trinquete que su propio script permitido puede
+# aflojar es una sugerencia.
+# ════════════════════════════════════════════════════════════════════
+_case_drift_update_no_sube() {
+  printf '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=5 warns=3"\n' > tools/check-drift.sh
+  printf '{\n  "errors": 2,\n  "warns": 1\n}\n' > tools/drift-ratchet.json
+  bash tools/drift-ratchet.sh --update >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    --update con el conteo por ENCIMA del techo no falló"; return 1; }
+  grep -q '"errors": *2' tools/drift-ratchet.json \
+    || { echo "    --update SUBIÓ el techo: $(cat tools/drift-ratchet.json)"; return 1; }
+}
+test_drift_update_nunca_sube_el_techo() { _harness_sandbox _case_drift_update_no_sube; }
+
+_case_drift_update_si_baja() {
+  printf '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=1 warns=0"\n' > tools/check-drift.sh
+  printf '{\n  "errors": 2,\n  "warns": 1\n}\n' > tools/drift-ratchet.json
+  bash tools/drift-ratchet.sh --update >/dev/null 2>&1
+  [ "$?" = "0" ] || { echo "    --update con un conteo MEJOR falló (falso positivo)"; return 1; }
+  grep -q '"errors": 1' tools/drift-ratchet.json \
+    || { echo "    no escribió el techo nuevo"; return 1; }
+}
+test_drift_update_si_puede_bajar() { _harness_sandbox _case_drift_update_si_baja; }
+
+# Primera adopción (JSON ausente): fijar el techo inicial ES legítimo.
+_case_drift_update_primera_vez() {
+  printf '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=7 warns=2"\n' > tools/check-drift.sh
+  rm -f tools/drift-ratchet.json
+  bash tools/drift-ratchet.sh --update >/dev/null 2>&1
+  [ "$?" = "0" ] || { echo "    primera adopción (sin JSON) fue rehusada"; return 1; }
+  grep -q '"errors": 7' tools/drift-ratchet.json \
+    || { echo "    no fijó el techo inicial"; return 1; }
+}
+test_drift_update_primera_vez_fija_el_techo() { _harness_sandbox _case_drift_update_primera_vez; }

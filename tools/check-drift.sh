@@ -78,12 +78,17 @@ fi
 #     Sigue siendo una señal, no un veredicto: la calidad real del test la mide
 #     `tools/mutation-score.sh`, que es el gate que de verdad importa.
 if [ -n "$EXISTING" ]; then
+  # UN solo `find` para el universo de tests, no 6 por archivo de lógica: la
+  # versión anterior era O(n·m) y en un repo mediano excedía el presupuesto del
+  # hook (que al agotar timeout NO bloquea — el gate moría en silencio).
+  ALL_TEST_BASES="$(find $EXISTING . -maxdepth 6 -type f 2>/dev/null \
+    | sed -E 's|.*/||' | grep -iE '(test|spec)' | sort -u)"
   while IFS= read -r f; do
     [ -z "$f" ] && continue
     base="$(basename "$f")"; base="${base%.*}"
     found=0
-    for cand in "${base}Tests" "${base}Test" "${base}_test" "${base}.test" "${base}.spec" "test_${base}"; do
-      if find $EXISTING . -maxdepth 6 -type f -name "${cand}.*" 2>/dev/null | grep -q .; then
+    for cand in "${base}Tests." "${base}Test." "${base}_test." "${base}.test." "${base}.spec." "test_${base}."; do
+      if printf '%s\n' "$ALL_TEST_BASES" | grep -qF "$cand"; then
         found=1; break
       fi
     done

@@ -13,6 +13,8 @@ _doc() { printf '%s\n' "$1" > docs/process/lessons_learned.md; }
 
 # ── happy path ──────────────────────────────────────────────────────
 _case_con_detector() {
+  # El detector citado debe EXISTIR (el verificador ahora lo comprueba).
+  mkdir -p tools/semgrep/rules; echo 'rules: []' > tools/semgrep/rules/universal.yaml
   _doc '# Lecciones
 
 ### [2026-01-01] Secreto de prueba con formato real
@@ -95,6 +97,7 @@ _case_encabezado_de_prosa() {
   # El propio doc tiene encabezados `###` explicativos que NO son lecciones.
   # Contarlos fue un falso positivo real (PRD 0001 §18). Una entrada se
   # reconoce por el corchete con fecha: `### [AAAA-MM-DD] …`.
+  mkdir -p tools/semgrep/rules; echo 'rules: []' > tools/semgrep/rules/universal.yaml
   _doc '# Lecciones
 
 ### Cómo usar este doc
@@ -106,6 +109,32 @@ El campo Detector es obligatorio.
   [ "$?" = "0" ] || { echo "    FALSO POSITIVO: contó un encabezado de prosa como lección"; return 1; }
 }
 test_encabezado_de_prosa_no_es_leccion() { _lessons_sandbox _case_encabezado_de_prosa; }
+
+# ── el detector citado tiene que EXISTIR ────────────────────────────
+# Validar solo que el campo esté relleno dejaba pasar detectores FANTASMA:
+# una lección citó un grep de check-drift que ya había sido eliminado y el
+# verificador daba ✅ igual. Prosa que cita un detector muerto es prosa.
+_case_detector_fantasma_falla() {
+  _doc '# Lecciones
+
+### [2026-01-01] Error con detector que ya no existe
+- **Detector:** tools/detector-que-borramos.sh'
+  bash tools/lesson-detector-link.sh >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    un detector citado INEXISTENTE fue aceptado"; return 1; }
+}
+test_detector_citado_inexistente_falla() { _lessons_sandbox _case_detector_fantasma_falla; }
+
+# FALSO POSITIVO guard: un detector descrito en prosa (sin ruta de archivo)
+# sigue valiendo — no todo detector es un archivo (p. ej. "branch protection").
+_case_detector_en_prosa_pasa() {
+  _doc '# Lecciones
+
+### [2026-01-01] Algo no mecanizable por archivo
+- **Detector:** branch protection en GitHub exige el status check ci-gates'
+  bash tools/lesson-detector-link.sh >/dev/null 2>&1
+  [ "$?" = "0" ] || { echo "    un detector válido descrito en prosa fue rechazado"; return 1; }
+}
+test_detector_en_prosa_sin_ruta_pasa() { _lessons_sandbox _case_detector_en_prosa_pasa; }
 
 _case_prosa_no_absorbe_la_siguiente() {
   # Un encabezado de prosa no debe "prestar" su detector a la entrada siguiente.

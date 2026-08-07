@@ -107,7 +107,7 @@ reglas cuando el contexto se compacta, y el commit final exige el VERDICT real.
 1. Escribes `backlog/0007-exportar-pdf.md` con el formato de `backlog/_template.md` — los
    **criterios de aceptación Dado/cuando/entonces son obligatorios**: son el contrato que se
    convierte en tests. Sin ellos, el runner la marca `blocked` y no improvisa (§1.4).
-2. Un schedule (cron, scheduled task de Claude Code, o `/loop 30m`) ejecuta
+2. Un schedule (cron, scheduled task de Claude Code, o el bucle supervisado de `backlog/README.md`) ejecuta
    `bash tools/backlog/run.sh`: toma la primera `ready` sin dependencias pendientes, crea
    `story/0007-exportar-pdf` desde `develop`, y trabaja la historia en headless **con todos
    los gates activos dentro**.

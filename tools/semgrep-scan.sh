@@ -25,7 +25,7 @@
 # Por qué 3 y no 1: sin esta distinción, un typo en `tools/semgrep/rules/*.yaml`
 # bloqueaba TODOS los commits, en ambos presets, sin escape — incluido el commit
 # que arreglaría el typo, porque la carga de reglas falla mires lo que mires.
-# Eso es un deadlock local y contradice AGENTS.md §4.4 ("un bug del hook nunca
+# Eso es un deadlock local y contradice AGENTS.md §14.3 ("un bug del hook nunca
 # debe trabar al dev"). "Tu código tiene un problema" y "no pude mirar tu
 # código" son cosas distintas y merecen respuestas distintas.
 # Lo cazó el `reviewer` en la 3ª ronda de P1 (PRD 0001 §18 G13).

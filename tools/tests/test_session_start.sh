@@ -23,14 +23,40 @@ _case_report_es_puro() {
 }
 test_report_no_modifica_el_estado() { _sst_sandbox _case_report_es_puro; }
 
-# ── …y el modo hook (sin args) SÍ resetea, como siempre ─────────────
+# ── …y el modo hook (startup) SÍ resetea, como siempre ──────────────
 _case_hook_resetea() {
   touch .agents/state/skills-read/algo.read
-  bash scripts/agent-hooks/session-start.sh >/dev/null 2>&1
+  echo '{"hook_event_name":"SessionStart","source":"startup"}' \
+    | bash scripts/agent-hooks/session-start.sh >/dev/null 2>&1
   [ -f .agents/state/skills-read/algo.read ] && { echo "    el modo hook dejó de resetear los markers"; return 1; }
   return 0
 }
 test_modo_hook_sigue_reseteando() { _sst_sandbox _case_hook_resetea; }
+
+# ── source=compact JAMÁS resetea (defensa en profundidad) ───────────
+# El bug real: SessionStart sin matcher borraba markers y baseline TRAS UNA
+# COMPACTACIÓN — el drift-stop re-baseaba incluyendo los errores que el agente
+# acababa de introducir, que pasaban a baseline y nunca se bloqueaban. El
+# matcher de settings.json ya lo enruta bien; esto fija que, aunque un wrapper
+# lo invoque mal, el script se defiende solo.
+_case_compact_no_resetea() {
+  touch .agents/state/skills-read/algo.read
+  echo baseline > .agents/state/drift-baseline.txt
+  echo '{"hook_event_name":"SessionStart","source":"compact"}' \
+    | bash scripts/agent-hooks/session-start.sh >/dev/null 2>&1
+  [ -f .agents/state/skills-read/algo.read ] || { echo "    compact BORRÓ los markers de skills"; return 1; }
+  [ -f .agents/state/drift-baseline.txt ]   || { echo "    compact borró el baseline de drift"; return 1; }
+}
+test_source_compact_no_resetea_estado() { _sst_sandbox _case_compact_no_resetea; }
+
+_case_resume_no_resetea() {
+  touch .agents/state/skills-read/algo.read
+  echo '{"hook_event_name":"SessionStart","source":"resume"}' \
+    | bash scripts/agent-hooks/session-start.sh >/dev/null 2>&1
+  [ -f .agents/state/skills-read/algo.read ] || { echo "    resume BORRÓ los markers de skills"; return 1; }
+  return 0
+}
+test_source_resume_no_resetea_estado() { _sst_sandbox _case_resume_no_resetea; }
 
 # ── el health-check detecta el Anillo 1 dormido ─────────────────────
 _case_detecta_anillo_dormido() {

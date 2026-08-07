@@ -99,6 +99,21 @@ done
 
 echo ""
 echo "────────────────────────────────────────"
+# El conjunto VACÍO no aprueba: "0 tests, 0 fallos, ✅" es un gate mudo con
+# disfraz de gate verde — exactamente lo que este harness combate. Si los
+# test_*.sh desaparecen (clone parcial, borrado accidental), esto tiene que
+# GRITAR, porque canon-enforce CHECK 4 y ci/run-gates.sh paso 1 dependen de
+# que esta suite exista. Ausencia de evidencia no es evidencia.
+if [ "$PASS" -eq 0 ] && [ "$FAIL" -eq 0 ]; then
+  if [ -n "$FILTER" ]; then
+    echo "⚠️  0 tests matchearon el filtro '$FILTER' (¿typo?)."
+    exit 0
+  fi
+  echo "❌ 0 tests descubiertos en tools/tests/test_*.sh — la suite del harness"
+  echo "   NO EXISTE en esta copia. Un runner que aprueba el conjunto vacío es"
+  echo "   un gate mudo. Restaura los tests antes de confiar en ningún gate."
+  exit 1
+fi
 if [ "$FAIL" -eq 0 ]; then
   echo "✅ tests del harness: $PASS pasaron, 0 fallaron."
   exit 0

@@ -22,9 +22,8 @@ Triage en 3 buckets (`tier`):
 
 ```
 tools/findings/
-  findings.sh     CLI PORTABLE (bash+python3) — el camino por defecto
-  findings.ts     CLI alternativo (Deno/Node) — mismo esquema, mismos ids
-  ledger.jsonl    ← FUENTE DE VERDAD (1 hallazgo = 1 línea JSON)
+  findings.sh     CLI del ledger (bash+python3) — ÚNICO runtime
+  ledger.jsonl    ← FUENTE DE VERDAD (1 hallazgo = 1 línea JSON, formato compacto)
   README.md       este archivo
 docs/process/
   findings-ledger.md  ← VISTA HUMANA generada (NO editar a mano)
@@ -33,9 +32,11 @@ docs/process/
                         no findings curados; los agrega tools/metrics/escape-rate.sh)
 ```
 
-> **¿Por qué dos CLIs?** `findings.ts` exigía Deno/Node y hubo máquinas sin ellos → el ledger
-> era inoperable y los hallazgos se acumulaban en archivos sueltos. `findings.sh` usa lo que el
-> repo ya asume (bash+python3). Ambos comparten esquema, hash de ids y el **invariante clave**:
+> **¿Por qué UN solo CLI?** Existió un `findings.ts` (Deno/Node) "equivalente" — y los dos
+> emisores divergieron en el byte-formato del JSON (espaciado), con lo que los contadores de
+> los hooks reportaban 0 abiertos en silencio (lección 2026-08-07). Dos runtimes para un
+> archivo es una fuente de divergencia sin beneficio: `findings.sh` usa lo que el repo ya
+> asume (bash+python3), escribe compacto, y el **invariante clave** queda en un solo sitio:
 > `add`/`import` jamás resucitan un estado terminal — cerrar es explícito.
 
 ## Uso diario
@@ -61,12 +62,12 @@ Esto evita que la re-detección nocturna infle el ledger o "des-haga" un fix.
 ## Comandos
 
 ```bash
-F="deno run --allow-read --allow-write tools/findings/findings.ts"   # o: node ... findings.ts
+F="bash tools/findings/findings.sh"
 $F add --title "Token en logs" --area "src/auth.ts:42" --severity high --tier owner-decision
 $F import /tmp/batch.json          # ingesta masiva (salida de un sub-agente)
 $F list --status open --tier owner-decision [--json]
-$F triage <id> --tier auto-fix     $F close <id> --resolution "commit abc"     $F accept <id> --reason "..."
-$F stats                           $F render      # regenera la vista md
+$F close <id> --resolution "commit abc"     $F accept <id> --reason "..."
+$F render                          # regenera la vista md
 ```
 
 ## Convención: cada productor anexa (lo que cierra la fuga)

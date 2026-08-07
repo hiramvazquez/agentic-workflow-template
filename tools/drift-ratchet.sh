@@ -7,7 +7,14 @@
 # esconder deuda. Para bajarlo cuando mejoras: `--update` y commitea el JSON.
 #
 #   --check    falla (exit 1) si el conteo actual SUPERA el techo
-#   --update   re-escribe el techo con el conteo actual (solo para bajarlo)
+#   --update   re-escribe el techo con el conteo actual — SOLO si no lo sube.
+#
+# LA DIRECCIÓN LA IMPONE ESTE SCRIPT (espejo de mutation-score.sh --update):
+# un `--update` con el conteo por ENCIMA del techo se rehúsa. Antes no
+# comparaba nada — el "trinquete" era una sugerencia: bastaba `--update` para
+# legalizar la deuda nueva. Fijado por test_ratchets.sh::test_drift_update_nunca_sube.
+# Primera vez (JSON ausente) sí se permite: fijar el techo inicial de un repo
+# con deuda preexistente es el caso de adopción legítimo.
 #
 # Failure-open en parsing: si no puede leer counts, exit 0 (infra rota no traba).
 set -uo pipefail
@@ -27,6 +34,19 @@ read_counts
 [ -z "${CUR_E:-}" ] || [ -z "${CUR_W:-}" ] && { echo "drift-ratchet: no pude leer counts (infra) — paso."; exit 0; }
 
 if [ "$MODE" = "--update" ]; then
+  if [ -f "$JSON" ]; then
+    MAX_E="$(ceil errors)"; MAX_W="$(ceil warns)"
+    : "${MAX_E:=0}"; : "${MAX_W:=0}"
+    if [ "$CUR_E" -gt "$MAX_E" ] || [ "$CUR_W" -gt "$MAX_W" ]; then
+      echo "❌ drift-ratchet --update REHUSADO: el conteo actual (errors=$CUR_E warns=$CUR_W)"
+      echo "   SUPERA el techo (errors=$MAX_E warns=$MAX_W). El techo SOLO baja."
+      echo "   Un trinquete que su propio script puede aflojar es una sugerencia."
+      echo "   Baja la deuda que introdujiste; si de verdad quieres aceptar deuda nueva,"
+      echo "   esa es una decisión del OWNER: edita el JSON a mano fuera del agente"
+      echo "   (está en permissions.deny a propósito) y explica el porqué en el commit."
+      exit 1
+    fi
+  fi
   cat > "$JSON" <<EOF
 {
   "errors": $CUR_E,

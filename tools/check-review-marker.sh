@@ -103,7 +103,14 @@ esac
 
 # ── 3. Edad ─────────────────────────────────────────────────────────
 NOW=$(date +%s)
-MTIME=$(stat -f %m "$MARKER" 2>/dev/null || stat -c %Y "$MARKER" 2>/dev/null || echo 0)
+# ORDEN: primero GNU (-c %Y), luego BSD/macOS (-f %m). Al revés era un bug
+# real en Linux: `stat -f` de GNU NO falla — imprime datos del FILESYSTEM
+# (con %m, el mount point "/") con exit 0, así que el fallback jamás corría,
+# MTIME quedaba no-numérico y el TTL reventaba: el marker VÁLIDO se rechazaba
+# siempre en CI. En tu Mac funcionaba — el clásico bug que solo vive en el
+# runner. Guard numérico además, por si algún stat exótico imprime otra cosa.
+MTIME=$(stat -c %Y "$MARKER" 2>/dev/null || stat -f %m "$MARKER" 2>/dev/null || echo 0)
+case "$MTIME" in ''|*[!0-9]*) MTIME=0 ;; esac
 [ $((NOW - MTIME)) -gt "$TTL" ] && fail "❌ review-marker: EXPIRADO (>${TTL}s). Re-corre \`reviewer\`."
 
 # ── 4. Binding a HEAD ───────────────────────────────────────────────

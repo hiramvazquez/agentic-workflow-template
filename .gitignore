@@ -33,3 +33,6 @@ config/secrets/
 # ─── OS / editor ─────────────────────────────────────────────────────
 .DS_Store
 *.log
+
+# Personal de cada dev (Claude Code lo genera solo; jamás al repo)
+.claude/settings.local.json

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "_comment": "Anillo 2 (Claude Code). Dos partes: (1) `permissions` = enforcement NATIVO, evaluado antes de que la tool corra — más fuerte y más barato que cualquier hook; (2) `hooks` = wrapper delgado sobre los scripts COMPARTIDOS de scripts/agent-hooks/. La lógica vive una sola vez; Cursor usa los mismos scripts vía .cursor/hooks.json.",
+  "_comment": "Anillo 2 (Claude Code). Dos partes: (1) `permissions` = enforcement NATIVO, evaluado antes de que la tool corra — más fuerte y más barato que cualquier hook; (2) `hooks` = wrapper delgado sobre los scripts COMPARTIDOS de scripts/agent-hooks/. La lógica vive una sola vez; otros clientes usan los mismos scripts vía sus wrappers (.cursor/hooks.json, .codex/hooks.json).",
 
-  "_comment_permissions": "AGENTS.md §7 dice 'jamás --no-verify, --force a main, ni push sin aprobación'. Como TEXTO eso es advisory: el modelo puede ignorarlo o perderlo tras una compactación. Aquí es determinista — la tool ni siquiera llega a ejecutarse. Regla: si una prohibición se puede expresar como patrón, va aquí, no en prosa.",
+  "_comment_permissions": "AGENTS.md §7 dice 'jamás --no-verify, --force a main, ni push sin aprobación'. Como TEXTO eso es advisory. Aquí es determinista para lo que la sintaxis de patrones soporta con garantía (prefijos y paths). OJO — límite conocido: los patrones Bash con comodín INTERMEDIO (p. ej. `git commit:*--no-verify*`) no están garantizados por la sintaxis documentada; se mantienen como capa extra, pero la garantía DURA de esas prohibiciones de flags vive en el git-guard de `reviewer-gate.sh`, que ve el comando completo. Verifica ambos con `bash tools/validate-harness.sh` y su checklist en vivo.",
   "permissions": {
     "deny": [
       "Bash(git commit:*--no-verify*)",
@@ -27,6 +27,8 @@
       "Write(./tools/mutation-ratchet.json)",
       "Edit(./tools/drift-ratchet.json)",
       "Edit(./tools/mutation-ratchet.json)",
+      "Write(./tools/preset)",
+      "Edit(./tools/preset)",
       "Write(./.agents/state/**)",
       "Edit(./.agents/state/**)",
       "Bash(*reviewer_run.txt*)"
@@ -45,7 +47,8 @@
       "Bash(bash tools/check-drift.sh)",
       "Bash(bash tools/check-layers.sh)",
       "Bash(bash tools/tests/run-tests.sh:*)",
-      "Bash(bash tools/drift-ratchet.sh:*)",
+      "Bash(bash tools/drift-ratchet.sh --check)",
+      "Bash(bash tools/validate-harness.sh)",
       "Bash(bash ci/run-gates.sh)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
@@ -53,7 +56,7 @@
     ]
   },
 
-  "_comment_ratchets": "Los dos *-ratchet.json están en `deny` de Write/Edit a propósito: son TRINQUETES. Solo los actualiza su propio script (`--update`), que impone la dirección permitida. Si el modelo pudiera editarlos a mano, el trinquete sería una sugerencia.",
+  "_comment_ratchets": "Los dos *-ratchet.json y tools/preset están en `deny` de Write/Edit a propósito: son TRINQUETES y el interruptor de los gates. Los ratchets solo los actualiza su propio script (`--update`), que impone la dirección permitida — drift solo baja, mutación solo sube. Nota: `--update` de drift-ratchet NO está en allow a propósito: aflojar un trinquete requiere intervención del humano.",
 
   "_comment_marker_deny": "`.agents/state/**` y `Bash(*reviewer_run.txt*)` son mitigación PARCIAL, declarada como tal: frenan un `cat > marker` naive, pero una redirección construida dinámicamente las rodea (ver f-marker-spoof en tools/findings/). Efecto secundario conocido: los patrones de Bash no distinguen leer de escribir, así que también bloquean `cat marker`. Para INSPECCIONAR el marker usa la tool Read, que no está denegada. La defensa real contra un agente adversario no es esto: es el Anillo 3, donde el marker no viaja.",
 
@@ -62,9 +65,15 @@
     "security-guidance@claude-plugins-official": true
   },
 
+  "_comment_SessionStart": "SessionStart dispara con source: startup|resume|clear|compact. El RESET (borrar markers de skills + baseline de drift) solo tiene sentido en sesiones NUEVAS (startup|clear). En `resume` solo se reporta estado: resetear ahí obligaba a re-leer skills a mitad de trabajo. En `compact` NO se resetea nada — se reinyecta el digest de reglas (post-compact.sh): resetear tras compactar re-baseaba el drift INCLUYENDO los errores recién introducidos, que pasaban a baseline y nunca se bloqueaban. (Antes esto vivía en un evento 'PostCompact' que NO EXISTE en Claude Code: el hook jamás disparó. Lección: docs/process/lessons_learned.md → test_hook_events.sh.)",
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/session-start.sh", "timeout": 5 }] }
+      { "matcher": "startup|clear",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/session-start.sh", "timeout": 10 }] },
+      { "matcher": "resume",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/session-start.sh --report", "timeout": 10 }] },
+      { "matcher": "compact",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/post-compact.sh", "timeout": 10 }] }
     ],
 
     "_comment_UserPromptSubmit": "Estado VIVO (findings abiertos, árbol sucio) inyectado cada turno, en vez de vivir congelado en CLAUDE.md inflándolo.",
@@ -72,27 +81,24 @@
       { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/inject-context.sh", "timeout": 5 }] }
     ],
 
+    "_comment_PreToolUse_timeouts": "Presupuestos de tiempo REALES: reviewer-gate corre drift+capas+semgrep en cada `git commit` y en un repo mediano eso no cabe en 30s. Un PreToolUse que agota su timeout NO bloquea — el gate desaparece en silencio, que es el peor modo de fallo posible. Por eso 90s, y el propio gate loguea telemetría si consume más de la mitad del presupuesto.",
     "PreToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/skill-reminder.sh", "timeout": 5 }] },
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/skill-reminder.sh", "timeout": 10 }] },
       { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/reviewer-gate.sh", "timeout": 30 }] }
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/reviewer-gate.sh", "timeout": 90 }] }
     ],
 
-    "_comment_PostToolUse": "post-edit-verify es el bucle de verificación IN-LOOP: lint/typecheck del archivo recién tocado, con el resultado de vuelta al agente vía additionalContext en el MISMO turno. Es el gate de mayor ROI del harness: sin él, un error del turno 3 se descubre en el turno 40.",
+    "_comment_PostToolUse": "post-edit-verify es el bucle de verificación IN-LOOP: lint/typecheck del archivo recién tocado, con el resultado de vuelta al agente vía additionalContext en el MISMO turno. Es el gate de mayor ROI del harness: sin él, un error del turno 3 se descubre en el turno 40. track-failure detecta el bucle de reintentos LEYENDO el resultado de la tool (éxito resetea la racha, fallo la incrementa) — antes vivía en un evento 'PostToolUseFailure' que no existe.",
     "PostToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/post-edit-verify.sh", "timeout": 15 }] },
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/post-edit-verify.sh", "timeout": 30 }] },
       { "matcher": "Read",
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-reads.sh", "timeout": 3 }] },
+      { "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-failure.sh", "timeout": 5 }] },
       { "matcher": "Read|Edit|Write|MultiEdit|Bash|Grep|Glob|Task|WebFetch|WebSearch|mcp__.*",
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-trajectory.sh", "timeout": 3 }] }
-    ],
-
-    "_comment_PostToolUseFailure": "Detecta el bucle de reintentos: 4 fallos del mismo comando no son mala suerte, son una hipótesis equivocada.",
-    "PostToolUseFailure": [
-      { "matcher": "Bash|Edit|Write",
-        "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/track-failure.sh", "timeout": 5 }] }
     ],
 
     "_comment_SubagentStop": "EL INVARIANTE Nº1 DEL HARNESS: el marker de review lo escribe el SISTEMA a partir del veredicto real del sub-agente, nunca el modelo. Sin esto, el reviewer-gate es decorativo. process-judge incluido: su veredicto vacía la cola de juicio (y NUNCA escribe el marker canónico del reviewer).",
@@ -101,20 +107,15 @@
         "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/capture-review-verdict.sh", "timeout": 10 }] }
     ],
 
-    "_comment_SessionEnd": "Si la sesión tocó código y nadie corrió el process-judge, la sesión queda ENCOLADA (judge-queue) y visible cada turno hasta que un juicio real la cierre. Un juez al que nadie llama es un juez que no existe.",
+    "_comment_SessionEnd": "Si la sesión tocó código y nadie corrió el process-judge, la sesión queda ENCOLADA (judge-queue) y visible cada turno hasta que un juicio real la cierre. Solo en preset `full`: en `lite` (uso personal) la cola era ruido perpetuo sin un segundo humano que exigiera el juicio.",
     "SessionEnd": [
       { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/session-end.sh", "timeout": 5 }] }
     ],
 
-    "_comment_PostCompact": "Tras compactar, el agente conserva el resumen pero pierde el detalle de las reglas — y no sabe que las perdió, así que no las relee. Se reinyecta el digest irrenunciable.",
-    "PostCompact": [
-      { "hooks": [{ "type": "command", "command": "bash scripts/agent-hooks/post-compact.sh", "timeout": 10 }] }
-    ],
-
     "Stop": [
       { "hooks": [
-          { "type": "command", "command": "bash scripts/agent-hooks/canon-enforce.sh", "timeout": 20 },
-          { "type": "command", "command": "bash scripts/agent-hooks/drift-stop.sh", "timeout": 30 }
+          { "type": "command", "command": "bash scripts/agent-hooks/canon-enforce.sh", "timeout": 60 },
+          { "type": "command", "command": "bash scripts/agent-hooks/drift-stop.sh", "timeout": 60 }
       ] }
     ]
   }

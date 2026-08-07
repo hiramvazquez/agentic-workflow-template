@@ -85,11 +85,27 @@ hook_context() {
 }
 
 # hook_json_block <evento> <razón>  → bloquea vía JSON (equivalente a exit 2)
+#
+# EL SHAPE DEPENDE DEL EVENTO (contrato documentado de Claude Code):
+#   Stop|SubagentStop → top-level  {"decision":"block","reason":"…"}
+#   PreToolUse        → {"hookSpecificOutput":{"permissionDecision":"deny",…}}
+# La versión anterior emitía `hookSpecificOutput.decision` para TODOS los
+# eventos — un shape que Stop/SubagentStop ignoran: el "bloqueo" del cierre
+# del sub-agente sin contrato VERDICT no bloqueaba nada (gate mudo).
+# Fijado por tools/tests/test_hook_json_shapes.sh.
 hook_json_block() {
   local ev="$1" why="$2"
   if command -v jq >/dev/null 2>&1; then
-    jq -nc --arg e "$ev" --arg r "$why" \
-      '{hookSpecificOutput:{hookEventName:$e, decision:"block", reason:$r}}'
+    case "$ev" in
+      Stop|SubagentStop|stop)
+        jq -nc --arg r "$why" '{decision:"block", reason:$r}' ;;
+      PreToolUse|preToolUse)
+        jq -nc --arg e "PreToolUse" --arg r "$why" \
+          '{hookSpecificOutput:{hookEventName:$e, permissionDecision:"deny", permissionDecisionReason:$r}}' ;;
+      *)
+        # Evento sin shape de bloqueo JSON conocido → exit 2 universal.
+        hook_block "$why" ;;
+    esac
     exit 0
   fi
   hook_block "$why"
