@@ -288,9 +288,11 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   tener marker.
 - **Causa raíz:** el clasificador se construyó enumerando directorios y olvidó los meta-doc
   de la raíz; y el orden del script evalúa el marker sin re-considerar la exención.
-- **Regla:** todo archivo que AGENTS.md §8 llama "meta-doc" debe estar en `NON_PRODUCT`; y
+- **Regla:** todo archivo que AGENTS.md §8 llama "meta-doc" — y las rutas de CI/config
+  (`.github/`, olvido nº2 cazado en vivo al día siguiente) — debe estar en `NON_PRODUCT`; y
   al añadir una exención, testear también el caso "con marker stale presente" — el estado
-  residual cambia el mensaje de error y despista al humano.
+  residual cambia el mensaje de error y despista al humano. Fix de raíz del zombi: el reset
+  de session-start purga markers ya expirados (test_reset_purga_marker_expirado).
 - **Detector:** tools/tests/test_review_marker_preset.sh::test_meta_doc_no_exige_marker
 - **Área:** tools/check-review-marker.sh
 

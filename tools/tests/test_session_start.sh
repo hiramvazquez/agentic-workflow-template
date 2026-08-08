@@ -49,6 +49,25 @@ _case_compact_no_resetea() {
 }
 test_source_compact_no_resetea_estado() { _sst_sandbox _case_compact_no_resetea; }
 
+# ── el reset purga markers de review EXPIRADOS (y respeta los vigentes) ─
+_case_purga_marker_expirado() {
+  mkdir -p .agents/state/markers
+  printf 'agent: reviewer\nverdict: GREEN\nsource: hook\n' > .agents/state/markers/reviewer_run.txt
+  touch -t 202001010000 .agents/state/markers/reviewer_run.txt 2>/dev/null
+  echo '{"source":"startup"}' | bash scripts/agent-hooks/session-start.sh >/dev/null 2>&1
+  [ -f .agents/state/markers/reviewer_run.txt ] && { echo "    el marker EXPIRADO sobrevivió al reset (seguirá dando errores confusos)"; return 1; }
+  return 0
+}
+test_reset_purga_marker_expirado() { _sst_sandbox _case_purga_marker_expirado; }
+
+_case_respeta_marker_vigente() {
+  mkdir -p .agents/state/markers
+  printf 'agent: reviewer\nverdict: GREEN\nsource: hook\n' > .agents/state/markers/reviewer_run.txt
+  echo '{"source":"startup"}' | bash scripts/agent-hooks/session-start.sh >/dev/null 2>&1
+  [ -f .agents/state/markers/reviewer_run.txt ] || { echo "    un marker VIGENTE fue purgado (rompería el flujo review→restart→commit)"; return 1; }
+}
+test_reset_respeta_marker_vigente() { _sst_sandbox _case_respeta_marker_vigente; }
+
 _case_resume_no_resetea() {
   touch .agents/state/skills-read/algo.read
   echo '{"hook_event_name":"SessionStart","source":"resume"}' \

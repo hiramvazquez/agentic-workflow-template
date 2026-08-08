@@ -42,6 +42,16 @@ if [ "$MODE" != "--report" ]; then
   # Reset: obliga a re-leer las skills requeridas en cada sesión nueva.
   find "$state_dir/skills-read" -mindepth 1 -delete 2>/dev/null || true
   rm -f "$state_dir/drift-baseline.txt" "$state_dir/drift-baseline.head" 2>/dev/null || true
+  # Purga el marker de review si ya EXPIRÓ (TTL 3600s por defecto): un marker
+  # zombi de otra sesión no valida nada, pero convierte el error del gate en
+  # un confuso "EXPIRADO" en vez del claro "no hay review" — despistó al owner
+  # dos veces en vivo. Uno vigente se respeta (sobrevive a un restart rápido).
+  _mk="$state_dir/markers/reviewer_run.txt"
+  if [ -f "$_mk" ]; then
+    _mt=$(stat -c %Y "$_mk" 2>/dev/null || stat -f %m "$_mk" 2>/dev/null || echo 0)
+    case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+    [ $(( $(date +%s) - _mt )) -gt "${REVIEWER_MARKER_TTL:-3600}" ] && rm -f "$_mk" 2>/dev/null
+  fi
 fi
 
 echo "═══ <PROJECT> — estado del proyecto ═══"

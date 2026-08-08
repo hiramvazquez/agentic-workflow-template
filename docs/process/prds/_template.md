@@ -27,6 +27,22 @@
 [ruta]   ← [por qué es intocable]
 ```
 
+## 5b. Fases entregables (el antídoto contra el PRD-monolito)
+
+> **Regla de tamaño:** cada fase debe ser MERGEABLE por sí sola y caber cómoda en una sesión
+> de agente (~1 historia de backlog). Heurística: si una fase toca red + dominio + UI a la
+> vez, son DOS fases. Un agente arranca cada fase con contexto 0 — su memoria son los
+> ARCHIVOS (este PRD, las skills, el código ya mergeado de las fases previas), así que cada
+> fase debe ser autocontenida y dejar la base verde. Orden canónico: **contrato primero**
+> (puertos + modelos + fake que pasa la conformidad), luego lógica (TDD puro), luego
+> orquestación/UI, luego pulido (validaciones, edge cases, i18n).
+
+| Fase | Entrega (mergeable) | Depende de | Historia backlog |
+|---|---|---|---|
+| 1 | [ej.: puerto + modelos request/response + fake con suite de conformidad] | — | `NNNN` |
+| 2 | [ej.: Logic/UseCase con TDD contra el fake] | 1 | `NNNN` |
+| 3 | [ej.: ViewModel + View + captura y validación de inputs] | 2 | `NNNN` |
+
 ## 6. Modelo de datos
 [Entidades, schema, contratos de API/edge nuevos o modificados. Contrato PRIMERO si aplica.]
 

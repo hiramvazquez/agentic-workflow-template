@@ -43,6 +43,82 @@ la implementación.** Si el test pasa antes de implementar, no prueba lo que cre
 - **`@MainActor`** en tests de ViewModels que tocan estado de UI.
 - **Determinismo:** inyecta reloj/fecha/UUID; nunca `Date()`/`UUID()` directo dentro de la lógica testeable.
 
+## Dobles de test: fake, spy — y cuándo usar cada uno
+
+> La regla que decide: **¿qué es el comportamiento observable de ESTA capa?**
+> - **Lógica pura (UseCase/Logic):** el comportamiento es la SALIDA (retorno/estado/error).
+>   Doble correcto: **fake** (con su suite de conformidad, `domain/SKILL.md`). Verificar
+>   "se llamó a X" aquí acopla el test a la implementación — es el anti-patrón.
+> - **Orquestación (ViewModel/Coordinator):** el comportamiento ES la coreografía — qué
+>   puertos se invocan, con qué, y **en qué orden** (validar ANTES de autenticar; guardar
+>   ANTES de navegar; analytics DESPUÉS del éxito). Doble correcto: **spy** — ahí el orden
+>   no es un detalle interno, es el contrato de la capa.
+
+**El patrón spy del proyecto (Swift 6.2, un solo doble que actúa Y registra):**
+
+```swift
+// Tests/ProfileTests/LoginDoubles.swift
+// Eventos como ENUM tipado (no strings): el compilador vigila el test.
+enum LoginEvent: Equatable {
+    case validated(email: String)
+    case authenticated(email: String)
+    case sessionSaved
+    case navigatedHome
+}
+
+// Fake+Spy: implementa los PUERTOS reales (frontera), se comporta (fake)
+// y registra (spy). @MainActor porque el ViewModel vive ahí — sin locks.
+@MainActor final class LoginPortsSpy: AuthPort, SessionPort, RouterPort {
+    private(set) var events: [LoginEvent] = []
+    var authResult: Result<Session, AuthError> = .success(.stub)
+
+    func validate(_ email: String) throws { events.append(.validated(email: email)) }
+    func authenticate(_ email: String, _ pass: String) async throws -> Session {
+        events.append(.authenticated(email: email))
+        return try authResult.get()
+    }
+    func save(_ s: Session) { events.append(.sessionSaved) }
+    func showHome() { events.append(.navigatedHome) }
+}
+
+// 🔴 El test de orquestación: el ORDEN es la aserción.
+@MainActor @Test func login_success_ejecutaElFlujoEnOrden() async throws {
+    let spy = LoginPortsSpy()
+    let sut = LoginViewModel(auth: spy, session: spy, router: spy)
+
+    await sut.submit(email: "a@b.c", password: "x")
+
+    #expect(spy.events == [.validated(email: "a@b.c"),
+                           .authenticated(email: "a@b.c"),
+                           .sessionSaved,
+                           .navigatedHome])          // ← orden completo, una aserción
+}
+
+@MainActor @Test func login_authFalla_noGuardaNiNavega() async throws {
+    let spy = LoginPortsSpy(); spy.authResult = .failure(.invalidCredentials)
+    let sut = LoginViewModel(auth: spy, session: spy, router: spy)
+
+    await sut.submit(email: "a@b.c", password: "x")
+
+    #expect(!spy.events.contains(.sessionSaved))     // el efecto NO ocurrió
+    #expect(!spy.events.contains(.navigatedHome))
+    #expect(sut.state == .error("login.error.invalidCredentials"))
+}
+```
+
+**Reglas del spy (para que no degenere en el anti-patrón):**
+
+1. **Solo en la frontera (puertos/protocolos)**, jamás espiando métodos internos o privados
+   del propio SUT — eso sí acopla al detalle de implementación.
+2. **Aserta el orden solo cuando el orden es contrato.** Si da igual que analytics dispare
+   antes o después de guardar, no lo fijes: cada aserción de orden innecesaria es un test
+   que se rompe en el próximo refactor legítimo (ley del 10% aplicada a tests).
+3. **Eventos como enum `Equatable`**, no strings — typo imposible, diff legible al fallar.
+4. **El spy que implementa un puerto pasa su suite de conformidad** igual que cualquier
+   fake: espiar no exime de comportarse como el contrato promete.
+5. La prueba de bolsillo sigue mandando: *si reordeno a propósito las llamadas en el
+   ViewModel, ¿el test falla?* Si no, el spy es decorativo — y el mutation score lo dirá.
+
 ## Ejemplo (red → green → refactor)
 
 Caso: `GreetingUseCase` saluda según la hora; de noche (≥21h) devuelve un saludo distinto.
@@ -156,8 +232,12 @@ bash tools/mutation-score.sh --update    # sube el piso (SOLO sube)
 
 - ❌ Escribir el test **después** de la implementación "para tener cobertura" — no es TDD y suele
   testear la implementación, no el comportamiento.
-- ❌ Tests acoplados a detalles internos (privados, orden de llamadas) → se rompen al refactorizar.
-- ❌ Mocks que verifican "se llamó a X" en vez del **resultado observable**.
+- ❌ Tests acoplados a detalles internos (privados, orden de llamadas **de la lógica pura**)
+  → se rompen al refactorizar. Matiz importante: en la capa de ORQUESTACIÓN el orden de
+  llamadas a los puertos sí es contrato — ver §Dobles de test (spy).
+- ❌ Mocks que verifican "se llamó a X" **cuando la capa tiene un resultado observable**
+  (lógica pura → aserta la salida). El spy es legítimo donde la interacción ES el
+  comportamiento (orquestación), no como sustituto de asertar resultados.
 - ❌ Lógica en la View/ViewModel que no se puede testear sin levantar UI → muévela a la capa pura.
 - ❌ **Tests que pasan con cualquier implementación** (`#expect(resultado != nil)`, `XCTAssertNoThrow`
   como única aserción). Es el modo de fallo nº1 del código escrito por agentes: parece cobertura,

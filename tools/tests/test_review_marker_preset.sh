@@ -72,7 +72,9 @@ test_lite_no_relaja_las_capas() { _rm_sandbox _case_lite_no_relaja_capas; }
 _case_meta_doc_exento() {
   git reset -q                       # fuera el src/App.swift del sandbox
   echo "## nueva regla" >> AGENTS.md 2>/dev/null || echo "# reglas" > AGENTS.md
-  git add AGENTS.md
+  # …y config de CI (.github/), el segundo olvido del clasificador cazado en vivo:
+  mkdir -p .github/workflows; echo "name: ci" > .github/workflows/ci.yml
+  git add AGENTS.md .github/workflows/ci.yml
   # …incluso con un marker viejo e inválido presente (el caso real):
   printf 'agent: reviewer\nverdict: GREEN\nsource: hook\n' > .agents/state/markers/reviewer_run.txt
   touch -t 202001010000 .agents/state/markers/reviewer_run.txt 2>/dev/null

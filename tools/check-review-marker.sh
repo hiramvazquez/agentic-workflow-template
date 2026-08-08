@@ -31,7 +31,7 @@ MARKER=".agents/state/markers/reviewer_run.txt"
 # commit de solo-reglas exigía marker de review — falso positivo real cazado en
 # vivo (un marker viejo de otra sesión lo convertía en EXPIRADO). Fijado por
 # test_review_marker_preset.sh::test_meta_doc_no_exige_marker.
-NON_PRODUCT='^(docs/|ci/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|lefthook|\.gitleaks|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
+NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|lefthook|\.gitleaks|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
 
 fail() { echo "$1"; exit 1; }
 
