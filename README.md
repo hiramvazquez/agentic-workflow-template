@@ -127,6 +127,7 @@ tools/
   check-review-marker.sh     ← verificación de review compartida por los 3 anillos
   lesson-detector-link.sh    ← toda lección tiene detector (nivel 9)
   skill-matrix.conf          ← FUENTE ÚNICA de la matriz path→skill (la lee skill-reminder)
+  upgrade.sh                 ← trae mejoras del template a tu proyecto (merge 3-vías + verificación)
   validate-harness.sh        ← ¿los gates EXISTEN de verdad? estático + checklist en vivo
   findings/findings.sh       ← CLI del ledger (bash+python3, único runtime)
   metrics/escape-rate.sh     ← contención por fase: ¿puedo bajar la revisión humana?

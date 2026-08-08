@@ -132,4 +132,5 @@ bash tools/drift-ratchet.sh --update                 # bajar el techo tras mejor
 bash tools/mutation-score.sh --update                # subir el piso tras mejorar (solo sube)
 bash tools/backlog/run.sh                            # trabajar la siguiente historia ready
 bash tools/findings/findings.sh list --status open   # qué está abierto
+bash tools/upgrade.sh                                # traer mejoras del template (merge verificado)
 ```

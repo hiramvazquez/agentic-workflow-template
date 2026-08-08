@@ -176,6 +176,31 @@ relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.
   criterios de aceptación Dado/cuando/entonces) y `bash tools/backlog/run.sh` las trabaja una
   a una en ramas `story/NNNN` que TÚ revisas antes de mergear. Detalle: `backlog/README.md`.
 
+## 9b. Mantenerse actualizado con el template (sin perder lo tuyo)
+
+El modelo mental: tu proyecto **nació de un clone** del template y ambos evolucionan. Tus
+rellenos (FILLs, skills, confs) viven **commiteados en tu historial**, así que traer
+novedades no los "marca como modificados": es un **merge de 3 vías** normal — git funde solo
+todo lo que no choque, y solo pide tu juicio donde ambos tocasteis las mismas líneas.
+
+```bash
+bash tools/upgrade.sh https://github.com/<tu-usuario>/agentic-workflow-template.git  # 1ª vez
+bash tools/upgrade.sh                                                                # después
+```
+
+El script: exige árbol limpio → fetch → te enseña qué commits nuevos hay → merge → y **no da
+el upgrade por bueno hasta que la suite del harness y `validate-harness` pasan** (si fallan,
+te deja la decisión: arreglar o `git reset --hard ORIG_HEAD`). Si hay conflictos, te los
+lista **clasificados**: en *maquinaria* (`scripts/`, `tools/*.sh`, `ci/`) suele ganar el
+template; en *contenido tuyo* (`AGENTS.md` §2-3, `.agents/skills/`, `*.conf`, ratchets,
+`docs/process/`, `backlog/`) suele ganar tu versión.
+
+Dos hábitos que reducen los conflictos a casi cero: (1) tus rellenos van en las **zonas
+FILL** y en archivos de contenido — la maquinaria no se toca sin necesidad (§8 ya lo pide),
+así el template puede mejorar sus scripts sin chocar contigo; (2) al revés, cuando en un
+proyecto descubras una mejora **del harness en sí** (un gate, un fix de script), llévala al
+repo del template y bájala a tus proyectos vía `upgrade.sh` — no la dejes divergir en uno solo.
+
 ## 10. Cómo se ve el día a día (empieza por aquí)
 
 **`docs/PLAYBOOK.md`** — el manual de USO del programador, de inicio a fin: los cuatro flujos
