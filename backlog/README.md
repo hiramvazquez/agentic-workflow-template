@@ -34,6 +34,11 @@ tú revisas la rama → merge a develop → status: done → desbloquea dependie
 bash tools/backlog/run.sh                 # una historia, ahora
 ```
 
+> **Escribir la historia es el 80% del resultado.** En Claude Code, `/historia <tu idea>`
+> te entrevista (solo lo que no puede deducir del código), redacta los criterios
+> Dado/cuando/entonces verificables y deja el archivo en `backlog/` con `status: ready`
+> pasando los mismos guards del runner. Flujo completo del día a día: `docs/PLAYBOOK.md` §2c.
+
 Para el ciclo automático, tres opciones según tu setup:
 
 | Mecanismo | Cómo | Cuándo usarlo |

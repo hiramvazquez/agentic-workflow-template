@@ -104,7 +104,7 @@ ios|android|web/AGENTS.md  ← overrides por plataforma (el más cercano gana)
   claude-security-guidance.md ← threat model para el revisor de contexto fresco
   rules/                   ← recordatorios cortos path-scoped (el gate duro es skill-matrix.conf)
   skills → .agents/skills
-.claude/commands/goal.md   ← /goal: objetivo con condiciones verificables (nivel 8)
+.claude/commands/           ← /adoptar (rellena los FILL entrevistándote) · /historia (idea → historia de backlog) · /goal (objetivo verificable, nivel 8)
 .cursor/                   ← rules/*.mdc + hooks.json (eventos REALES de Cursor + gate-adapter)
 .codex/config.toml         ← config Codex (lee AGENTS.md directo)
 .codex/hooks.json          ← hooks Codex (2026): reviewer-gate vía gate-adapter
@@ -140,6 +140,7 @@ lefthook.yml + .gitleaks.toml                    ← Anillo 1
 .agents/skills/            ← base de conocimiento (frontmatter con `paths:` = auto-carga)
 backlog/                   ← historias de usuario tipo Jira → tools/backlog/run.sh las
                              trabaja una a una en ramas story/NNNN (PRD 0003; merge = humano)
+docs/PLAYBOOK.md           ← el día a día del programador: los 4 flujos + qué hacer si un gate bloquea
 docs/EXAMPLES.md           ← 4 escenarios iOS end-to-end: bug, feature con PRD, /goal, backlog
 docs/process/              ← PRDs, lessons (con detector obligatorio), execution map, ledger
 .claude-plugin/            ← (opcional) plugin.json + marketplace.json

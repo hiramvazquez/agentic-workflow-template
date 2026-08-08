@@ -68,6 +68,12 @@ Todos leen `AGENTS.md` (la fuente canónica). Solo activas el adaptador de los q
 
 ## 4. Rellenar lo que es TUYO (el trabajo de verdad)
 
+> **Atajo recomendado:** en una sesión de Claude Code, `/adoptar <explica tu stack>` — te
+> entrevista (una sola tanda), rellena los FILL en el orden de impacto de abajo, deja como
+> OPEN QUESTION lo que no sepas (jamás un default inventado), y al final te enseña con
+> `session-start --report` qué niveles dejaron de estar MUDOS. Lo que sigue es el mismo
+> proceso a mano.
+
 Busca todos los marcadores y resuélvelos:
 
 ```bash
@@ -171,6 +177,10 @@ relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.
   a una en ramas `story/NNNN` que TÚ revisas antes de mergear. Detalle: `backlog/README.md`.
 
 ## 10. Cómo se ve el día a día (empieza por aquí)
+
+**`docs/PLAYBOOK.md`** — el manual de USO del programador, de inicio a fin: los cuatro flujos
+(bug interactivo, feature con PRD, backlog desatendido, `/goal`), la tabla de "qué hacer
+cuando un gate te bloquea" y la chuleta de comandos. Empieza por ahí.
 
 **`docs/EXAMPLES.md`** — 4 escenarios end-to-end en iOS con los prompts literales y qué hace
 cada gate: un bug con el flow corto, una feature mediana con PRD + design-review, un run
