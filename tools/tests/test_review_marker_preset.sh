@@ -64,6 +64,33 @@ _case_lite_no_relaja_capas() {
 }
 test_lite_no_relaja_las_capas() { _rm_sandbox _case_lite_no_relaja_capas; }
 
+# ── meta-doc NO exige marker (falso positivo cazado en vivo) ────────
+# AGENTS.md es meta-doc, no producto: no estaba en NON_PRODUCT y un commit de
+# solo-reglas exigió marker — y como había un marker VIEJO de otra sesión, el
+# error fue el confuso "EXPIRADO" en vez de la exención. Peor aún: un marker
+# stale presente hacía el commit de docs MÁS difícil que sin marker.
+_case_meta_doc_exento() {
+  git reset -q                       # fuera el src/App.swift del sandbox
+  echo "## nueva regla" >> AGENTS.md 2>/dev/null || echo "# reglas" > AGENTS.md
+  git add AGENTS.md
+  # …incluso con un marker viejo e inválido presente (el caso real):
+  printf 'agent: reviewer\nverdict: GREEN\nsource: hook\n' > .agents/state/markers/reviewer_run.txt
+  touch -t 202001010000 .agents/state/markers/reviewer_run.txt 2>/dev/null
+  local a1; a1="$(_anillo1 full)"
+  [ "$a1" = "0" ] || { echo "    un cambio solo-AGENTS.md exigió marker (exit=$a1)"; return 1; }
+}
+test_meta_doc_no_exige_marker() { _rm_sandbox _case_meta_doc_exento; }
+
+_case_producto_sigue_gateado() {
+  # FALSO NEGATIVO guard: la exención de meta-doc no puede abrir la puerta a
+  # un diff MIXTO (reglas + código) — con producto en el diff, se gatea igual.
+  echo "## nueva regla" >> AGENTS.md 2>/dev/null || echo "# reglas" > AGENTS.md
+  git add AGENTS.md      # src/App.swift ya está staged por el sandbox
+  local a1; a1="$(_anillo1 full)"
+  [ "$a1" = "1" ] || { echo "    un diff mixto (AGENTS.md + código) NO fue gateado (exit=$a1)"; return 1; }
+}
+test_diff_mixto_con_producto_sigue_gateado() { _rm_sandbox _case_producto_sigue_gateado; }
+
 # ── el marker legítimo funciona igual desde ambos caminos ───────────
 _case_marker_valido_ambos() {
   cat > .agents/state/markers/reviewer_run.txt <<EOF

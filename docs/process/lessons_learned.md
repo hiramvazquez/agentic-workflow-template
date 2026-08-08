@@ -279,6 +279,23 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 
 ---
 
+### [2026-08-08] El clasificador producto/meta-doc no conocía AGENTS.md (y el marker stale lo empeoró)
+- **Qué pasó:** un commit de solo-reglas (AGENTS.md + skills + tooling) fue BLOQUEADO por el
+  review-marker en el Anillo 1 — primer bloqueo en vivo del gate, pero injusto. Doble causa:
+  `AGENTS.md` no estaba en la lista `NON_PRODUCT` (es meta-doc, no producto; su gate humano
+  ya existe en permissions.ask), y un marker viejo de otra sesión convirtió el error en un
+  confuso "EXPIRADO" — un marker stale presente hacía el commit de docs MÁS difícil que no
+  tener marker.
+- **Causa raíz:** el clasificador se construyó enumerando directorios y olvidó los meta-doc
+  de la raíz; y el orden del script evalúa el marker sin re-considerar la exención.
+- **Regla:** todo archivo que AGENTS.md §8 llama "meta-doc" debe estar en `NON_PRODUCT`; y
+  al añadir una exención, testear también el caso "con marker stale presente" — el estado
+  residual cambia el mensaje de error y despista al humano.
+- **Detector:** tools/tests/test_review_marker_preset.sh::test_meta_doc_no_exige_marker
+- **Área:** tools/check-review-marker.sh
+
+---
+
 ### [2026-08-07] Un trinquete cuyo propio script podía aflojarlo
 - **Qué pasó:** `drift-ratchet.sh --update` reescribía el techo con el conteo actual SIN
   comparar dirección, y además estaba en `permissions.allow` — un agente podía legalizar la

@@ -1,8 +1,12 @@
 # Arquitectura — específico iOS (SwiftUI vanilla + MVVM-C)
 
-> Referencia **rellenada** del template. Stack: iOS 17+, Swift 6, SwiftUI, Swift Testing.
+> Referencia **rellenada** del template. Stack: iOS 17+, Swift 6.2, SwiftUI, Swift Testing.
 > Patrón: **View + @Observable @MainActor ViewModel + Logic/UseCase puro + Coordinator + DI por ctor**.
 > Ajusta los `<!-- FILL -->` a los nombres reales de tu app.
+>
+> **Lee también `swift-estado-del-arte.md`** (misma carpeta): el estado VIVO del lenguaje —
+> concurrencia 6.2 (approachable, actors, @concurrent), qué está prohibido (try!/as!/GCD) y
+> qué aún no se usa. Evita que el agente programe "el Swift que memorizó".
 
 ## Estructura de carpetas (por feature)
 

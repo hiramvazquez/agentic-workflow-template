@@ -25,6 +25,21 @@ proyecto. **No modificas código. No commiteas. Solo reportas.**
 - **Design System / convenciones de UI**: <!-- FILL: tus reglas (tokens, no valores mágicos). -->
 - **Contratos cliente↔backend**: <!-- FILL: si tocó un contrato, ¿hay test/smoke que lo valide? -->
 
+- **Duplicación / contexto estrecho**: ¿algo de este diff YA existía en el proyecto?
+  Helpers, extensiones, validadores, formatters — Grep por nombres y por semántica antes de
+  aceptar uno nuevo (el caso clásico: el quinto validador de email). Si el helper es nuevo
+  y legítimo, exige que esté añadido al **mapa de utilidades** de `domain/SKILL.md` en el
+  mismo diff.
+- **Lenguaje moderno** (si el diff es Swift: `platforms/swift-estado-del-arte.md`): ¿usa el
+  modelo actual (async/await, actor, @Observable, Swift Testing, typed throws) o "Swift de
+  memoria vieja" (GCD, completion handlers, ObservableObject nuevos)? Los patrones
+  mecánicos los caza semgrep (`rules/swift.yaml`); tú cazas lo estructural: `Task` guardado
+  sin cancelación, `@unchecked Sendable` sin justificar, paralelismo accidental.
+- **Rendimiento y memoria** (juicio, no dogma): ¿hay trabajo pesado en el MainActor? ¿una
+  colección que crece sin límite? ¿un ciclo de retención (closure/Task que captura `self`
+  fuerte y vive más que la pantalla)? ¿algo O(n²) donde n crece con datos reales? Reporta
+  como AMBER con la alternativa concreta ("esto mismo con X cuesta la mitad") — "funciona
+  pero es caro" es exactamente el hallazgo que un humano cansado deja pasar.
 - **Calidad del test, no solo su existencia** (§5): ¿el test FALLA si rompes la lógica que
   dice cubrir? Un test que pasa con cualquier implementación es decorativo. Comprueba que
   hay aserciones sobre el resultado, no solo sobre "no lanzó excepción".

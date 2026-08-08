@@ -92,6 +92,26 @@ existir, de menos a más fuerte — usa la más fuerte que puedas:
 
 <!-- FILL: invariantes que tests/CI deben proteger. Ej.: "un Profile con plan .pro siempre tiene método de pago". -->
 
+## Mapa de utilidades compartidas (ANTES de escribir un helper, mira aquí)
+
+> **El bug de contexto estrecho:** un sub-agente que solo ve su tarea no sabe que
+> `String.isValidEmail` ya existe — así que escribe la suya, y el proyecto acaba con cinco
+> validadores de email distintos (caso real). Este mapa es la vacuna: como esta skill es de
+> lectura OBLIGATORIA antes de tocar lógica (matriz §11), todo agente entra sabiendo qué
+> existe. **Regla dura: antes de crear un helper/extensión, buscas aquí y con Grep en el
+> código. Si creas uno nuevo, lo AÑADES a este mapa en el mismo cambio** — un helper que no
+> está en el mapa es un duplicado esperando a nacer.
+
+| Utilidad | Dónde vive | Qué hace |
+|---|---|---|
+| <!-- FILL: ej. `String+Validation` --> | <!-- ej. `Shared/Extensions/String+Validation.swift` --> | <!-- ej. `isValidEmail`, `isBlank` --> |
+| <!-- FILL: ej. `DateFormatting` --> | <!-- ej. `Shared/DateFormatting.swift` --> | <!-- ej. formato relativo i18n --> |
+
+<!-- OPINIÓN: mantén el mapa pequeño y de grano grueso (archivos/namespaces, no cada
+     función). Si crece a decenas de filas, agrupa por dominio. El reviewer verifica la
+     regla (ítem "duplicación" de su checklist); si la duplicación reincide pese al mapa,
+     añade un detector mecánico (jscpd o similar) en CI — lección→detector. -->
+
 ## Suite de conformidad puerto ↔ fake (regla dura)
 
 > **Todo fake debe pasar exactamente la misma suite de tests que el adapter real.**
