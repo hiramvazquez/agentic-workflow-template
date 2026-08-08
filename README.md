@@ -141,6 +141,7 @@ lefthook.yml + .gitleaks.toml                    ← Anillo 1
 backlog/                   ← historias de usuario tipo Jira → tools/backlog/run.sh las
                              trabaja una a una en ramas story/NNNN (PRD 0003; merge = humano)
 docs/PLAYBOOK.md           ← el día a día del programador: los 4 flujos + qué hacer si un gate bloquea
+docs/ONBOARDING-IA.md      ← runbook para el AGENTE que estrena el harness: "lee esto y guíame"
 docs/EXAMPLES.md           ← 4 escenarios iOS end-to-end: bug, feature con PRD, /goal, backlog
 docs/process/              ← PRDs, lessons (con detector obligatorio), execution map, ledger
 .claude-plugin/            ← (opcional) plugin.json + marketplace.json
