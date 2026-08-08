@@ -10,12 +10,14 @@
 tú escribes backlog/0007-*.md (status: ready)
         │
 run.sh  ├─ next.sh elige la primera ready SIN deps pendientes
-        ├─ crea story/0007-<slug> desde `base:` (develop)
-        ├─ claude -p con la historia + el contrato del harness
+        ├─ `git worktree add` crea un directorio AISLADO con story/0007-<slug>
+        │    (tu checkout NUNCA cambia de rama; tu árbol sucio no estorba)
+        ├─ claude -p trabaja DENTRO del worktree + el contrato del harness
         │    └─ dentro rigen los MISMOS gates: TDD, capas, semgrep,
-        │       reviewer con VERDICT real, trinquetes
+        │       reviewer con VERDICT real, trinquetes (.agents/state limpio)
         ├─ commits quedan EN LA RAMA (jamás push, jamás merge)
-        └─ historia → in-review (o blocked, con la rama para inspección)
+        └─ historia → in-review (worktree se limpia) · blocked (worktree
+        │    queda para inspección) · in-review NO se re-trabaja: se espera tu merge
         │
 tú revisas la rama → merge a develop → status: done → desbloquea dependientes
 ```

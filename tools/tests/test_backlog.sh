@@ -86,16 +86,55 @@ _case_sin_backlog_silencio() {
 }
 test_sin_backlog_es_noop() { _bl_sandbox _case_sin_backlog_silencio; }
 
-# ── guards del runner ───────────────────────────────────────────────
-_case_arbol_sucio_aborta() {
-  _story 0001-a.md 0001 ready ""
-  echo dirty > seed.txt                      # árbol sucio
-  bash tools/backlog/run.sh >/dev/null 2>&1
-  local rc=$?
-  [ "$rc" = "1" ] || { echo "    con árbol sucio no abortó (rc=$rc)"; return 1; }
-  grep -q "status: ready" backlog/0001-a.md || { echo "    tocó la historia pese a abortar"; return 1; }
+# ── guards del runner (contrato WORKTREE: el checkout del humano es intocable) ─
+_fake_claude() { # instala un claude falso que registra invocaciones en $CLAUDE_LOG
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\n[ -n "${CLAUDE_LOG:-}" ] && echo run >> "$CLAUDE_LOG"\nexit 0\n' > bin/claude
+  chmod +x bin/claude
 }
-test_arbol_sucio_aborta_sin_tocar_nada() { _bl_sandbox _case_arbol_sucio_aborta; }
+
+_case_arbol_sucio_ya_no_bloquea() {
+  # ANTES: guard duro (exit 1). AHORA el worktree aísla: el run procede y los
+  # cambios sucios del humano quedan EXACTAMENTE como estaban.
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  echo dirty > seed.txt
+  _fake_claude
+  PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1
+  local rc=$?
+  [ "$rc" = "0" ] || { echo "    con worktrees, el árbol sucio no debería bloquear (rc=$rc)"; return 1; }
+  [ "$(cat seed.txt)" = "dirty" ] || { echo "    el run TOCÓ los cambios sin commitear del humano"; return 1; }
+}
+test_arbol_sucio_ya_no_bloquea() { _bl_sandbox _case_arbol_sucio_ya_no_bloquea; }
+
+_case_checkout_humano_intacto() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  _fake_claude
+  PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1
+  [ "$(git rev-parse --abbrev-ref HEAD)" = "develop" ] \
+    || { echo "    el run CAMBIÓ la rama del checkout del humano ($(git rev-parse --abbrev-ref HEAD))"; return 1; }
+  grep -q "status: ready" backlog/0001-a.md \
+    || { echo "    el estado cambió en la BASE antes del merge (debe cambiar solo en la rama)"; return 1; }
+  git rev-parse --verify story/0001-a >/dev/null 2>&1 \
+    || { echo "    no existe la rama de la historia"; return 1; }
+  local st; st="$(git show story/0001-a:backlog/0001-a.md | grep '^status:')"
+  case "$st" in *in-review*) : ;; *) echo "    en la rama la historia no quedó in-review ($st)"; return 1 ;; esac
+}
+test_checkout_del_humano_queda_intacto() { _bl_sandbox _case_checkout_humano_intacto; }
+
+_case_in_review_no_se_retrabaja() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  _fake_claude
+  export CLAUDE_LOG="$PWD/runs.log"
+  PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1   # 1º: trabaja → in-review
+  PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1   # 2º: debe SALTARLA
+  local n; n="$(wc -l < runs.log | tr -d ' ')"
+  unset CLAUDE_LOG
+  [ "$n" = "1" ] || { echo "    una historia in-review fue RE-trabajada ($n invocaciones de claude, esperaba 1)"; return 1; }
+}
+test_historia_in_review_no_se_retrabaja() { _bl_sandbox _case_in_review_no_se_retrabaja; }
 
 _case_sin_claude_exit3() {
   _story 0001-a.md 0001 ready ""
@@ -120,8 +159,7 @@ base: develop
 ---
 Hacer algo, ya tal.
 EOF
-  printf '#!/usr/bin/env bash\nexit 0\n' > claude_fake; chmod +x claude_fake
-  mkdir -p bin; mv claude_fake bin/claude
+  _fake_claude
   PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1
   grep -q "status: blocked" backlog/0001-vacia.md \
     || { echo "    una historia SIN criterios de aceptación no quedó blocked (§1.4: no se improvisa)"; return 1; }

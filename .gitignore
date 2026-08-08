@@ -36,3 +36,13 @@ config/secrets/
 
 # Personal de cada dev (Claude Code lo genera solo; jamás al repo)
 .claude/settings.local.json
+
+# Worktrees del backlog runner (runtime, jamás al repo)
+.agents/worktrees/
+
+# Carpetas TRANSITORIAS del puente Claude↔disco (jamás al repo):
+# _pending-claude/ = archivos de .claude/ pendientes de mover a mano;
+# _to_delete/ = papelera del bridge (no puede borrar). Si git las ve, el
+# clasificador del review-marker las trata como producto → bloqueo confuso.
+_pending-claude/
+_to_delete/

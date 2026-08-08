@@ -64,7 +64,8 @@ El flujo "historia → comando → rama lista para tu review":
 # 1. Escribe la historia (o mejor: /historia en Claude Code te la redacta y valida)
 $EDITOR backlog/0007-exportar-pdf.md      # formato _template.md, status: ready
 
-# 2. Dispara
+# 2. Dispara (trabaja en un WORKTREE aislado: tu checkout no cambia de rama,
+#    tu árbol sucio no estorba, y una historia in-review no se re-trabaja)
 bash tools/backlog/run.sh                 # una historia, ahora
 # …o en ciclo: cron / scheduled task / while bash tools/backlog/run.sh; do sleep 60; done
 
