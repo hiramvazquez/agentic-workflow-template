@@ -434,8 +434,43 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   real contra un fixture mínimo, en ESTE repo, emitiendo su contrato (§14.3). Se corre en
   segundos tras cada adopción y cada update de cliente. Y la comprobación más barata de
   todas (¿compila?) grita en session-start y validate-harness mientras siga sin cablear.
-- **Detector:** tools/validate-harness.sh --selftest (y en CI vía harness-ci)
-- **Área:** tools/validate-harness.sh · scripts/agent-hooks/session-start.sh · ci/run-gates.sh
+- **Regla 2 — *ausente* ≠ *presente-y-roto*:** todo detector debe distinguir "no tengo la
+  herramienta" de "la tengo, corrió y falló". Colapsarlos convierte una **avería** en una
+  **tarea pendiente**, que es el estado que nadie mira: el nivel 4 respondía "configúralo"
+  cuando muter llevaba media hora corriendo y había fallado. Corolario: cuanto más TARDA un
+  gate, más ruidoso debe ser su modo de fallo — el coste de un mensaje engañoso se multiplica
+  por el tiempo que costó llegar a él.
+- **Regla 3 — el fixture del selftest no puede ser famoso:** el primer selftest usaba
+  `AKIAIOSFODNN7EXAMPLE`, la clave de ejemplo de la documentación de AWS, que gitleaks ignora
+  a propósito. Daba ❌ sobre un gate perfectamente sano. Es la lección del fixture-con-formato-
+  real por el otro lado, y en un selftest duele más: **un verificador con falsos positivos se
+  ignora entero**, y entonces deja de proteger justo de aquello para lo que existe.
+- **Detector:** tools/validate-harness.sh --selftest (y en CI vía harness-ci) ·
+  tools/tests/test_ratchets.sh — `test_muter_score_se_lee_del_archivo_no_de_stdout`,
+  `test_muter_cero_mutantes_es_ruidoso_y_distinto` y `test_muter_roto_no_se_disfraza_de_sin_runner`
+  (fijan la Regla 2: los tres estados nunca vuelven a ser el mismo mensaje).
+- **Área:** tools/validate-harness.sh · scripts/agent-hooks/session-start.sh · ci/run-gates.sh ·
+  tools/mutation-score.sh
+
+---
+
+### [2026-08-09] Un archivo llegado por fuera de upgrade.sh revirtió un arreglo en silencio
+- **Qué pasó:** `semgrep-scan.sh` llegó al proyecto copiado a mano (puente, snapshot anterior
+  del template) y aplastó el split de `.errors[]` ya commiteado — el nivel 2 volvió a quedar
+  mal clasificado. Lo cazó `test_las_reglas_de_semgrep_cargan`: un test que existía porque el
+  arreglo local lo había dejado detrás.
+- **Causa raíz:** `upgrade.sh` verifica (suite + selftest) DESPUÉS de su merge, pero un `cp`
+  no pasa por `upgrade.sh` — cualquier archivo que entre por fuera se salta la única red.
+  Y el "por qué" de una divergencia local vivía en prosa (comentario, lección): un `cp`
+  aplasta prosa sin protestar.
+- **Regla:** (1) los archivos del harness entran por `upgrade.sh`; si por lo que sea entran a
+  mano, corre `run-tests.sh` + `validate-harness --selftest` INMEDIATAMENTE, no "luego".
+  (2) Toda divergencia local deliberada respecto al template lleva **su propio test** — es la
+  única forma de la divergencia que sobrevive a un `cp` descuidado. (3) Quien entrega por
+  fuera (humano o IA) diffea contra lo commiteado ANTES de escribir, y mergea — no clobberea.
+- **Detector:** tools/upgrade.sh (verificación post-merge con --selftest) + el test propio de
+  cada arreglo local (ejemplar: tools/tests/test_shell_hygiene.sh::test_las_reglas_de_semgrep_cargan)
+- **Área:** tools/upgrade.sh · flujo template↔proyecto
 
 ---
 

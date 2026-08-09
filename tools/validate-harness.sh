@@ -197,8 +197,17 @@ selftest() {
 
   # 3. secret-scan: un secreto con formato real staged DEBE bloquear.
   #    (La clave se ENSAMBLA para no dejar un patrón contiguo en este script.)
+  #
+  #    ⚠️ La clave NO puede ser `AKIAIOSFODNN7EXAMPLE`: es la de la documentación
+  #    oficial de AWS y gitleaks la ignora A PROPÓSITO (aparece en todos los
+  #    tutoriales). Con ella el selftest daba ❌ sobre un gate perfectamente
+  #    sano — verificado: misma clave en cualquier archivo → exit 0; cualquier
+  #    otra AKIA en el mismo archivo → exit 1. Un selftest con falsos positivos
+  #    se ignora entero, y entonces deja de proteger de los gates mudos, que es
+  #    justo para lo que existe (§14, ley del 10%).
+  #    Usa un formato válido pero NO canónico, como hace docs/ADOPTION.md §7.
   if command -v gitleaks >/dev/null 2>&1; then
-    ( cd "$SB/r" && printf 'aws_secret_access_key = "%s%s"\n' 'AKIA' 'IOSFODNN7EXAMPLE' > s.env.py \
+    ( cd "$SB/r" && printf 'aws_secret_access_key = "%s%s"\n' 'AKIA' '1234567890ABCDEF' > s.env.py \
       && git add s.env.py ) 2>/dev/null
     out="$(cd "$SB/r" && bash tools/secret-scan.sh --staged 2>&1)"; rc=$?
     if [ "$rc" = "1" ]; then ok "secret-scan: VE (cazó una clave AWS staged)"

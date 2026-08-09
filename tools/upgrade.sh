@@ -91,11 +91,16 @@ else
 fi
 
 # ── Verificación: el upgrade no cuenta hasta que la evidencia lo diga ─
+# Con --selftest: cada detector debe DEMOSTRAR una detección real tras el
+# merge, no solo existir. Es la red contra el modo de fallo más caro de un
+# upgrade: un archivo del template que REVIERTE un arreglo local en silencio
+# (pasó en vivo con semgrep-scan.sh — un snapshot viejo borró el split de
+# .errors[] y solo lo cazó un test que ese arreglo había dejado detrás).
 echo ""
 echo "━━━ verificando el harness tras el upgrade ━━━"
 FAIL=0
 bash tools/tests/run-tests.sh >/dev/null 2>&1 || { echo "❌ la suite del harness FALLA tras el merge."; FAIL=1; }
-bash tools/validate-harness.sh >/dev/null 2>&1 || { echo "❌ validate-harness FALLA tras el merge."; FAIL=1; }
+bash tools/validate-harness.sh --selftest >/dev/null 2>&1 || { echo "❌ validate-harness --selftest FALLA tras el merge."; FAIL=1; }
 if [ "$FAIL" = "1" ]; then
   echo ""
   echo "   El merge quedó commiteado pero el harness NO está sano. Opciones:"
@@ -103,7 +108,15 @@ if [ "$FAIL" = "1" ]; then
   echo "   · decisión del owner: deshacer con  git reset --hard ORIG_HEAD  (destruye el merge)."
   exit 1
 fi
-echo "✅ upgrade verificado: suite en verde + validate-harness OK."
+echo "✅ upgrade verificado: suite en verde + validate-harness --selftest OK."
 echo "   Repasa 'git show --stat HEAD' y, si un cambio del template pisó un FILL tuyo"
 echo "   que git fundió sin conflicto, es un buen momento para revisarlo."
+echo ""
+echo "   ⚠️  REGLA DE ORO DEL FLUJO INVERSO: si algún archivo del harness te llega"
+echo "   por FUERA de este script (copiado a mano, pegado, traído por un puente),"
+echo "   corre inmediatamente:  bash tools/tests/run-tests.sh && bash tools/validate-harness.sh --selftest"
+echo "   Un archivo que entra sin pasar por aquí se salta esta red — y un arreglo"
+echo "   local sin test propio puede quedar revertido EN SILENCIO. Corolario:"
+echo "   toda divergencia local deliberada lleva SU test, que es lo que la hace"
+echo "   sobrevivir a un cp descuidado (lección 2026-08-09 del primer proyecto)."
 exit 0

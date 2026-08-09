@@ -108,11 +108,42 @@ fi
 # regla inválida produce `errors=0 warns=0` — indistinguible de "todo bien".
 # Es el modo de fallo G5 (gate anunciado y mudo) en su versión peor: silencioso
 # incluso con la herramienta instalada. Lo cazó el `reviewer` revisando P1.
-RULE_ERRORS="$(jq '[.errors[]?] | length' "$OUT" 2>/dev/null || echo 0)"
+
+# MATIZ que costó una adopción real (Pelis, iOS) y que YA SE PERDIÓ UNA VEZ al
+# traer este archivo del template: `.errors[]` mezcla DOS cosas muy distintas,
+# y tratarlas igual rompe el gate en el sentido contrario — lo declara MUDO
+# para siempre en proyectos sanos:
+#
+#   a) fallo de CARGA de reglas    → level:"error"       → el detector no puede mirar (exit 3)
+#   b) PartialParsing de un FUENTE → level:"warn"+path   → semgrep sí corrió; no
+#      supo parsear un trozo de UN archivo (las MACROS LIBRES de Swift —
+#      #Preview, #Predicate— que su gramática aún no soporta).
+#
+# (b) NO es "el detector está roto": es "esa porción no se escaneó". Merece
+# aviso visible —código no parseado es código no escaneado— pero NO puede
+# tumbar el gate entero, o ningún proyecto SwiftUI tendría nivel 2 operativo.
+# Lo fija test_las_reglas_de_semgrep_cargan: si esto se revierte, falla.
+RULE_ERRORS="$(jq '[.errors[]? | select((.level // "error") == "error")] | length' "$OUT" 2>/dev/null || echo 0)"
+PARSE_WARNS="$(jq '[.errors[]? | select((.level // "error") != "error")] | length' "$OUT" 2>/dev/null || echo 0)"
+
+if [ "${PARSE_WARNS:-0}" -gt 0 ]; then
+  {
+    echo "⚠️  semgrep: $PARSE_WARNS trozo(s) de fuente que NO se pudieron parsear."
+    echo "   Semgrep corrió, pero esas porciones NO fueron escaneadas:"
+    jq -r '.errors[]? | select((.level // "error") != "error")
+           | "   · " + ((.path // "?") | tostring) + " — "
+             + ((.message // "?") | gsub("\n"; " ") | .[0:140])' "$OUT" 2>/dev/null
+    echo "   En Swift suele ser una macro libre (#Preview). Convención del proyecto:"
+    echo "   #Preview SIEMPRE al final del archivo, para que lo no-parseado sea"
+    echo "   solo el preview y nunca código de producto (f-2cc1e4c1)."
+  } >&2
+fi
+
 if [ "${RULE_ERRORS:-0}" -gt 0 ]; then
   {
     echo "❌ semgrep: $RULE_ERRORS error(es) CARGANDO las reglas — el detector está MUDO."
-    jq -r '.errors[]? | "   · " + ((.message // .type // "?") | gsub("\n"; " ") | .[0:200])' "$OUT" 2>/dev/null
+    jq -r '.errors[]? | select((.level // "error") == "error")
+           | "   · " + ((.message // .type // "?") | gsub("\n"; " ") | .[0:200])' "$OUT" 2>/dev/null
     echo "   Valídalas:  semgrep --validate --config $RULES_DIR"
     echo "   Un gate que no puede cargar sus reglas NO es un gate que no encuentra nada."
   } >&2
