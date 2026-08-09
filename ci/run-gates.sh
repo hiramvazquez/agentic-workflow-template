@@ -149,6 +149,18 @@ if [ -f tools/lesson-detector-link.sh ]; then
   bash tools/lesson-detector-link.sh || FAIL=1
 fi
 
+# 8d) Contención por fase — INFORMATIVO, nunca bloquea.
+#     No es un gate: es el termómetro que dice si los gates sirven. Va aquí
+#     porque una métrica que hay que acordarse de correr no se corre nunca
+#     (vivió meses como script huérfano: cero llamadas desde el informe, desde
+#     run-gates y desde CI). Bloquear con ella sería un error opuesto: penaliza
+#     al que detecta más, y el objetivo es que detectar salga barato.
+if [ -f tools/metrics/escape-rate.sh ]; then
+  echo ""
+  step "métrica (informativa) — contención por fase"
+  bash tools/metrics/escape-rate.sh 2>&1 | head -20 || true
+fi
+
 echo ""
 [ "$FAIL" -eq 0 ] && { echo "✅ run-gates: TODOS los gates pasaron."; exit 0; }
 echo "❌ run-gates: al menos un gate falló (ver arriba)."; exit 1

@@ -108,6 +108,49 @@ _case_evento_jamas_rompe() {
 }
 test_telemetria_rota_jamas_rompe_al_gate() { _fcli_sandbox _case_evento_jamas_rompe; }
 
+# ── Anti-ráfaga: 10 disparos del MISMO evento no son 10 detecciones ──
+# Observado en vivo: SubagentStop se disparó 8-10 veces por el mismo
+# veredicto y el log guardó diez líneas idénticas. escape-rate CUENTA estos
+# eventos para medir contención por fase, así que una ráfaga le inventa
+# nueve detecciones y sesga la única métrica que dice si el harness sirve.
+_case_rafaga_se_deduplica() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    PROJECT_ROOT="$(pwd)" hook_log_detection "reviewer" "verdict-RED" "el mismo scope" 2
+  done
+  local c; c="$(grep -c 'verdict-RED' .agents/state/metrics/detections.jsonl 2>/dev/null || echo 0)"
+  [ "$c" = "1" ] || { echo "    una ráfaga de 10 eventos idénticos registró $c líneas (esperaba 1)"; return 1; }
+}
+test_rafaga_del_mismo_evento_cuenta_una_vez() { _fcli_sandbox _case_rafaga_se_deduplica; }
+
+_case_eventos_distintos_no_se_pisan() {
+  # FALSO POSITIVO del dedup: si la ventana tragara eventos DISTINTOS,
+  # apagaríamos la telemetría entera para "arreglar" el ruido. Dos
+  # detecciones diferentes seguidas deben registrarse las dos.
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  PROJECT_ROOT="$(pwd)" hook_log_detection "semgrep" "hallazgo" "a.swift" 1
+  PROJECT_ROOT="$(pwd)" hook_log_detection "check-layers" "violacion" "b.swift" 3
+  PROJECT_ROOT="$(pwd)" hook_log_detection "semgrep" "hallazgo" "a.swift" 2
+  local c; c="$(grep -c . .agents/state/metrics/detections.jsonl 2>/dev/null || echo 0)"
+  [ "$c" = "3" ] || { echo "    3 eventos DISTINTOS registraron $c líneas (el dedup se está comiendo señal)"; return 1; }
+}
+test_eventos_distintos_seguidos_se_registran_todos() { _fcli_sandbox _case_eventos_distintos_no_se_pisan; }
+
+_case_repeticion_legitima_fuera_de_ventana() {
+  # El mismo evento MÁS TARDE sí es una detección nueva (el agente volvió a
+  # tropezar). Ventana configurable para poder probarlo sin dormir 2 min.
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" hook_log_detection "drift" "sube" "x" 1
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" hook_log_detection "drift" "sube" "x" 1
+  local c; c="$(grep -c '"source":"drift"' .agents/state/metrics/detections.jsonl 2>/dev/null || echo 0)"
+  [ "$c" = "2" ] || { echo "    con ventana 0 el evento repetido registró $c líneas (esperaba 2)"; return 1; }
+}
+test_repeticion_fuera_de_ventana_si_cuenta() { _fcli_sandbox _case_repeticion_legitima_fuera_de_ventana; }
+
 # ── formato byte-idéntico entre emisores (L-json-espacios) ──────────
 # El bug real: findings.sh (python, json.dumps con espacios) y los greps de
 # los hooks ('"status":"open"', sin espacio) → "findings abiertos: 0" SIEMPRE,

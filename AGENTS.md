@@ -231,6 +231,14 @@ tratarlo como éxito convertiría un scanner roto en luz verde permanente. Corol
 del hook nunca debe trabar el commit en local; un gate que no corrió nunca debe parecer un
 gate que pasó.**
 
+**§14.4 — El Anillo 3 es OBLIGATORIO en preset `full`, y esto no es burocracia: es lo que
+hace verdadera la frase anterior.** Todo el fail-open local de §14.3 está justificado *por*
+la existencia del backstop. Sin Anillo 3, un exit 3 no es "avisa y luego CI bloquea": es
+**fail-open definitivo y silencioso**, y el razonamiento de todos los niveles se cae con él.
+Lo verifica `tools/check-ring3.sh` (remoto + config de CI que ejecute los gates), y lo exige
+`validate-harness` en `full`. En `lite` no bloquea, pero se DECLARA en cada arranque de
+sesión — porque el pecado que este harness no comete es anunciar una defensa que no existe.
+
 ## 15. Cómo entrar a una sesión nueva
 
 1. Lee este archivo. 2. Lee `docs/process/current_execution_map.md`. 3. Carga la skill del área (§11).

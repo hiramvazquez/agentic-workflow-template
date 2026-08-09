@@ -40,6 +40,12 @@ qué orden vive en `docs/ADOPTION.md` §4 — síguelo; no inventes otro orden.
       en el mismo cambio) · `tools/layers.conf` · `.gitignore` (bloque de tu plataforma)
    6. `scripts/agent-hooks/canon-enforce.sh` §CHECK 5 y `tools/semgrep/rules/` SOLO si el
       owner ya tiene anti-patrones claros — no inventes reglas ruidosas (ley del 10%, §14)
+   7. **`ci/run-gates.sh` paso 6 (build+tests reales) y el ANILLO 3** — este paso cierra la
+      pirámide y no es opcional en preset `full` (§14.4). Comprueba con
+      `bash tools/check-ring3.sh`; si falta, dile al owner exactamente qué le toca a él
+      (`git remote add` + `git push`) y copia tú el workflow desde `ci/examples/`.
+      Sin Anillo 3, todo exit 3 de cualquier detector es fail-open DEFINITIVO: el paso 3.7
+      no es "el último de la lista", es el que hace ciertos a los otros seis.
 4. **Regla de honestidad:** lo que el owner no sepa aún, se deja como FILL con una nota
    `<!-- OPEN QUESTION: … -->` — jamás un default inventado en silencio (§1.4). Menos
    relleno correcto > más relleno inventado.

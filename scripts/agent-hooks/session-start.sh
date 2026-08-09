@@ -114,6 +114,14 @@ grep -q 'FILL: añade build/test' ci/run-gates.sh 2>/dev/null \
   && { echo "⚠️  SIN COMPILADOR EN LOS GATES: ci/run-gates.sh paso 6 en FILL — los 9 niveles pueden estar en verde con el build ROTO. Cablea build+tests ANTES que nada (AGENTS.md §2)."; _health=0; }
 command -v gitleaks >/dev/null 2>&1 \
   || echo "⚠️  gitleaks no instalado — el scan de secretos del Anillo 1 no corre en local."
+# El ANILLO mudo, no solo el nivel mudo: sin Anillo 3 el fail-open de §14.3
+# ("avisa en local, CI bloquea") pierde su segunda mitad y ningún exit 3
+# lo bloquea nunca. Declararlo aquí es el mínimo; en preset full,
+# validate-harness además FALLA.
+if [ -f tools/check-ring3.sh ]; then
+  bash tools/check-ring3.sh >/dev/null 2>&1 \
+    || { echo "⚠️  ANILLO 3 AUSENTE: sin remoto o sin CI que ejecute los gates. Todo detector que devuelva exit 3 hace fail-open DEFINITIVO (bash tools/check-ring3.sh para el remedio)."; _health=0; }
+fi
 
 # ── ¿El Anillo 1 está DORMIDO? ──────────────────────────────────────
 # lefthook.yml en el repo no significa nada si nadie corrió `lefthook install`:

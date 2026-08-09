@@ -93,6 +93,23 @@ _tailf() { # _tailf <archivo> <n> [descripcion]
   _section "5. Detecciones de los gates (telemetría, últimas 40)"
   _tailf "$STATE/metrics/detections.jsonl" 40 "ningún gate ha detectado nada aún, o la telemetría no corre"
 
+  # LA métrica del proyecto (nivel 9) vivía como script HUÉRFANO: existía,
+  # estaba bien escrito, se alimentaba solo... y no lo invocaba nadie — ni el
+  # informe, ni run-gates, ni CI. Es decir, la tesis central del harness ("la
+  # revisión humana decrece") era la única afirmación sin evidencia del
+  # sistema que exige evidencia para todo. Aquí se cierra: si el número no
+  # sale en el informe que el humano lee, el número no existe.
+  _section "5b. Contención por fase (escape rate) — LA métrica del nivel 9"
+  echo '```'
+  if [ -f tools/metrics/escape-rate.sh ]; then
+    bash tools/metrics/escape-rate.sh 2>&1 | head -30
+  else
+    echo "(tools/metrics/escape-rate.sh ausente — nivel 9 sin medir)"
+  fi
+  echo '```'
+  echo "_Cuanto más ABAJO se detecta (in-loop, gate), más barato. Si el reparto no se_"
+  echo "_mueve hacia abajo con el tiempo, estás añadiendo ceremonia, no calidad._"
+
   _section "6. Atascos, overrides y cola de juicio"
   echo "**Atascos (4+ fallos seguidos):**"
   _tailf "$STATE/stuck-log.txt" 15

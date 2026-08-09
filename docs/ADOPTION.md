@@ -101,17 +101,37 @@ Prioridad de relleno (en orden de impacto — es la pirámide de
 
 > Mi opinión por defecto vive en `<!-- OPINIÓN: ... -->`. Acéptala o cámbiala; no es ley.
 
-## 5. (Opcional) Conectar CI
+## 5. Conectar CI — OBLIGATORIO en preset `full` (AGENTS.md §14.4)
 
-Copia el ejemplo de tu proveedor y bórrale el `.example`:
+> Esto **era** "opcional" y era una contradicción con la propia doctrina. §14.3 justifica que
+> un detector roto no bloquee en local diciendo *"CI sí lo bloqueará"*. Sin CI, esa frase es
+> falsa: cada exit 3 pasa a ser **fail-open definitivo**. No te quedas "con dos anillos de
+> tres": te quedas con dos anillos y con un razonamiento roto en los otros niveles, que es
+> peor, porque el razonamiento no se nota que está roto.
+
+Necesitas **las dos** cosas — sin remoto ningún CI puede ejecutarse:
 
 ```bash
-# GitHub:    cp ci/examples/github-actions.yml.example   .github/workflows/gates.yml
+git remote add origin <url-de-tu-repo>
+git push -u origin HEAD
+cp ci/examples/github-actions.yml.example .github/workflows/gates.yml
+```
+
+```bash
 # GitLab:    cp ci/examples/gitlab-ci.yml.example         .gitlab-ci.yml
 # Bitbucket: cp ci/examples/bitbucket-pipelines.yml.example bitbucket-pipelines.yml
 ```
 
-Todos invocan el mismo `ci/run-gates.sh`. Si no usas CI, te quedas con Anillos 1 y 2.
+Todos invocan el mismo `ci/run-gates.sh`, que por defecto cierra el fail-open
+(`GATES_REQUIRE_SEMGREP=1`, y mutación auto-escalada en cuanto el piso supera 0).
+
+Verifícalo: `bash tools/check-ring3.sh` — y en la primera ejecución **abre la pestaña de
+Actions de tu proveedor y mira que el run pasa en verde**. Un workflow cableado que falla en
+rojo desde hace semanas es otra vez el mismo modo de fallo: nadie lo mira, y parece cubierto.
+
+Si de verdad vas a trabajar sin CI, cambia a preset `lite` (`echo lite > tools/preset`) para
+que el harness deje de prometerte un backstop que no tienes. La pérdida está declarada en
+cada `SessionStart`, que es la única forma honesta de operar sin él.
 
 ## 5b. (Opcional, empresa) Enforcement nativo no anulable + distribución como plugin
 

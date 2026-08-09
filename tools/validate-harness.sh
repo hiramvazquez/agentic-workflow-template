@@ -154,6 +154,45 @@ else
   ok "ci/run-gates.sh paso 6 cableado (build/tests en el Anillo 3)"
 fi
 
+# ── 8b. ¿EXISTE el Anillo 3? ────────────────────────────────────────
+# El fail-open local de §14.3 está justificado POR el backstop. Si el
+# backstop no existe, el razonamiento entero se cae — y hasta hoy nada lo
+# comprobaba: se declaraban niveles mudos, nunca el anillo mudo.
+# Severidad por preset: en `full` es un FALLO; en `lite` (uso personal) se
+# DECLARA con todas las letras, que es el mínimo innegociable.
+echo ""
+echo "── 8b. Anillo 3 (CI) ──"
+if [ -f tools/check-ring3.sh ]; then
+  if _r3="$(bash tools/check-ring3.sh 2>&1)"; then
+    ok "$(printf '%s' "$_r3" | grep -v RING3_SUMMARY | head -1)"
+  else
+    _preset="$(awk 'NR==1{print $1; exit}' tools/preset 2>/dev/null || echo full)"
+    if [ "${_preset:-full}" = "lite" ]; then
+      warn "Anillo 3 AUSENTE (preset lite: se declara, no bloquea)."
+      warn "Cada exit 3 de un detector es fail-open DEFINITIVO mientras siga así."
+    else
+      bad "Anillo 3 AUSENTE en preset full — el backstop de §14.3 no existe."
+      printf '%s\n' "$_r3" | grep -E '^\s+(·|Remedio|CONSECUENCIA)' | sed 's/^/     /'
+    fi
+  fi
+else
+  warn "tools/check-ring3.sh ausente — no puedo verificar el Anillo 3."
+fi
+
+# ── 9. Bits de ejecución ────────────────────────────────────────────
+# 15 scripts sin +x el mismo día no es ruido: es el síntoma de archivos que
+# llegaron por FUERA de git (un puente/cp no preserva permisos). Funciona
+# igual porque todo se invoca con `bash script.sh`, pero ensucia cada diff.
+echo ""
+echo "── 9. Bits de ejecución ──"
+NOEXEC="$(find tools ci scripts -name '*.sh' ! -perm -u+x 2>/dev/null | wc -l | tr -d ' ')"
+if [ "${NOEXEC:-0}" = "0" ]; then
+  ok "todos los .sh tienen bit +x"
+else
+  warn "$NOEXEC scripts .sh sin bit +x — síntoma de archivos llegados por fuera de git (flujo inverso)."
+  warn "Remedio:  find tools ci scripts -name '*.sh' -exec chmod +x {} +"
+fi
+
 # ════════════════════════════════════════════════════════════════════
 # SELFTEST — cada detector DEMUESTRA una vez que ve (--selftest / --full)
 # ════════════════════════════════════════════════════════════════════
@@ -172,6 +211,7 @@ selftest() {
   SB="$(mktemp -d)"
   mkdir -p "$SB/r"
   cp -R tools "$SB/r/tools" 2>/dev/null
+  cp -R scripts "$SB/r/scripts" 2>/dev/null   # los hooks bloqueantes también se selftestean
   rm -rf "$SB/r/tools/tests"   # la suite no es un detector
   (
     cd "$SB/r" || exit 1
@@ -262,6 +302,53 @@ selftest() {
     0|1) ok "drift-ratchet: corre y responde (exit $rc)" ;;
     *)   bad "drift-ratchet: crasheó en el selftest (exit $rc): $(printf '%s' "$out" | head -2)" ;;
   esac
+
+  # ── Los tres que BLOQUEAN trabajo ─────────────────────────────────
+  # Donde un fallo mudo o un falso positivo cuestan más: si uno de estos
+  # tres calla, el flujo entero pierde su garantía — y si grita de más,
+  # el equipo lo desactiva. Pedido explícitamente por la retro del primer
+  # proyecto real ("los que paran el trabajo son donde más duele").
+
+  # 7. git-guard (reviewer-gate §0): un --no-verify DEBE denegarse (exit 2).
+  #    El bloqueo ocurre ANTES de los detectores, así que no requiere stubs.
+  out="$(cd "$SB/r" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m x"}}' \
+        | bash scripts/agent-hooks/reviewer-gate.sh 2>&1)"; rc=$?
+  if [ "$rc" = "2" ]; then ok "git-guard: VE (denegó git commit --no-verify)"
+  else bad "git-guard: NO denegó --no-verify (exit $rc) — la prohibición nº1 de §7 está muda"; fi
+
+  # 8. skill-reminder: editar un path de la matriz sin haber leído las refs
+  #    DEBE bloquear (exit 2, preset full). El path se SINTETIZA desde tu
+  #    propio skill-matrix.conf y se verifica contra el mismo glob que usa
+  #    el hook — así el selftest sigue valiendo cuando cambies la matriz.
+  local CAND="" g c
+  while IFS='|' read -r g _; do
+    case "$g" in ''|'#'*) continue ;; esac
+    g="$(printf '%s' "$g" | sed -E 's/[[:space:]]+$//')"
+    c="$g"; c="${c//\*\*\//app/}"; c="${c//\*\*/app}"; c="${c//\*/X}"
+    # candidatos que caen en las EXCLUSIONES del hook (doc/tooling) no sirven
+    case "$c" in .agents/*|.claude/*|.cursor/*|docs/*|tools/*|scripts/*|ci/*|enterprise/*|*.md) continue ;; esac
+    # shellcheck disable=SC2254  # el glob DEBE expandirse como patrón
+    case "$c" in $g) CAND="$c"; break ;; esac
+  done < tools/skill-matrix.conf
+  if [ -n "$CAND" ]; then
+    out="$(cd "$SB/r" && printf '{"tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$CAND" \
+          | bash scripts/agent-hooks/skill-reminder.sh 2>&1)"; rc=$?
+    if [ "$rc" = "2" ]; then ok "skill-reminder: VE (bloqueó editar $CAND sin leer sus refs)"
+    else bad "skill-reminder: dejó editar $CAND sin lecturas (exit $rc) — la matriz §11 está muda"; fi
+  else
+    warn "skill-reminder: no pude sintetizar un path desde tu skill-matrix.conf — verifica el gate a mano"
+  fi
+
+  # 9. canon-enforce: un secreto RECIÉN ESCRITO en el árbol debe bloquear el
+  #    cierre de turno. (Clave ensamblada; formato válido no canónico.)
+  ( cd "$SB/r" && printf 'let apiKey = "%s%s"\n' 'AKIA' 'X7Q4ZR9PL2MN8V3B' > Leak.swift )
+  out="$(cd "$SB/r" && bash scripts/agent-hooks/canon-enforce.sh </dev/null 2>&1)"; rc=$?
+  if [ "$rc" = "2" ] && printf '%s' "$out" | grep -q 'SECRETO'; then
+    ok "canon-enforce: VE (bloqueó el cierre de turno con un secreto recién escrito)"
+  else
+    bad "canon-enforce: NO bloqueó un secreto recién escrito (exit $rc) — el Stop-gate está mudo"
+  fi
+  ( cd "$SB/r" && rm -f Leak.swift )
 
   rm -rf "$SB"
 }

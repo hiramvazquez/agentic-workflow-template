@@ -153,6 +153,33 @@ hook_log_detection() {
     case "$n" in ''|*[!0-9]*) n=1 ;; esac
     # JSON a mano con saneo mínimo: sin dependencia de python3/jq a propósito.
     src="${src//\"/}"; rule="${rule//\"/}"; area="${area//\"/}"
+
+    # ── Anti-ráfaga: el MISMO evento repetido no son N detecciones ─────
+    # Observado en vivo: un SubagentStop puede dispararse 8-10 veces para el
+    # mismo veredicto, y el log acababa con diez líneas idénticas separadas
+    # por segundos. Eso no es ruido cosmético: escape-rate mide contención
+    # por fase CONTANDO estos eventos, así que una ráfaga inventa nueve
+    # detecciones que nunca ocurrieron y sesga la única métrica que dice si
+    # el harness sirve. Ventana corta y caché de una ranura (las ráfagas son
+    # contiguas): barato, sin parsear el JSONL y sin tocar su esquema.
+    # Un evento legítimamente repetido más tarde SÍ se registra.
+    local win="${DETECTION_DEDUP_WINDOW:-120}" now prev
+    now="$(date +%s 2>/dev/null || echo 0)"
+    local key="$src|$rule|$area|$n"
+    local cache="$dir/.last-detection"
+    if [ "$now" != "0" ] && [ -f "$cache" ]; then
+      prev="$(cat "$cache" 2>/dev/null)"
+      case "$prev" in
+        *"|$key")
+          local pts="${prev%%|*}"
+          case "$pts" in
+            ''|*[!0-9]*) : ;;
+            *) [ "$((now - pts))" -lt "$win" ] && exit 0 ;;
+          esac ;;
+      esac
+    fi
+    printf '%s|%s' "$now" "$key" > "$cache" 2>/dev/null
+
     printf '{"ts":"%s","source":"%s","rule":"%s","area":"%s","n":%s}\n' \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo '?')" \
       "$src" "$rule" "$area" "$n" >> "$dir/detections.jsonl" 2>/dev/null

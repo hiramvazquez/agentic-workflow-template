@@ -26,19 +26,29 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 DOC="${LESSONS_DOC:-docs/process/lessons_learned.md}"
+# El ARCHIVO se verifica igual que el doc vivo. Una lección archivada lo está
+# PRECISAMENTE porque su detector es un test que corre en CI: si alguien borra
+# ese test, la lección deja de estar garantizada y debe volver al doc vivo.
+# Sin verificar el archivo, rotar sería una forma silenciosa de esquivar este
+# gate — el archivo se convertiría en el sitio donde las lecciones van a morir.
+ARCHIVE="${LESSONS_ARCHIVE:-docs/process/lessons_archive.md}"
 [ -f "$DOC" ] || { echo "LESSONS_SUMMARY total=0 sin_detector=0"; exit 0; }
 
 # Solo entradas REALES: `### [fecha] título` en el cuerpo del doc. Se ignora
 # lo que viva dentro de comentarios HTML (ejemplos del template) o de bloques
 # de código con ``` (la plantilla de entrada). Contar esos sería el clásico
 # falso positivo que mata la confianza en un detector.
-ACTIVE="$(awk '
-  /^[[:space:]]*```/ { fence = !fence; next }
-  fence              { next }
-  /<!--/             { inc = 1 }
-  !inc               { print }
-  /-->/              { inc = 0 }
-' "$DOC")"
+_strip() {
+  awk '
+    /^[[:space:]]*```/ { fence = !fence; next }
+    fence              { next }
+    /<!--/             { inc = 1 }
+    !inc               { print }
+    /-->/              { inc = 0 }
+  ' "$1"
+}
+ACTIVE="$(_strip "$DOC")"
+[ -f "$ARCHIVE" ] && ACTIVE="$ACTIVE"$'\n'"$(_strip "$ARCHIVE")"
 
 TOTAL=0; MISSING=0; ORPHANS=""
 CURRENT=""; HAS_DETECTOR=0

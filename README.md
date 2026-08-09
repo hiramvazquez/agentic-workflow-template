@@ -6,7 +6,28 @@
 > No es un framework de código: es una **forma de trabajar** codificada en archivos que
 > los agentes leen y en *gates* que se ejecutan solos. La empresa lo clona, rellena los
 > placeholders de su stack, y arranca con governance desde el día 1.
-> Trae **iOS (SwiftUI + MVVM-C) y TDD** como referencia ya rellenada; otras plataformas quedan como skeleton.
+
+---
+
+## Alcance real, sin marketing
+
+Este harness aplica su propia regla —*declara lo que NO cubres*— a sí mismo. Lo que hay hoy,
+medido, no prometido:
+
+| | Estado | Qué significa al adoptarlo |
+|---|---|---|
+| **La maquinaria** (3 anillos, hooks, trinquetes, marker, ledger, selftest) | **Curtida** — validada en un proyecto real de principio a fin | Portable. No depende del lenguaje. |
+| **iOS** (Swift 6 / SwiftUI / MVVM-C / Swift Testing) | **Curtido** — reglas semgrep AST, lint in-loop, capas, skills con ejemplos reales | `/adoptar` y a trabajar. |
+| **Android · web · backend** | **Skeleton** — el esqueleto está, los detectores no | Adoptarlo aquí **no es rellenar FILLs**: es escribir de cero el nivel 1 (lint/typecheck in-loop), el nivel 2 (reglas AST) y el nivel 4 (runner de mutación) para tu stack. Cuenta con **una tarde larga**, no diez minutos. |
+
+Concretamente, hoy: reglas semgrep para `swift` y `universal`; `post-edit-verify` cableado
+para `.swift`, `.sh` y `.json`; ~119 marcadores `FILL` repartidos por el repo. `session-start`
+te dirá en cada arranque qué niveles están MUDOS en TU proyecto — esa es la fuente de verdad,
+no esta tabla.
+
+**Por qué se dice así de claro:** la lección más cara de este harness es que un gate anunciado
+y no operativo es peor que uno ausente, porque compra confianza falsa. Sería incoherente
+cometer ese error en el propio README.
 
 ---
 

@@ -156,3 +156,107 @@ _case_doc_ausente() {
   [ "$?" = "0" ] || { echo "    falló sin doc de lecciones (debe ser no-op)"; return 1; }
 }
 test_sin_doc_es_noop() { _lessons_sandbox _case_doc_ausente; }
+
+# ════════════════════════════════════════════════════════════════════
+# ROTACIÓN — una lección MECANIZADA ya no necesita leerse
+# ════════════════════════════════════════════════════════════════════
+# El corolario del propio bucle: si el detector es un test que corre en el
+# Anillo 3, la regla está garantizada por una máquina y no por la memoria.
+# El riesgo del mecanismo es archivar de MÁS (perder la lección de verdad),
+# así que estos tests fijan sobre todo lo que NO debe archivarse.
+_rot_sandbox() {
+  local d; d="$(mktemp -d)"
+  mkdir -p "$d/tools/tests" "$d/docs/process"
+  cp "$PROJECT_ROOT/tools/lessons-rotate.sh" "$d/tools/"
+  cp "$PROJECT_ROOT/tools/lesson-detector-link.sh" "$d/tools/"
+  ( cd "$d" || exit 1; git init -q . 2>/dev/null; "$1" )
+  local rc=$?; rm -rf "$d"; return $rc
+}
+
+_case_rota_la_mecanizada_y_conserva_la_manual() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Con test en la suite
+- **Regla:** algo mecánico.
+- **Detector:** tools/tests/test_ejemplo.sh::test_x
+- **Área:** x
+
+### [2026-01-02] Juicio de producto
+- **Regla:** algo opinable.
+- **Detector:** n/a-manual — es criterio de diseño
+- **Área:** proceso'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1
+  grep -q 'Juicio de producto' docs/process/lessons_learned.md \
+    || { echo "    la lección n/a-manual fue archivada: su prosa ES el mecanismo"; return 1; }
+  grep -q '^### .*Con test en la suite' docs/process/lessons_learned.md \
+    && { echo "    la lección mecanizada sigue entera en el doc vivo"; return 1; }
+  grep -q 'Con test en la suite' docs/process/lessons_archive.md \
+    || { echo "    la lección mecanizada no llegó al archivo"; return 1; }
+  return 0
+}
+test_rotacion_archiva_mecanizadas_y_respeta_manuales() {
+  _rot_sandbox _case_rota_la_mecanizada_y_conserva_la_manual
+}
+
+_case_deja_indice() {
+  # Archivar SIN dejar rastro cambiaría un problema por otro: el agente
+  # dejaría de saber que la regla existe y se enteraría al ver fallar un
+  # test — una vuelta entera más cara que leer una línea.
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Regla mecanizada
+- **Regla:** algo.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1
+  grep -q 'Regla mecanizada' docs/process/lessons_learned.md \
+    || { echo "    no quedó línea de índice: la señal de que la regla existe se perdió"; return 1; }
+}
+test_rotacion_deja_indice_de_una_linea() { _rot_sandbox _case_deja_indice; }
+
+_case_keep_visible_manda() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] El owner quiere verla siempre
+<!-- KEEP-VISIBLE: duele demasiado como para esconderla -->
+- **Regla:** algo.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1
+  grep -q '^### .*owner quiere verla' docs/process/lessons_learned.md \
+    || { echo "    KEEP-VISIBLE no protegió la lección del archivado"; return 1; }
+}
+test_keep_visible_veta_el_archivado() { _rot_sandbox _case_keep_visible_manda; }
+
+_case_detector_sin_test_no_se_archiva() {
+  # Garantía PARCIAL: un detector que es un script sin test propio no
+  # asegura nada por sí solo. Archivar eso sería archivar una promesa.
+  printf '#!/usr/bin/env bash\n' > tools/otro.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Detector sin test propio
+- **Regla:** algo.
+- **Detector:** tools/otro.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1
+  grep -q '^### .*Detector sin test propio' docs/process/lessons_learned.md \
+    || { echo "    se archivó una lección con garantía solo PARCIAL"; return 1; }
+}
+test_detector_sin_test_en_la_suite_no_se_archiva() {
+  _rot_sandbox _case_detector_sin_test_no_se_archiva
+}
+
+_case_archivo_sigue_verificado() {
+  # Sin esto, rotar sería la forma silenciosa de esquivar el gate de
+  # lecciones: el archivo se volvería el sitio donde van a morir.
+  mkdir -p docs/process
+  printf '# Lecciones\n' > docs/process/lessons_learned.md
+  printf '# Archivadas\n\n### [2026-01-01] Detector fantasma\n- **Detector:** tools/tests/test_borrado.sh\n- **Área:** x\n' \
+    > docs/process/lessons_archive.md
+  bash tools/lesson-detector-link.sh >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    una lección ARCHIVADA con detector inexistente pasó el gate"; return 1; }
+}
+test_lecciones_archivadas_siguen_verificadas() { _rot_sandbox _case_archivo_sigue_verificado; }
