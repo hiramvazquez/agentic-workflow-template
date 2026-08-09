@@ -130,6 +130,17 @@ fi
 #       esac
 #     done <<< "$CHANGED"
 #   fi
+#
+#      Ejemplo REAL (del primer proyecto iOS): proteger DECISIONES DE BUILD
+#      fijadas. El default de aislamiento (MainActor, Xcode 26) se intentó
+#      revertir DOS veces pese a estar documentado en la skill — prosa que
+#      nadie relee. La regla mecánica lo hizo imposible:
+#   if printf '%s' "$CHANGED" | grep -q 'project\.pbxproj'; then
+#     grep -q 'SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated' <TuApp>.xcodeproj/project.pbxproj 2>/dev/null \
+#       && err "el default MainActor es decisión FIJADA (AGENTS.md §3): escapes puntuales con @concurrent, jamás a nivel de target"
+#     grep -q 'SWIFT_TREAT_WARNINGS_AS_ERRORS = NO' <TuApp>.xcodeproj/project.pbxproj 2>/dev/null \
+#       && err "warnings-as-errors es el nivel 0 (AGENTS.md §2): no se apaga"
+#   fi
 # -->
 
 # ── Veredicto ───────────────────────────────────────────────────────

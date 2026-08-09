@@ -111,6 +111,10 @@ configuración antes de seguir — un gate mudo con apariencia de sano es el peo
 - Y la regla permanente: tras cada update de Claude Code / Codex / Cursor →
   `bash tools/validate-harness.sh` otra vez. Los contratos de hooks versionan rápido y
   fallan hacia el silencio.
+- **Cierra generando el informe:** `bash tools/harness-report.sh` — y dile al humano que
+  pegue su contenido en la conversación donde se mantiene el harness. Ese informe es el
+  canal por el que quien no estuvo aquí (humano u otra IA) ve cómo se comportó TODO el
+  sistema con evidencia, no con recuerdos.
 
 ---
 

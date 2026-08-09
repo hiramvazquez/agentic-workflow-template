@@ -68,25 +68,35 @@ case "$REL" in
     fi
     ;;
 
-  # <!-- FILL: cablea el lint/typecheck de TU stack. Regla: solo el archivo
-  #      tocado, < 2s, y que devuelva texto accionable. Ejemplos:
-  #
-  #  *.swift)
-  #    try "swiftformat --lint" swiftformat --lint "$FILE"
-  #    try "swiftlint"          swiftlint lint --quiet --path "$FILE"
-  #    ;;
-  #  *.kt|*.kts)
-  #    try "ktlint"             ktlint "$FILE"
-  #    ;;
-  #  *.ts|*.tsx)
-  #    try "eslint"             npx --no-install eslint --format unix "$FILE"
-  #    # typecheck del proyecto (más caro): déjalo para pre-push si tarda.
-  #    try "tsc"                npx --no-install tsc --noEmit -p .
-  #    ;;
-  #  *.py)
-  #    try "ruff"               ruff check "$FILE"
-  #    try "mypy"               mypy "$FILE"
-  #    ;;
+  # ── Swift (referencia iOS, ACTIVA — se auto-desactiva sin toolchain) ─
+  # Cableado nacido en el primer proyecto real y promovido al template.
+  # swift-format viene con Xcode: cero instalación. Calibra `.swift-format`
+  # al estilo de TU editor (la referencia: 4 espacios/120 cols) — con defaults
+  # ajenos grita en TODOS los archivos y un linter así se desactiva entero
+  # (ley del 10%, AGENTS.md §14). Sin `--strict`: ahogaría la señal real.
+  # El typecheck completo es caro (simulador) → va en el commit, no aquí.
+  *.swift)
+    try "swift-format lint $REL" swift-format lint "$FILE"
+    # Anti-patrones Swift 6.2 que el compilador NO caza pero la skill
+    # `swift-estado-del-arte.md` prohíbe. Solo patrones EXACTOS (ley del 10%).
+    legacy=""
+    dq="$(grep -nE '^[^/]*DispatchQueue\.(main|global)' "$FILE" 2>/dev/null | head -3)"
+    [ -n "$dq" ] && legacy="${legacy}GCD en código nuevo → usa async/await o @MainActor:
+$dq
+"
+    grep -qE '^[^/]*: *ObservableObject' "$FILE" 2>/dev/null \
+      && legacy="${legacy}ObservableObject → usa @Observable (Swift 6.2 / iOS 17+).
+"
+    grep -qE '@unchecked +Sendable' "$FILE" 2>/dev/null \
+      && legacy="${legacy}@unchecked Sendable requiere justificación escrita del invariante (AGENTS.md §3).
+"
+    [ -n "$legacy" ] && { add "── Swift 6.2: estado del arte ──"; add "$legacy"; }
+    ;;
+  # <!-- FILL: cablea el lint/typecheck del RESTO de tu stack. Regla: solo el
+  #      archivo tocado, < 2s, y texto accionable. Ejemplos:
+  #  *.kt|*.kts)  try "ktlint"  ktlint "$FILE" ;;
+  #  *.ts|*.tsx)  try "eslint"  npx --no-install eslint --format unix "$FILE" ;;
+  #  *.py)        try "ruff"    ruff check "$FILE" ;;
   # -->
   *) : ;;
 esac

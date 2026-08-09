@@ -34,6 +34,12 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
+# Sin esto, semgrep intenta un version-check de red al arrancar y en redes
+# restringidas se CUELGA (no falla: espera). Misma lección que el bloque
+# _ver() de harness-report.sh — un scan que puede colgarse indefinidamente
+# convierte cualquier gate que lo invoque en una lotería de timeouts.
+export SEMGREP_ENABLE_VERSION_CHECK=0
+
 RULES_DIR="${SEMGREP_RULES:-tools/semgrep/rules}"
 MODE="${1:---all}"
 

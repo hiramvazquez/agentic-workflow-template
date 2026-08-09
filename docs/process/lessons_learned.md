@@ -279,6 +279,95 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 
 ---
 
+### [2026-08-09] Anillo 0: dos sintaxis inertes, delatadas por la voz del propio cliente en los logs
+- **Qué pasó:** el primer proyecto real confirmó f-3c027a85 y añadió el segundo agujero: los
+  logs persistidos de los runs traían el aviso del propio Claude Code — "`Write(path)` is not
+  matched by file permission checks — only `Edit(path)` rules are". TODAS las reglas Write()
+  del deny eran inertes; los Bash con comodín intermedio, también. `git clean -f` quedaba sin
+  cubrir por NADIE. El Anillo 0 "determinista" era en gran parte decorativo.
+- **Causa raíz:** sintaxis asumida, jamás verificada en vivo (la lección de los hooks
+  fantasma, en su tercera forma) — y sin logs persistidos el aviso del cliente se habría
+  perdido en la terminal.
+- **Regla:** en permissions solo formas GARANTIZADAS (paths Read/Edit, Bash por prefijo);
+  las prohibiciones de flags viven en el git-guard, que ve el comando completo. Y todo
+  output de un run se persiste — la evidencia que no se guarda no existe.
+- **Detector:** tools/tests/test_hook_events.sh::test_permissions_sin_sintaxis_inerte
+- **Área:** .claude/settings.json · scripts/agent-hooks/reviewer-gate.sh
+
+---
+
+### [2026-08-09] El gate del marker no conocía los commits de MERGE (el owner atascado en su propio flujo)
+- **Qué pasó:** primer merge humano de una rama de historia (GREEN al crearse, gates verdes
+  commit a commit) → `check-review-marker` exigió un marker NUEVO para el diff del merge →
+  el merge quedó a medias con `MERGE_HEAD` colgado y una cascada de errores confusos detrás.
+- **Causa raíz:** el gate se diseñó pensando en commits de CONTENIDO; el commit de merge es
+  otra especie — no introduce trabajo nuevo (sin conflictos), y re-revisar lo ya revisado no
+  añade verificación. Nadie había mergeado en vivo hasta hoy: el camino feliz del propio
+  flujo (backlog → review → merge humano) nunca se había recorrido entero.
+- **Regla:** `MERGE_HEAD` presente (modo staged) → exento de marker; el merge es acto del
+  owner por doctrina. La exención NO se generaliza: sin MERGE_HEAD, producto staged se gatea
+  igual. Y la meta-regla: un flujo no está validado hasta recorrer su camino feliz COMPLETO
+  — los caminos de error se prueban solos; el feliz hay que caminarlo.
+- **Detector:** tools/tests/test_review_marker_preset.sh::test_merge_de_rama_validada_no_exige_marker
+- **Área:** tools/check-review-marker.sh · flujo de merge del backlog
+
+---
+
+### [2026-08-09] La matriz exigía leer un archivo que el tracker no sabía registrar (bucle infinito)
+- **Qué pasó:** se añadieron refs `platforms/*.md` a `skill-matrix.conf` sin ampliar el filtro
+  estático de `track-reads.sh`. Resultado: el agente leía la skill (obedeciendo al gate), el
+  marker jamás se creaba, y `skill-reminder` bloqueaba PARA SIEMPRE la edición de lógica
+  Swift. Lo cazó **el agente del primer proyecto real**, depurando el hook al notar que sus
+  Reads no producían markers.
+- **Causa raíz:** dos piezas acopladas (qué exige la matriz / qué registra el tracker) con
+  listas independientes — la misma familia del bug de "la matriz en 5 sitios", en versión
+  sutil: unificamos la matriz pero el tracker conservó su propia copia implícita.
+- **Regla:** el tracker deriva lo registrable DE LA MATRIZ (la lee en runtime); cualquier
+  par gate↔tracker comparte fuente o tiene un test de consistencia que recorra una y
+  verifique la otra.
+- **Detector:** tools/tests/test_skill_matrix.sh::test_toda_ref_es_registrable_por_track_reads
+- **Área:** scripts/agent-hooks/track-reads.sh · tools/skill-matrix.conf
+
+---
+
+### [2026-08-08] "Puro" era ambiguo: el agente revirtió el default de concurrencia del target entero
+- **Qué pasó:** en el primer proyecto real, el agente detectó `SWIFT_DEFAULT_ACTOR_ISOLATION
+  = MainActor` (default Xcode 26) y, leyendo "Logic puro" en la skill de arquitectura, cambió
+  el default del TARGET a `nonisolated` — revirtiendo el Approachable Concurrency que la skill
+  del lenguaje manda, y creando drift spec↔código desde el día cero. Informó, pero no esperó.
+- **Causa raíz:** dos docs internos en tensión aparente ("MainActor por defecto" vs "Logic
+  puro") + un término ambiguo ("puro") sin definición operativa. Ante el conflicto, el agente
+  eligió en vez de preguntar.
+- **Regla:** "puro" = puro en DEPENDENCIAS, no en aislamiento (definido ya en ambas skills);
+  los defaults de build del target son decisión de OWNER; y conflicto entre docs internos =
+  Open Question, jamás elección unilateral (§1.4).
+- **Detector:** n/a-manual — es juicio de diseño; la prevención real es la definición
+  operativa añadida a `swift-estado-del-arte.md` y `platforms/ios.md`, y el ítem del
+  design-reviewer sobre decisiones de build settings.
+- **Área:** .agents/skills/architecture/ · settings del target
+
+---
+
+### [2026-08-08] El doc que enseña el simulacro de secretos CONTENÍA el secreto del simulacro
+- **Qué pasó:** primer commit del harness sobre un proyecto real → gitleaks bloqueó: 1 leak.
+  Era `docs/ADOPTION.md` §7 — el ejemplo del "commit de prueba" traía un AWS key de formato
+  real y contiguo. En el template nunca mordió porque su primer commit entró SIN el Anillo 1
+  (hecho desde un entorno sin lefthook) y los diffs posteriores no tocaban esa línea: el gate
+  solo ve deltas, y la adopción en un proyecto nuevo stagea TODO → primer escaneo completo.
+- **Causa raíz:** doble — un doc con un patrón de secreto contiguo (contra la doctrina del
+  propio `.gitleaks.toml`: "formatos obviamente inválidos o allowlist por PATH"), y la
+  ceguera de "el gate solo ve deltas": lo que entra sin escanear queda invisible hasta que
+  alguien lo re-stagea entero.
+- **Regla:** los strings de simulacro en docs se CONSTRUYEN en runtime (`printf 'AKIA%s'
+  RESTO`) — el doc nunca contiene el patrón contiguo, el archivo del drill sí. Y tras montar
+  el Anillo 1 en un repo con historia, corre un escaneo COMPLETO una vez
+  (`gitleaks detect --source .`), no confíes en que los deltas te cubren lo viejo.
+- **Detector:** .gitleaks.toml — el propio scan del Anillo 1 sobre el staging completo (así
+  se cazó); el drill de ADOPTION §7 verifica que sigue vivo.
+- **Área:** docs/ADOPTION.md · flujo de adopción
+
+---
+
 ### [2026-08-08] El clasificador producto/meta-doc no conocía AGENTS.md (y el marker stale lo empeoró)
 - **Qué pasó:** un commit de solo-reglas (AGENTS.md + skills + tooling) fue BLOQUEADO por el
   review-marker en el Anillo 1 — primer bloqueo en vivo del gate, pero injusto. Doble causa:
@@ -308,6 +397,45 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   de `mutation-score.sh`); en `allow` va solo `--check`.
 - **Detector:** tools/tests/test_ratchets.sh::test_drift_update_nunca_sube_el_techo
 - **Área:** tools/drift-ratchet.sh · .claude/settings.json
+
+---
+
+### [2026-08-09] Un merge "concluido" commiteó los marcadores de conflicto y ningún gate lo vio
+- **Qué pasó:** al resolver el conflicto del ledger en un merge, el archivo se stageó con los
+  tres marcadores (`<<<<<<<` / `=======` / `>>>>>>>`) todavía dentro y un finding duplicado.
+  git no protesta: solo rechaza paths "unmerged", y `git add` del archivo con los marcadores
+  "resuelve" el index. El ledger quedó corrupto en develop; `findings.sh` moría al parsearlo y
+  el harness-report lo mostró como "(ledger no disponible)" — así se cazó.
+- **Causa raíz:** doble. (1) Nadie miraba el CONTENIDO staged en busca de marcadores; (2) la
+  exención de MERGE_HEAD del review-marker — correcta — hace los merges menos vigilados a
+  propósito, así que el único commit donde este error puede ocurrir es justo el menos mirado.
+  Toda exención de un gate necesita un contrapeso mecánico para su caso.
+- **Regla:** los merges se concluyen con el conflicto resuelto DE VERDAD; en un JSONL de
+  append (ledger) la resolución habitual es conservar AMBAS líneas y deduplicar por id al
+  estado más avanzado. Y para citar marcadores en un doc: indentados, nunca a inicio de línea.
+- **Detector:** tools/tests/test_conflict_markers.sh (gate: `conflict-markers` en lefthook →
+  tools/check-conflict-markers.sh, que exige ambos extremos presentes — ley del 10%).
+- **Área:** lefthook.yml · tools/findings/ · merges del owner
+
+---
+
+### [2026-08-09] Tres gates parecían sanos y ninguno había demostrado jamás que VE
+- **Qué pasó:** los tres fallos más caros del primer proyecto real tenían la misma forma.
+  (1) Nueve niveles en verde con el build de Xcode roto — el paso de build era el único
+  `FILL` sin cablear. (2) El nivel 4 pasó de "mudo" a "cableado" sin haber producido nunca
+  un score: muter no emite JSON por stdout y el fallo caía al mensaje de "sin runner".
+  (3) semgrep podía colgarse indefinidamente por un version-check de red. Ninguno era un
+  gate que bloqueó mal: eran gates que NUNCA habían detectado nada y nadie se lo exigió.
+- **Causa raíz:** los checks de salud medían CONFIGURACIÓN (¿existe el binario? ¿está el
+  conf?) y no EVIDENCIA (¿ha producido este detector una detección real alguna vez, aquí,
+  con estos binarios?). Contra esa clase de fallo el resto del harness no puede defender:
+  todos los demás niveles dan verde precisamente porque el detector mudo no habla.
+- **Regla:** ningún detector cuenta como activo hasta pasar su **selftest**: una detección
+  real contra un fixture mínimo, en ESTE repo, emitiendo su contrato (§14.3). Se corre en
+  segundos tras cada adopción y cada update de cliente. Y la comprobación más barata de
+  todas (¿compila?) grita en session-start y validate-harness mientras siga sin cablear.
+- **Detector:** tools/validate-harness.sh --selftest (y en CI vía harness-ci)
+- **Área:** tools/validate-harness.sh · scripts/agent-hooks/session-start.sh · ci/run-gates.sh
 
 ---
 

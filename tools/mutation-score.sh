@@ -35,24 +35,95 @@ compute_score() {
     printf '%s' "$MUTATION_SCORE_OVERRIDE"; return 0
   fi
 
-  # <!-- FILL: invoca el runner de mutación de TU stack y extrae el % entero.
-  #      Recomendaciones por plataforma:
-  #        Swift   → muter        (`muter run --format xcode`)
-  #        Kotlin  → PIT/pitest   (`./gradlew pitest`)
-  #        JS/TS   → StrykerJS    (`npx stryker run`)
-  #        Python  → mutmut       (`mutmut run && mutmut results`)
-  #        Java    → PIT          (`mvn org.pitest:pitest-maven:mutationCoverage`)
-  #      El runner suele ser LENTO: va en CI/nocturno (Anillo 3), no en pre-commit.
-  #      Ejemplo (Stryker):
-  #        npx stryker run --reporters json >/dev/null 2>&1 || return 1
-  #        sed -nE 's/.*"mutationScore":([0-9]+).*/\1/p' reports/mutation/mutation.json | head -1
-  #  -->
+  # ── Swift → muter (referencia iOS, ACTIVA — se auto-desactiva sin muter) ─
+  # Nacido en el primer proyecto real, y REPARADO ahí mismo dos veces. LENTO
+  # (la suite entera por mutante): va en CI/nocturno (Anillo 3) o a mano,
+  # NUNCA en pre-commit. Config: muter.conf.yml O muter.conf.json en la raíz
+  # (`muter init` moderno genera .yml; versiones viejas .json).
+  #
+  # muter NO emite JSON fiable por stdout: `--format json` mezcla el logo
+  # ASCII y el progreso; el reporte solo es JSON con `-o <archivo>`. La v1
+  # hacía json.loads(stdout), fallaba SIEMPRE, y el fallo caía al mensaje de
+  # "sin runner configurado" — 30-90 min de muter para un mensaje engañoso
+  # (modo de fallo G5: gate anunciado y no operativo). Por eso ahora:
+  # reporte a archivo, y todo fallo POST-arranque es RUIDOSO y distinto
+  # (return 2), jamás confundible con "no hay runner" (return 1).
+  if command -v muter >/dev/null 2>&1 && { [ -f muter.conf.yml ] || [ -f muter.conf.json ]; }; then
+    local rc tmp
+    tmp="$(mktemp)"
+    muter run --format json --skip-update-check -o "$tmp" >/dev/null 2>&1; rc=$?
+    if [ $rc -ne 0 ]; then
+      echo "muter CORRIÓ y falló (rc=$rc). Repro: muter run --format json -o /tmp/muter.json" >&2
+      echo "Si el log dice 'wasn't able to discover any code': cobertura del scheme apagada," >&2
+      echo "o la sintaxis Swift del código es más nueva que el SwiftSyntax de tu muter." >&2
+      rm -f "$tmp"; return 2
+    fi
+    # JSON anidado → python3, no sed. Distingue "0 candidatos" de un score:
+    # un run sin mutantes descubiertos NO es un 0% — es el detector sin ojos.
+    local parsed
+    parsed="$(python3 - "$tmp" <<'PY' 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+score = total = None
+def walk(o):
+    global score, total
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if k == "mutationScore" and isinstance(v, (int, float)) and score is None:
+                score = int(v)
+            if isinstance(v, (int, float)) and total is None and \
+               k.lower() in ("totalappliedmutationoperators", "totalmutantsintroduced", "numberofmutants"):
+                total = int(v)
+            walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            walk(v)
+walk(d)
+if total == 0:
+    print("NOMUTANTS")
+elif score is not None:
+    print(score)
+PY
+)"
+    rm -f "$tmp"
+    case "$parsed" in
+      NOMUTANTS)
+        echo "muter corrió pero descubrió 0 mutantes: eso NO es un score (ni bueno ni malo)." >&2
+        echo "Causas típicas: cobertura del scheme apagada, o sintaxis Swift más nueva que" >&2
+        echo "el SwiftSyntax de tu versión de muter (p. ej. typed throws)." >&2
+        return 2 ;;
+      "")
+        echo "muter corrió pero el reporte no trae un mutationScore legible (formato inesperado)." >&2
+        return 2 ;;
+      *)
+        printf '%s' "$parsed"; return 0 ;;
+    esac
+  fi
+  # <!-- FILL: runner de mutación del RESTO de stacks:
+  #      Kotlin/Java → PIT · JS/TS → StrykerJS · Python → mutmut.
+  #      Contrato: imprime el % ENTERO por stdout, o return 1 (jamás 0 vacío). -->
   return 1
 }
 
-SCORE="$(compute_score 2>/dev/null || true)"
+_ERRTMP="$(mktemp)"
+SCORE="$(compute_score 2>"$_ERRTMP")"; _CRC=$?
 
 if [ -z "$SCORE" ]; then
+  if [ "$_CRC" = "2" ]; then
+    # El runner EXISTE y corrió — esto no es "configúralo", es "está roto o
+    # sin candidatos". Confundir ambos mensajes costó una tarde del owner.
+    echo "❌ mutation-score: el runner corrió y NO produjo un score:"
+    sed 's/^/   /' "$_ERRTMP"
+    echo "   Contrato §14.3: el detector no pudo mirar (exit 3). CI lo trata como fallo"
+    echo "   con GATES_REQUIRE_MUTATION=1; en local no bloquea, pero el nivel 4 está MUDO."
+    rm -f "$_ERRTMP"
+    [ "${GATES_REQUIRE_MUTATION:-0}" = "1" ] && exit 1
+    exit 3
+  fi
+  rm -f "$_ERRTMP"
   echo "⚠️  mutation-score: sin runner configurado (tools/mutation-score.sh §FILL)."
   echo "   Sin esta métrica NO puedes distinguir un test real de uno decorativo."
   echo "   Es el gate de mayor valor contra tests escritos por IA. Configúralo."
@@ -60,6 +131,7 @@ if [ -z "$SCORE" ]; then
   [ "${GATES_REQUIRE_MUTATION:-0}" = "1" ] && exit 1
   exit 0
 fi
+rm -f "$_ERRTMP"
 
 # ── Evidencia CORRUPTA no es evidencia de aprobación ────────────────
 # `[ "$SCORE" -lt "$MIN" ]` con un $SCORE no numérico lanza "integer expression

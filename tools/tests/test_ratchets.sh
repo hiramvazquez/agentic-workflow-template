@@ -212,6 +212,74 @@ test_mutacion_update_sube_el_piso() {
   _harness_sandbox _case_mutacion_update_si_sube
 }
 
+# ── El cableado de muter, contra un stub FIEL al muter real ─────────
+# Dos bugs cazados en vivo en el primer proyecto (una tarde del owner cada
+# uno): (1) el detector aceptaba solo muter.conf.json y el init moderno
+# genera .yml; (2) muter NO emite JSON por stdout (--format json mezcla
+# logo y progreso) — el reporte solo sale con -o <archivo>, y la v1 hacía
+# json.loads(stdout), fallaba siempre, y caía al mensaje de "sin runner".
+# El stub reproduce ESE contrato: basura por stdout, JSON solo en -o.
+_muter_stub() { # _muter_stub <json-del-reporte>
+  mkdir -p bin
+  cat > bin/muter <<STUB
+#!/usr/bin/env bash
+out=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in -o|--output) out="\$2"; shift 2 ;; *) shift ;; esac
+done
+echo "=== MUTER ==="
+echo "Discovering source files..."
+[ -n "\$out" ] && printf '%s' '$1' > "\$out"
+exit 0
+STUB
+  chmod +x bin/muter
+  : > muter.conf.yml
+}
+
+_case_muter_reporte_via_archivo() {
+  _muter_stub '{"mutationScore": 72, "totalAppliedMutationOperators": 25}'
+  local out
+  out="$(PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --report 2>&1)"
+  printf '%s' "$out" | grep -q 'score=72' \
+    || { echo "    el score no salió del reporte -o (¿volvió el parseo de stdout?): $out"; return 1; }
+}
+test_muter_score_se_lee_del_archivo_no_de_stdout() {
+  _harness_sandbox _case_muter_reporte_via_archivo
+}
+
+_case_muter_cero_mutantes_no_es_score() {
+  # "0 candidatos" NO es un 0%: es el detector sin ojos (scheme sin cobertura
+  # o SwiftSyntax viejo ante sintaxis nueva). Debe salir por §14.3 (exit 3)
+  # con mensaje PROPIO — jamás por la rama de "sin runner configurado".
+  _muter_stub '{"mutationScore": 0, "totalAppliedMutationOperators": 0}'
+  local out rc
+  out="$(PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --report 2>&1)"; rc=$?
+  [ "$rc" = "3" ] || { echo "    0 mutantes salió con exit $rc (esperaba 3, §14.3)"; return 1; }
+  printf '%s' "$out" | grep -q 'sin runner configurado' \
+    && { echo "    0 mutantes cayó al mensaje de 'sin runner' — los dos fallos vuelven a ser indistinguibles"; return 1; }
+  printf '%s' "$out" | grep -qi 'mutantes' \
+    || { echo "    el mensaje no explica el caso 0-mutantes: $out"; return 1; }
+}
+test_muter_cero_mutantes_es_ruidoso_y_distinto() {
+  _harness_sandbox _case_muter_cero_mutantes_no_es_score
+}
+
+_case_muter_crash_distinto_de_sin_runner() {
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\necho boom >&2\nexit 1\n' > bin/muter
+  chmod +x bin/muter
+  : > muter.conf.yml
+  local out rc
+  out="$(PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --report 2>&1)"; rc=$?
+  [ "$rc" = "3" ] || { echo "    muter crasheado salió con exit $rc (esperaba 3)"; return 1; }
+  printf '%s' "$out" | grep -q 'sin runner configurado' \
+    && { echo "    un muter que CORRIÓ y falló se reportó como 'sin runner'"; return 1; }
+  return 0
+}
+test_muter_roto_no_se_disfraza_de_sin_runner() {
+  _harness_sandbox _case_muter_crash_distinto_de_sin_runner
+}
+
 # ════════════════════════════════════════════════════════════════════
 # Drift ratchet — --update TAMBIÉN impone la dirección (espejo de mutación).
 # El bug real: --update reescribía el techo con el conteo actual SIN comparar

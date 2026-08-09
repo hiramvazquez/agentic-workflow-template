@@ -107,6 +107,11 @@ grep -q '<!-- FILL' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && { echo "⚠️  Nivel 1 PARCIAL: post-edit-verify sin lint/typecheck de tu stack (§FILL) — el agente no recibe señal in-loop."; _health=0; }
 grep -q '"min_score": 0' tools/mutation-ratchet.json 2>/dev/null \
   && { echo "⚠️  Nivel 4 MUDO: mutation score en 0 — NADA distingue un test real de uno decorativo."; _health=0; }
+# El fallo más caro del primer proyecto real: 9 niveles en verde y el build
+# roto. La comprobación más barata y definitiva (¿compila?) no puede ser el
+# único FILL silencioso mientras semgrep y trinquetes vienen de fábrica.
+grep -q 'FILL: añade build/test' ci/run-gates.sh 2>/dev/null \
+  && { echo "⚠️  SIN COMPILADOR EN LOS GATES: ci/run-gates.sh paso 6 en FILL — los 9 niveles pueden estar en verde con el build ROTO. Cablea build+tests ANTES que nada (AGENTS.md §2)."; _health=0; }
 command -v gitleaks >/dev/null 2>&1 \
   || echo "⚠️  gitleaks no instalado — el scan de secretos del Anillo 1 no corre en local."
 

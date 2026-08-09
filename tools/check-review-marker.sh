@@ -31,7 +31,7 @@ MARKER=".agents/state/markers/reviewer_run.txt"
 # commit de solo-reglas exigía marker de review — falso positivo real cazado en
 # vivo (un marker viejo de otra sesión lo convertía en EXPIRADO). Fijado por
 # test_review_marker_preset.sh::test_meta_doc_no_exige_marker.
-NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|lefthook|\.gitleaks|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
+NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|lefthook|\.gitleaks|muter\.conf|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
 
 fail() { echo "$1"; exit 1; }
 
@@ -46,6 +46,22 @@ fi
 
 CRITICAL="$(printf '%s\n' "$CHANGED" | grep -vE "$NON_PRODUCT" || true)"
 [ -z "$CRITICAL" ] && { echo "✅ review-marker: el cambio no toca código de producto (solo docs/tooling)."; exit 0; }
+
+# ── Commit de MERGE: el contenido YA pasó sus gates en su rama ──────
+# Cazado en vivo en el PRIMER merge del primer proyecto: el owner mergeaba
+# story/0003 (GREEN en su creación, gates verdes commit a commit) y este gate
+# exigía un marker NUEVO para el diff del merge → el merge quedaba a medias
+# con MERGE_HEAD colgado. Re-revisar lo ya revisado no añade verificación, y
+# el merge es acto del OWNER por doctrina (backlog/README: "el merge es
+# SIEMPRE humano"). Solo aplica al modo staged (en --range/CI el análisis es
+# sobre el rango completo, donde el merge ya es historia).
+if [ "$MODE" != "--range" ]; then
+  _GITDIR="$(git rev-parse --git-dir 2>/dev/null)"
+  if [ -n "$_GITDIR" ] && [ -f "$_GITDIR/MERGE_HEAD" ]; then
+    echo "✅ review-marker: commit de MERGE (MERGE_HEAD presente) — el contenido pasó sus gates en su rama; el merge es acto del owner."
+    exit 0
+  fi
+fi
 
 # ── Preset: `lite` AVISA, `full` BLOQUEA (AGENTS.md §13) ────────────
 # Esta comprobación vive AQUÍ, en la implementación compartida, y no en cada

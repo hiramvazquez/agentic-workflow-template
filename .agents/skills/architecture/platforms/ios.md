@@ -26,7 +26,12 @@ App/                         // composition root + Coordinator
 |---|---|---|
 | **View** (SwiftUI) | renderiza `state`, emite intención | lógica de negocio, llamadas a datos |
 | **ViewModel** (`@Observable @MainActor`) | mantiene el estado de pantalla, llama UseCases | reglas de negocio, acceso directo a red/DB |
-| **Logic/UseCase** (Swift puro) | la regla de negocio, composición de puertos | tocar UI, conocer navegación |
+| **Logic/UseCase** (Swift puro¹) | la regla de negocio, composición de puertos | tocar UI, conocer navegación |
+
+¹ *Puro = en DEPENDENCIAS (sin UI/infra, determinista), no "libre de actor": con el default
+MainActor de Xcode 26 la lógica es implícitamente @MainActor y eso está bien — el escape para
+cómputo pesado es puntual (`@concurrent`), nunca revertir el default del target
+(`swift-estado-del-arte.md` §Concurrencia).*
 
 ```swift
 // ProfileViewModel.swift

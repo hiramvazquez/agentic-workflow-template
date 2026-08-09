@@ -12,10 +12,12 @@
 # bloquear algo una vez. Este script hace (A) todo lo verificable en estático,
 # y (B) imprime el checklist EN VIVO de lo que solo una sesión real prueba.
 #
-#   bash tools/validate-harness.sh          # checks estáticos + checklist
-#   bash tools/validate-harness.sh --full   # además corre la suite completa
+#   bash tools/validate-harness.sh            # checks estáticos + checklist
+#   bash tools/validate-harness.sh --selftest # además: cada detector DEMUESTRA
+#                                             # que ve, contra un fixture mínimo
+#   bash tools/validate-harness.sh --full     # estático + selftest + suite entera
 #
-# Salida: exit 1 si algún check estático falla. Correr tras CADA update de
+# Salida: exit 1 si algún check falla. Correr tras CADA update de
 # Claude Code / Cursor / Codex: sus contratos de hooks versionan rápido.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -138,6 +140,124 @@ else
   fi
 fi
 
+# ── 8. ¿El COMPILADOR está en algún gate? ───────────────────────────
+# El fallo más caro del primer proyecto real: nueve niveles en verde y el
+# build de Xcode roto — la comprobación más barata y definitiva (¿compila?)
+# era la única sin cablear, mientras semgrep, capas y trinquetes venían
+# listos de fábrica. Esto no puede ser un FILL silencioso más.
+echo ""
+echo "── 8. Compilador en los gates ──"
+if grep -q 'FILL: añade build/test' ci/run-gates.sh 2>/dev/null; then
+  warn "ci/run-gates.sh paso 6 sigue en FILL: NINGÚN gate compila ni corre tus tests."
+  warn "Los 9 niveles pueden estar en verde con el build ROTO. Cablea build+tests ANTES que nada."
+else
+  ok "ci/run-gates.sh paso 6 cableado (build/tests en el Anillo 3)"
+fi
+
+# ════════════════════════════════════════════════════════════════════
+# SELFTEST — cada detector DEMUESTRA una vez que ve (--selftest / --full)
+# ════════════════════════════════════════════════════════════════════
+# Nacido de la retrospectiva del primer proyecto real: sus tres fallos más
+# caros (build sin cablear, semgrep autodeclarado muerto, nivel 4 fantasma)
+# tenían la misma forma — un gate que PARECÍA sano y nunca había producido
+# una detección. Los checks estáticos miran configuración; esto exige
+# EVIDENCIA: cada detector corre contra un fixture mínimo, con los binarios
+# y confs de ESTE repo, y debe emitir su contrato (§14.3) — un exit code
+# correcto y su marca (SUMMARY / score). Un detector que no pasa su selftest
+# no está "pendiente": está MUDO y anunciándose como sano.
+selftest() {
+  echo ""
+  echo "━━━ selftest: cada detector demuestra que VE ━━━"
+  local SB out rc
+  SB="$(mktemp -d)"
+  mkdir -p "$SB/r"
+  cp -R tools "$SB/r/tools" 2>/dev/null
+  rm -rf "$SB/r/tools/tests"   # la suite no es un detector
+  (
+    cd "$SB/r" || exit 1
+    git init -q . 2>/dev/null; git config user.email s@s.s; git config user.name s
+    echo seed > seed.txt; git add seed.txt; git commit -qm init 2>/dev/null
+    echo full > tools/preset
+  ) || { warn "selftest: no pude montar el sandbox"; rm -rf "$SB"; return 0; }
+
+  # 1. conflict-markers: un conflicto staged DEBE bloquear (exit 1).
+  ( cd "$SB/r" && printf '%s HEAD\na\n%s\nb\n%s rama\n' '<<<<<<<' '=======' '>>>>>>>' > c.txt \
+    && git add c.txt ) 2>/dev/null
+  out="$(cd "$SB/r" && bash tools/check-conflict-markers.sh 2>&1)"; rc=$?
+  if [ "$rc" = "1" ]; then ok "conflict-markers: VE (bloqueó un conflicto staged)"
+  else bad "conflict-markers: NO vio un conflicto staged (exit $rc)"; fi
+  ( cd "$SB/r" && git rm -q --cached c.txt 2>/dev/null; rm -f c.txt )
+
+  # 2. review-marker: código de producto staged sin marker DEBE bloquear.
+  ( cd "$SB/r" && mkdir -p app && echo 'let x = 1' > app/main.swift && git add app/main.swift ) 2>/dev/null
+  out="$(cd "$SB/r" && bash tools/check-review-marker.sh --staged 2>&1)"; rc=$?
+  if [ "$rc" = "1" ]; then ok "review-marker: VE (exigió review a producto staged sin marker)"
+  else bad "review-marker: dejó pasar producto sin marker (exit $rc) — el gate nº1 está mudo"; fi
+  ( cd "$SB/r" && git rm -q --cached app/main.swift 2>/dev/null; rm -rf app )
+
+  # 3. secret-scan: un secreto con formato real staged DEBE bloquear.
+  #    (La clave se ENSAMBLA para no dejar un patrón contiguo en este script.)
+  if command -v gitleaks >/dev/null 2>&1; then
+    ( cd "$SB/r" && printf 'aws_secret_access_key = "%s%s"\n' 'AKIA' 'IOSFODNN7EXAMPLE' > s.env.py \
+      && git add s.env.py ) 2>/dev/null
+    out="$(cd "$SB/r" && bash tools/secret-scan.sh --staged 2>&1)"; rc=$?
+    if [ "$rc" = "1" ]; then ok "secret-scan: VE (cazó una clave AWS staged)"
+    else bad "secret-scan: NO cazó una clave AWS staged (exit $rc) — gitleaks está pero no mira"; fi
+    ( cd "$SB/r" && git rm -q --cached s.env.py 2>/dev/null; rm -f s.env.py )
+  else
+    warn "secret-scan: gitleaks no instalado — selftest saltado (el nivel ya se reporta MUDO)"
+  fi
+
+  # 4. semgrep: un patrón prohibido staged debe dar exit 1 + SEMGREP_SUMMARY;
+  #    sin semgrep instalado, el contrato correcto es exit 3 (no pudo mirar).
+  local FIXT=""
+  if ls tools/semgrep/fixtures/* >/dev/null 2>&1; then
+    FIXT="$(ls tools/semgrep/fixtures/* | head -1)"
+    cp "$FIXT" "$SB/r/fixture_selftest.${FIXT##*.}" 2>/dev/null
+  elif [ -f tools/semgrep/rules/swift.yaml ]; then
+    printf 'import Foundation\nlet d = try! JSONDecoder().decode(Int.self, from: Data())\n' \
+      > "$SB/r/fixture_selftest.swift"
+  fi
+  if [ -n "$(ls "$SB"/r/fixture_selftest.* 2>/dev/null)" ]; then
+    ( cd "$SB/r" && git add fixture_selftest.* ) 2>/dev/null
+    out="$(cd "$SB/r" && bash tools/semgrep-scan.sh --staged 2>&1)"; rc=$?
+    if command -v semgrep >/dev/null 2>&1; then
+      if [ "$rc" = "1" ] && printf '%s' "$out" | grep -q 'SEMGREP_SUMMARY'; then
+        ok "semgrep: VE (cazó el fixture y emitió SEMGREP_SUMMARY)"
+      else
+        bad "semgrep: instalado pero NO cazó el fixture (exit $rc) — reglas rotas o scan mudo"
+      fi
+    else
+      if [ "$rc" = "3" ]; then ok "semgrep: ausente y lo DECLARA (exit 3, contrato §14.3)"
+      else bad "semgrep ausente pero exit $rc (esperaba 3) — un scanner que no corrió parece uno que pasó"; fi
+    fi
+  else
+    warn "semgrep: sin fixture generable para tus reglas — añade uno en tools/semgrep/fixtures/"
+  fi
+
+  # 5. mutation-score: el CABLEADO del score, con override (muter real es
+  #    lento y va aparte). Fija que el número entra, viaja y sale.
+  out="$(cd "$SB/r" && MUTATION_SCORE_OVERRIDE=57 bash tools/mutation-score.sh --report 2>&1)"; rc=$?
+  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q 'score=57'; then
+    ok "mutation-score: el cableado del score funciona (override 57 → score=57)"
+  else
+    bad "mutation-score: el score NO viaja (exit $rc: $out) — nivel 4 fantasma"
+  fi
+  if command -v muter >/dev/null 2>&1 && { [ -f muter.conf.yml ] || [ -f muter.conf.json ]; }; then
+    warn "mutation-score: runner real presente; el selftest NO lo corre (lento). Evidencia real: bash tools/mutation-score.sh --report"
+  fi
+
+  # 6. drift-ratchet: corre y emite su resumen (sin crashear en ESTE repo).
+  out="$(cd "$SB/r" && bash tools/drift-ratchet.sh --check 2>&1)"; rc=$?
+  case "$rc" in
+    0|1) ok "drift-ratchet: corre y responde (exit $rc)" ;;
+    *)   bad "drift-ratchet: crasheó en el selftest (exit $rc): $(printf '%s' "$out" | head -2)" ;;
+  esac
+
+  rm -rf "$SB"
+}
+case "${1:-}" in --selftest|--full) selftest ;; esac
+
 # ── Veredicto estático + checklist en vivo ──────────────────────────
 echo ""
 echo "━━━ checklist EN VIVO (esto NO se puede verificar en estático) ━━━"
@@ -146,10 +266,9 @@ En una sesión REAL de Claude Code sobre este repo, verifica una vez por
 versión del cliente (y anota la fecha en docs/process/lessons_learned.md):
 
   □ SessionStart: al abrir la sesión se imprime el health-check.
-  □ Anillo 0: pide `git commit --no-verify -m x` → debe DENEGARSE (permissions
-    o, en su defecto, git-guard del reviewer-gate). Si lo deniega el guard y
-    no permissions, los patrones deny con comodín intermedio están inertes en
-    tu versión: elimínalos o corrígelos.
+  □ git-guard: pide `git commit --no-verify -m x` → debe DENEGARSE por el
+    reviewer-gate. (Las prohibiciones de FLAGS viven en el guard a propósito:
+    permissions no soporta comodines intermedios — lección f-3c027a85.)
   □ skill-reminder: intenta editar un archivo que case la matriz sin haber
     leído las refs → debe bloquear (preset full).
   □ reviewer-gate: `git commit` sin marker → bloqueado (full) / aviso (lite).

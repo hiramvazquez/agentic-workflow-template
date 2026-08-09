@@ -74,6 +74,34 @@ test_todo_script_de_hook_existe_y_parsea() {
   return "$bad"
 }
 
+# Sintaxis INERTE en permissions: dos formas que parecen protección y no son
+# — descubiertas por la voz del propio Claude Code en los logs de los runs
+# (persistidos: por eso existieron como evidencia). `Write(path)` no se evalúa
+# (solo Edit cubre las tools de edición), y los Bash con comodín intermedio o
+# inicial jamás matchean. Un deny que no matchea es INVISIBLE: peor que no
+# tenerlo, porque compra confianza falsa.
+test_permissions_sin_sintaxis_inerte() {
+  python3 -c "
+import json, re, sys
+cfg = json.load(open('.claude/settings.json'))
+perms = cfg.get('permissions', {})
+bad = []
+for section in ('deny', 'ask', 'allow'):
+    for rule in perms.get(section, []):
+        if rule.startswith('Write('):
+            bad.append(f'{section}: {rule} — Write() es INERTE; usa Edit()')
+        m = re.match(r'Bash\((.+)\)$', rule)
+        if m:
+            body = m.group(1)
+            if body.startswith('*'):
+                bad.append(f'{section}: {rule} — comodín INICIAL no soportado')
+            elif re.search(r':\*.+', body) and not body.endswith(':*'):
+                bad.append(f'{section}: {rule} — comodín INTERMEDIO no matchea; las prohibiciones de flags van al git-guard')
+if bad:
+    print('\n'.join('    ' + b for b in bad)); sys.exit(1)
+" || return 1
+}
+
 # El matcher de SessionStart debe separar startup|clear (reset) de compact
 # (reinyección SIN reset): si alguien unifica los matchers, la compactación
 # volvería a borrar el baseline de drift a mitad de sesión.

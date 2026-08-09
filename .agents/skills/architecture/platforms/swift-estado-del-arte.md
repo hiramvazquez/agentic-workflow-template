@@ -21,7 +21,15 @@
 
 ## Concurrencia — el modelo mental de 2026
 
-**Proyecto nuevo = Approachable Concurrency activada + aislamiento por defecto en MainActor.**
+**Proyecto nuevo = Approachable Concurrency activada + aislamiento por defecto en MainActor —
+y ese default NO se revierte a nivel de target.** Aclaración que ya costó una decisión
+equivocada en vivo: "Logic *puro*" en esta arquitectura significa puro en DEPENDENCIAS
+(sin imports de UI/infra, determinista, testeable con fakes) — no "libre de actor". Que la
+lógica de dominio sea implícitamente `@MainActor` en un app target está BIEN; si una función
+concreta necesita paralelismo real, se marca ELLA (`@concurrent`/`nonisolated`) con su
+justificación — jamás se cambia el default del target entero, que devuelve al proyecto a la
+fricción pre-6.2 y contradice esta skill. Conflicto aparente entre docs internos → Open
+Question al owner, no elección unilateral (§1.4).
 En Xcode: build settings *Approachable Concurrency* = YES y *Default Actor Isolation* =
 MainActor. En SPM (tools 6.2+): los cinco upcoming features (`DisableOutwardActorInference`,
 `GlobalActorIsolatedTypesUsability`, `InferIsolatedConformances`, `InferSendableFromCaptures`,

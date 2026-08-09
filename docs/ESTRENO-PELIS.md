@@ -57,15 +57,46 @@ bash tools/backlog/run.sh        # la 0002 se desbloqueó sola — repite
 Primera historia con el run supervisado (tú delante), como pide `backlog/README.md`.
 Mientras el agente trabaja, tu checkout queda LIBRE — el worktree aísla.
 
-## Qué anotar para mí (el botín del estreno)
+## El botín del estreno (cómo me lo traes — mecánico, no de memoria)
 
-- ¿`/historia` troceó solo o hubo que empujarlo? ¿`/adoptar` dejó niveles MUDOS sin avisar?
-- Cada gate que bloquee: ¿fue justo? Los injustos son oro (ley del 10%) — logs completos.
+**El comando que lo empaqueta todo:**
+
+```bash
+bash tools/harness-report.sh
+```
+
+Genera UN markdown pegable (acotado + secretos redactados) con: entorno y versiones, salud
+del harness, los logs de los últimos runs del backlog (cada `run.sh` deja el suyo en
+`.agents/state/backlog/` automáticamente), la telemetría de qué gate detectó qué, atascos,
+overrides, findings abiertos y el estado de las ramas. **Pega su contenido completo en
+nuestra conversación** después de cada historia (o al final del día) — con eso yo veo cómo
+se comportó el sistema real y arreglamos con evidencia.
+
+**Lo que el informe NO captura y tu ojo sí** (anótalo aparte):
+
+- ¿`/historia` troceó solo la idea o hubo que empujarlo? ¿`/adoptar` dejó niveles MUDOS sin avisar?
+- Cada gate que bloquee: ¿fue justo? Los injustos son oro (ley del 10%).
 - ¿El agente usó Swift 6.2 de verdad (actors, @Observable, Swift Testing) o "Swift viejo"
   pese a `swift-estado-del-arte.md`? ¿Respetó el orden con spies sin que se lo pidieras?
-- ¿Cuántos turnos consumió cada historia? (calibra el troceo y `BACKLOG_MAX_TURNS`)
-- Los checks en vivo del `validate-harness` que fallen: máxima prioridad, esos son los
-  gates presuntos que aún no hemos visto disparar.
+- Los checks en vivo del `validate-harness` que fallen: máxima prioridad — gates presuntos.
 
 Todo eso vuelve a esta conversación → lessons con detector → el harness sale del estreno
 mejor de lo que entró. Esa es la única métrica del éxito que importa.
+
+## Criterios de graduación (cuándo Pelis cumplió su misión)
+
+El estreno NO es "terminar la app" — es ver cada pieza del harness funcionar en vivo una
+vez. Pelis se gradúa (y se abre el siguiente proyecto) cuando TODO esto haya ocurrido:
+
+- [ ] **El camino GREEN completo**: reviewer emite `VERDICT: GREEN` → SubagentStop escribe
+      el marker (`source: hook`) → `git commit` pasa los 3 anillos. (El camino RED ya está
+      visto: 28 veces. Falta ver la puerta ABRIRSE.)
+- [ ] **`/historia` trocea solo** una idea multi-capa en cadena con `depends_on`.
+- [ ] **Una historia end-to-end**: `run.sh` en worktree → TDD dentro → `in-review` → tu
+      merge → `done` desbloquea la siguiente. Al menos UNA vez de punta a punta.
+- [ ] **Anillo 0 y semgrep/SwiftUI**: findings con evidencia en el ledger (ya casi) y fix
+      upstream aplicado + bajado vía `upgrade.sh` — el primer upgrade real de un proyecto vivo.
+- [ ] **`harness-report` final** pegado en la conversación de mejora, con el balance.
+
+Lo que quede sin ver al graduarse, se declara — no se presume. La app de pelis en sí puede
+quedar a medias sin culpa: era el campo de tiro, no el objetivo.

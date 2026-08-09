@@ -48,6 +48,14 @@ pre-commit:
         [ "$rc" = "3" ] && { echo "⚠️  semgrep no pudo correr — commit permitido, CI lo bloqueará."; exit 0; }
         exit $rc
 
+    # ── Marcadores de conflicto en lo staged ─────────────────────────
+    # git solo rechaza paths "unmerged"; un `git add` con los <<<<<<< dentro
+    # "resuelve" el index y el commit pasa. Cazado en vivo: un merge concluido
+    # así corrompió el ledger de findings. Es además el contrapeso de la
+    # exención MERGE_HEAD del review-marker (los merges van menos vigilados).
+    - name: conflict-markers
+      run: bash tools/check-conflict-markers.sh
+
     # ── Review marker: ¿este cambio fue REALMENTE revisado? ──────────
     # Antes esto vivía SOLO en el Anillo 2 (hooks de Claude/Cursor), así que
     # no hacía falta `--no-verify` para saltárselo: bastaba commitear desde

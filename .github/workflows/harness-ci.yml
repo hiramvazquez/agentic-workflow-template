@@ -48,8 +48,8 @@ jobs:
       - name: Toda lección tiene detector (y el detector existe)
         run: bash tools/lesson-detector-link.sh
 
-      - name: validate-harness (checks estáticos)
-        run: bash tools/validate-harness.sh
+      - name: validate-harness (estáticos + selftest de detectores)
+        run: bash tools/validate-harness.sh --selftest
 
       - name: Las reglas semgrep CARGAN y matchean (G15 — --validate no basta)
         run: |

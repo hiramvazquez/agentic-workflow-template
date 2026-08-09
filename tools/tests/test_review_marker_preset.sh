@@ -93,6 +93,27 @@ _case_producto_sigue_gateado() {
 }
 test_diff_mixto_con_producto_sigue_gateado() { _rm_sandbox _case_producto_sigue_gateado; }
 
+# ── un MERGE de rama ya validada NO exige marker nuevo ──────────────
+# Bug real del primer merge en vivo: la rama fue GREEN al crearse, y el gate
+# pedía marker fresco para el commit de merge → MERGE_HEAD colgado y el owner
+# atascado. El merge es acto del owner; sus commits ya pasaron gates al nacer.
+_case_merge_no_exige_marker() {
+  git checkout -qb story/x
+  mkdir -p src; echo "let m = 1" > src/Merged.swift
+  git add src/Merged.swift; git commit -qm "feat: en rama (ya revisado allí)"
+  git checkout -q develop 2>/dev/null || git checkout -q -
+  echo divergencia >> seed.txt; git add seed.txt; git commit -qm "avance en base"
+  git merge --no-commit --no-ff story/x >/dev/null 2>&1     # deja MERGE_HEAD
+  local a1; a1="$(_anillo1 full)"
+  git merge --abort 2>/dev/null
+  [ "$a1" = "0" ] || { echo "    el gate exigió marker para un commit de MERGE (exit=$a1) — owner atascado"; return 1; }
+}
+test_merge_de_rama_validada_no_exige_marker() { _rm_sandbox _case_merge_no_exige_marker; }
+
+# FALSO NEGATIVO guard: sin MERGE_HEAD, producto staged sigue gateado igual
+# (lo fijan test_full_bloquea_en_los_dos_anillos y compañía — este comentario
+# existe para que nadie "generalice" la exención más allá del merge).
+
 # ── el marker legítimo funciona igual desde ambos caminos ───────────
 _case_marker_valido_ambos() {
   cat > .agents/state/markers/reviewer_run.txt <<EOF

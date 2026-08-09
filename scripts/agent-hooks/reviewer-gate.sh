@@ -61,6 +61,14 @@ while IFS= read -r seg; do
       *--hard*) hook_block "🛑 git-guard: \`reset --hard\` destruye trabajo sin recuperación. Usa \`git stash\` o pide aprobación al owner." ;;
     esac
   fi
+  # `git clean -f` borra untracked sin papelera. Hueco cazado por el finding
+  # f-3c027a85 del primer proyecto: "sin cubrir por NADIE" — el deny inerte
+  # del Anillo 0 era su única defensa nominal. Ahora es del guard.
+  if _seg_is_git_sub "$seg" clean; then
+    case "$seg" in
+      *" -f"*|*-fd*|*-fx*|*--force*) hook_block "🛑 git-guard: \`git clean -f\` destruye archivos untracked sin recuperación (AGENTS.md §7). Lista primero con \`git clean -n\` y pide aprobación al owner." ;;
+    esac
+  fi
   _seg_is_git_sub "$seg" add && HAS_ADD=1
 done <<< "$(printf '%s' "$CMD" | tr ';&|' '\n')"
 

@@ -135,9 +135,12 @@ Rota cualquier credencial aún válida. El baseline es **deuda**, no exención: 
 ## 7. Primer commit de prueba
 
 ```bash
-echo 'aws_secret_access_key = "AKIA1234567890ABCDEF"' > /tmp/leak.txt && cp /tmp/leak.txt .
+# El string se CONSTRUYE en runtime (printf) a propósito: si este doc contuviera
+# el patrón contiguo, el propio scan lo cazaría — nos pasó en el primer proyecto
+# real: el ejemplo del simulacro ERA el secreto que bloqueó el commit del harness.
+printf 'aws_secret_access_key = "AKIA%s"\n' 1234567890ABCDEF > leak.txt
 git add leak.txt && git commit -m "test"   # debe FALLAR por gitleaks
-rm leak.txt
+rm leak.txt && git reset leak.txt 2>/dev/null
 ```
 
 Si el commit se bloquea, el Anillo 1 está vivo.

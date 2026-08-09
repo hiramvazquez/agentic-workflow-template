@@ -54,6 +54,32 @@ _case_path_fuera_de_matriz_pasa() {
 }
 test_path_fuera_de_la_matriz_no_bloquea() { _smx_sandbox _case_path_fuera_de_matriz_pasa; }
 
+# ── consistencia matriz ↔ track-reads (bug real, cazado EN VIVO) ────
+# Toda ref que la matriz EXIGE leer debe ser REGISTRABLE por track-reads.
+# Si no, el flujo es un bucle infinito: el agente lee la skill (obedece),
+# el marker no se crea, skill-reminder bloquea, el agente re-lee… Lo cazó
+# el agente del primer proyecto real depurando el hook — platforms/*.md
+# estaba en la matriz pero no en el filtro del tracker.
+_case_refs_registrables() {
+  cp "$PROJECT_ROOT/tools/skill-matrix.conf" tools/skill-matrix.conf
+  local glob refs r _old bad=0
+  while IFS='|' read -r glob refs; do
+    case "$glob" in ''|'#'*) continue ;; esac
+    _old="$IFS"; IFS=','
+    for r in $refs; do
+      r="$(printf '%s' "$r" | sed -E 's/^ +//; s/ +$//')"; [ -z "$r" ] && continue
+      rm -rf .agents/state/skills-read
+      printf '{"tool_name":"Read","tool_input":{"file_path":"%s/%s"}}' "$PWD" "$r" \
+        | bash scripts/agent-hooks/track-reads.sh >/dev/null 2>&1
+      [ -f ".agents/state/skills-read/${r//\//__}.read" ] \
+        || { echo "    ref '$r' NO registrable por track-reads → skill-reminder bloquearía para siempre"; bad=1; }
+    done
+    IFS="$_old"
+  done < tools/skill-matrix.conf
+  return "$bad"
+}
+test_toda_ref_es_registrable_por_track_reads() { _smx_sandbox _case_refs_registrables; }
+
 _case_sin_conf_usa_fallback() {
   rm -f tools/skill-matrix.conf
   local rc

@@ -124,15 +124,28 @@ CONTRATO (no negociable — AGENTS.md es la fuente canónica y sus gates están 
 EOF
 )"
 
+# ── Registro del run: la salida de claude NO se evapora en la terminal ─
+# Cada run queda en .agents/state/backlog/<id>-<ts>.log (gitignored). Es la
+# materia prima de tools/harness-report.sh: sin esto, "¿cómo se comportó el
+# agente?" solo se puede responder de memoria — y la memoria no es evidencia.
+LOG_DIR="$(pwd)/.agents/state/backlog"; mkdir -p "$LOG_DIR"
+RUN_LOG="$LOG_DIR/${ID}-$(date -u +%Y%m%dT%H%M%SZ).log"
+{
+  echo "═══ backlog run · story=${STORY} · branch=${BRANCH} · base=${BASE}"
+  echo "═══ fecha=$(date -u +%Y-%m-%dT%H:%M:%SZ) · max_turns=${BACKLOG_MAX_TURNS:-∞} · flags=${BACKLOG_CLAUDE_FLAGS:-—}"
+} > "$RUN_LOG"
+
 echo "━━━ backlog: trabajando ${STORY} en ${BRANCH} (worktree ${WT}, base ${BASE}) ━━━"
+echo "    log del run: ${RUN_LOG}"
 set +e
 # shellcheck disable=SC2086
 ( cd "$WT" && claude -p "$PROMPT" \
     --permission-mode acceptEdits \
     ${BACKLOG_MAX_TURNS:+--max-turns "$BACKLOG_MAX_TURNS"} \
-    ${BACKLOG_CLAUDE_FLAGS:-} )
-RC=$?
+    ${BACKLOG_CLAUDE_FLAGS:-} ) 2>&1 | tee -a "$RUN_LOG"
+RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
+echo "═══ fin del run · rc=$RC" >> "$RUN_LOG"
 
 # ── Cierre de estado (en la rama) y limpieza del worktree ───────────
 if [ $RC -eq 0 ]; then

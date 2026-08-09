@@ -69,6 +69,20 @@ _case_commit_am_bloqueado_en_full() {
 }
 test_commit_am_bloqueado_en_full() { _gg_sandbox _case_commit_am_bloqueado_en_full; }
 
+_case_clean_f_bloqueado() {
+  # El hueco de f-3c027a85: clean -f no lo cubría NADIE (el deny era inerte).
+  local rc; rc="$(_gate 'git clean -fd' lite)"
+  [ "$rc" = "2" ] || { echo "    git clean -fd pasó (exit $rc) — borra untracked sin recuperación"; return 1; }
+}
+test_clean_f_bloqueado_incluso_en_lite() { _gg_sandbox _case_clean_f_bloqueado; }
+
+_case_clean_n_pasa() {
+  # FALSO POSITIVO guard: el dry-run es EL camino recomendado — no puede bloquearse.
+  local rc; rc="$(_gate 'git clean -n' full)"
+  [ "$rc" = "0" ] || { echo "    git clean -n (dry-run) fue bloqueado (exit $rc)"; return 1; }
+}
+test_clean_dry_run_pasa() { _gg_sandbox _case_clean_n_pasa; }
+
 # ── FALSOS POSITIVOS (⅓ de la suite, regla test_meta_fp) ────────────
 _case_grep_que_menciona_no_verify_pasa() {
   local rc; rc="$(_gate 'grep -r \\"git commit --no-verify\\" docs/' full)"
