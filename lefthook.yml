@@ -56,6 +56,13 @@ pre-commit:
     - name: conflict-markers
       run: bash tools/check-conflict-markers.sh
 
+    # ── Bit +x de los scripts staged ─────────────────────────────────
+    # Los archivos que entran por fuera de git pierden permisos. Se avisó
+    # durante días y aun así un commit del harness metió SEIS mode changes
+    # 100755 => 100644. Un problema que reaparece no necesita otro aviso.
+    - name: exec-bits
+      run: bash tools/check-exec-bits.sh --staged
+
     # ── Review marker: ¿este cambio fue REALMENTE revisado? ──────────
     # Antes esto vivía SOLO en el Anillo 2 (hooks de Claude/Cursor), así que
     # no hacía falta `--no-verify` para saltárselo: bastaba commitear desde

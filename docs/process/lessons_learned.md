@@ -242,3 +242,43 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** tools/tests/test_lessons.sh (`test_rotacion_archiva_mecanizadas_y_respeta_manuales`,
   `test_rotacion_deja_indice_de_una_linea`, `test_lecciones_archivadas_siguen_verificadas`)
 - **Área:** tools/lessons-rotate.sh · tools/lesson-detector-link.sh · docs/process/
+
+### [2026-08-09] Avisar cinco veces no impidió que el problema entrara en la historia
+- **Qué pasó:** los archivos que llegan al repo por fuera de git (puente, `cp`, descarga)
+  pierden el bit `+x`. Se reportó cinco veces como "ruido menor de cada diff", se añadió un
+  AVISO en `validate-harness` §9... y el commit siguiente del propio harness incluyó **seis
+  `mode change 100755 => 100644`**. Ya no es ruido: quedó en la historia, y quien clone recibe
+  scripts no ejecutables.
+- **Causa raíz:** se clasificó por MOLESTIA (cosmético, todo se invoca con `bash x.sh` igual)
+  en vez de por REINCIDENCIA. Un aviso informa a quien ya está mirando; no detiene nada. Y la
+  reincidencia era el dato importante: cinco repeticiones significaban que ninguna disciplina
+  humana lo iba a arreglar.
+- **Regla:** un problema que reaparece **tres veces** deja de ser candidato a aviso y pasa a
+  gate — es la doctrina de Tricorder aplicada a nosotros mismos (*todo comentario de review que
+  se repite es un bug en tu tooling*). Corolario del diseño: el gate necesitó su exención desde
+  el minuto uno (las libs que se SOURCEAN no llevan `+x`), porque un gate con falso positivo
+  permanente se desactiva entero y protege menos que el aviso al que sustituyó.
+- **Detector:** tools/tests/test_exec_bits.sh (gate: `exec-bits` en lefthook →
+  `tools/check-exec-bits.sh`; auditoría del repo entero en validate-harness §9)
+- **Área:** lefthook.yml · tools/check-exec-bits.sh · flujo inverso
+
+### [2026-08-09] El harness solo sabía crecer: ningún mecanismo preguntaba si algo ya sobraba
+- **Qué pasó:** auditando el template salió que todos sus mecanismos son monótonos crecientes.
+  Cada error añade un detector, cada lección un test, cada incidente un anillo; los trinquetes
+  tienen dirección fija; las lecciones se acumulaban sin caducar. No existía ningún momento del
+  proceso en el que se preguntara si una defensa sigue haciendo falta.
+- **Causa raíz:** se optimizó por no perder cobertura y nunca por el coste de mantenerla. Pero
+  la ceremonia no es neutra: cobra tiempo de gate, tokens de contexto y fricción, y es
+  exactamente lo que lleva a un equipo a desactivar el harness entero. Un gate que existía
+  para un error que el modelo ya no comete es peaje puro.
+- **Regla:** revisar periódicamente (mensual, no diario) qué componentes siguen siendo
+  *load-bearing*. Y el matiz sin el cual el informe miente: **cero detecciones es ambiguo** —
+  puede ser disuasión perfecta o gate mudo, y los datos no los distinguen. Lo desempata el
+  `--selftest`: cero eventos + selftest verde = disuasión, se queda; cero eventos + sin
+  selftest = nadie ha demostrado nunca que ese gate vea. Retirar es decisión del owner (§8);
+  la herramienta solo hace la pregunta respondible con datos en vez de con intuición.
+  Corolario simétrico: un gate que dispara CONSTANTEMENTE tampoco está bien — pide que la capa
+  de arriba haga imposible ese error (§14.1).
+- **Detector:** tools/metrics/gate-value.sh (ritual mensual; sale en el harness-report §5c, que
+  es la superficie que el humano sí lee — una métrica que hay que recordar correr no se corre)
+- **Área:** tools/metrics/ · docs/process/ · ritual de mantenimiento

@@ -185,12 +185,16 @@ fi
 # igual porque todo se invoca con `bash script.sh`, pero ensucia cada diff.
 echo ""
 echo "── 9. Bits de ejecución ──"
-NOEXEC="$(find tools ci scripts -name '*.sh' ! -perm -u+x 2>/dev/null | wc -l | tr -d ' ')"
-if [ "${NOEXEC:-0}" = "0" ]; then
-  ok "todos los .sh tienen bit +x"
+if [ -f tools/check-exec-bits.sh ]; then
+  if _eb="$(bash tools/check-exec-bits.sh --all 2>&1)"; then
+    ok "todos los .sh ejecutables tienen bit +x (las libs sourceadas están exentas)"
+  else
+    bad "hay scripts .sh sin bit +x YA en el repo — se pierden en todo camino que no sea git."
+    printf '%s\n' "$_eb" | grep -E '^\s+·' | head -8 | sed 's/^/     /'
+    warn "Remedio rápido:  git ls-files '*.sh' | grep -v '/lib/' | xargs chmod +x && git add -u"
+  fi
 else
-  warn "$NOEXEC scripts .sh sin bit +x — síntoma de archivos llegados por fuera de git (flujo inverso)."
-  warn "Remedio:  find tools ci scripts -name '*.sh' -exec chmod +x {} +"
+  warn "tools/check-exec-bits.sh ausente — no puedo verificar los bits de ejecución."
 fi
 
 # ════════════════════════════════════════════════════════════════════

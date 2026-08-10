@@ -110,6 +110,18 @@ _tailf() { # _tailf <archivo> <n> [descripcion]
   echo "_Cuanto más ABAJO se detecta (in-loop, gate), más barato. Si el reparto no se_"
   echo "_mueve hacia abajo con el tiempo, estás añadiendo ceremonia, no calidad._"
 
+  # La otra mitad de la misma pregunta: escape-rate dice DÓNDE se caza;
+  # esto dice QUIÉN sigue cazando. Un harness que solo crece acaba cobrando
+  # peaje por defensas que ya no defienden.
+  _section "5c. Valor por gate (¿sigue siendo load-bearing?)"
+  echo '```'
+  if [ -f tools/metrics/gate-value.sh ]; then
+    bash tools/metrics/gate-value.sh 2>&1 | head -28
+  else
+    echo "(tools/metrics/gate-value.sh ausente)"
+  fi
+  echo '```'
+
   _section "6. Atascos, overrides y cola de juicio"
   echo "**Atascos (4+ fallos seguidos):**"
   _tailf "$STATE/stuck-log.txt" 15
