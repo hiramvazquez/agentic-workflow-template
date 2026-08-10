@@ -11,7 +11,7 @@ _upg_sandbox() { # crea TEMPLATE (origen) y PROYECTO (clon) reales
   (
     cd "$tpl" || exit 1
     git init -q .; git config user.email t@t.t; git config user.name t
-    printf 'v1 maquinaria\n' > scripts/gate.sh
+    stub scripts/gate.sh 'v1 maquinaria\n'
     printf 'stack: <!-- FILL -->\n' > AGENTS.md
     git add -A; git commit -qm "template v1"
   )
@@ -25,7 +25,7 @@ _upg_sandbox() { # crea TEMPLATE (origen) y PROYECTO (clon) reales
     mkdir -p tools/tests
     cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
     printf '#!/usr/bin/env bash\nexit 0\n' > tools/tests/run-tests.sh
-    printf '#!/usr/bin/env bash\nexit 0\n' > tools/validate-harness.sh
+    stub tools/validate-harness.sh '#!/usr/bin/env bash\nexit 0\n'
     git add -A; git commit -qm "proyecto: añade upgrade"
     TPL_DIR="$tpl" "$1"
   )
@@ -62,7 +62,7 @@ _case_merge_conserva_ambos() {
   printf 'stack: Swift 6 + SwiftUI\n' > AGENTS.md
   git add AGENTS.md; git commit -qm "proyecto: rellena stack"
   # …y el TEMPLATE mejora la maquinaria (archivo distinto → sin conflicto).
-  ( cd "$TPL_DIR" && printf 'v2 maquinaria mejorada\n' > scripts/gate.sh \
+  ( cd "$TPL_DIR" && stub scripts/gate.sh 'v2 maquinaria mejorada\n' \
     && git add -A && git commit -qm "template v2" )
   bash tools/upgrade.sh >/dev/null 2>&1
   [ "$?" = "0" ] || { echo "    el upgrade limpio falló"; return 1; }
@@ -100,7 +100,7 @@ _upg_sandbox_copia() { # TEMPLATE y PROYECTO con historias SEPARADAS
   (
     cd "$tpl" || exit 1
     git init -q .; git config user.email t@t.t; git config user.name t
-    printf 'v2 maquinaria del template\n' > scripts/gate.sh
+    stub scripts/gate.sh 'v2 maquinaria del template\n'
     printf 'stack: <!-- FILL -->\n' > AGENTS.md
     git add -A; git commit -qm "template"
   )
@@ -109,11 +109,11 @@ _upg_sandbox_copia() { # TEMPLATE y PROYECTO con historias SEPARADAS
     cd "$prj" || exit 1
     git init -q .; git config user.email p@p.p; git config user.name p
     printf 'app\n' > App.swift
-    printf 'v1 maquinaria copiada\n' > scripts/gate.sh
+    stub scripts/gate.sh 'v1 maquinaria copiada\n'
     printf 'stack: iOS real\n' > AGENTS.md
     cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
     printf '#!/usr/bin/env bash\nexit 0\n' > tools/tests/run-tests.sh
-    printf '#!/usr/bin/env bash\nexit 0\n' > tools/validate-harness.sh
+    stub tools/validate-harness.sh '#!/usr/bin/env bash\nexit 0\n'
     git add -A; git commit -qm "proyecto con harness COPIADO"
     git remote add template "$tpl"
     TPL_DIR="$tpl" "$1"
@@ -203,7 +203,7 @@ _case_sync_no_se_salta_nada_en_silencio() {
   # abortaba TODO, y el 2>/dev/null lo ocultaba. Real: trajo los tests de
   # tres herramientas SIN las herramientas, y reportó éxito.
   ( cd "$TPL_DIR" && mkdir -p tools/tests \
-    && printf 'v2 herramienta\n' > tools/una-herramienta.sh \
+    && stub tools/una-herramienta.sh 'v2 herramienta\n' \
     && printf 'test\n' > tools/tests/test_una.sh \
     && git add -A && git commit -qm "template: herramienta + su test" ) >/dev/null 2>&1
   bash tools/upgrade.sh >/dev/null 2>&1
@@ -222,10 +222,10 @@ _case_sync_respeta_los_fill() {
   # Regla mecánica: si la versión del TEMPLATE trae FILL, es propiedad
   # compartida y no se pisa.
   ( cd "$TPL_DIR" && mkdir -p scripts \
-    && printf '#!/usr/bin/env bash\n# <!-- FILL: tus reglas -->\n' > scripts/canon.sh \
+    && stub scripts/canon.sh '#!/usr/bin/env bash\n# <!-- FILL: tus reglas -->\n' \
     && git add -A && git commit -qm "template: canon con FILL" ) >/dev/null 2>&1
   mkdir -p scripts
-  printf '#!/usr/bin/env bash\n# MI REGLA LOCAL del pbxproj\n' > scripts/canon.sh
+  stub scripts/canon.sh '#!/usr/bin/env bash\n# MI REGLA LOCAL del pbxproj\n'
   git add -A; git commit -qm "proyecto: canon personalizado" 2>/dev/null
   bash tools/upgrade.sh >/dev/null 2>&1
   grep -q 'MI REGLA LOCAL' scripts/canon.sh \

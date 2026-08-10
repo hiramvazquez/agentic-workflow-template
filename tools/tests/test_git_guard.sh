@@ -17,8 +17,8 @@ _gg_sandbox() {
     git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
     echo x > seed.txt; git add seed.txt; git commit -qm init 2>/dev/null
     # Detectores en verde para aislar el guard del resto del gate.
-    printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
-    printf '#!/usr/bin/env bash\nexit 0\n' > tools/check-layers.sh
+    stub tools/drift-ratchet.sh '#!/usr/bin/env bash\nexit 0\n'
+    stub tools/check-layers.sh '#!/usr/bin/env bash\nexit 0\n'
     rm -f tools/semgrep-scan.sh tools/check-review-marker.sh 2>/dev/null
     "$1"
   )

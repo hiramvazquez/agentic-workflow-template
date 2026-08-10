@@ -234,7 +234,7 @@ test_keep_visible_veta_el_archivado() { _rot_sandbox _case_keep_visible_manda; }
 _case_detector_sin_test_no_se_archiva() {
   # Garantía PARCIAL: un detector que es un script sin test propio no
   # asegura nada por sí solo. Archivar eso sería archivar una promesa.
-  printf '#!/usr/bin/env bash\n' > tools/otro.sh
+  stub tools/otro.sh '#!/usr/bin/env bash\n'
   _doc '# Lecciones
 
 ### [2026-01-01] Detector sin test propio

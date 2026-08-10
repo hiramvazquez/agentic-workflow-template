@@ -409,3 +409,22 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   resolvió cuando vivía en cinco sitios y divergía.
 - **Detector:** tools/tests/test_bash_matrix.sh (9 tests, 5 de ellos de falso positivo)
 - **Área:** scripts/agent-hooks/reviewer-gate.sh §0c · scripts/agent-hooks/lib/skill-matrix.sh
+
+### [2026-08-09] Un test verde en Linux y rojo en macOS: dependía de los PERMISOS del archivo que sobrescribía
+- **Qué pasó:** cinco tests de `test_ratchets.sh` fallaban en la máquina del owner (macOS) y
+  pasaban en el contenedor (Linux), con `Permission denied` **al escribir el stub**, no al
+  ejecutarlo. Los tests hacían `printf '...' > tools/drift-ratchet.sh` sobre el archivo que el
+  sandbox había COPIADO del repo: una redirección sobre un archivo existente hereda su modo y
+  sus flags, y esos archivos habían llegado al repo por un canal que los dejó en modo 700.
+- **Causa raíz:** el test dependía de una propiedad del entorno que nadie había declarado — los
+  permisos del archivo copiado. Verde o rojo según la máquina es la peor clase de fallo: no
+  señala un defecto real y erosiona la confianza en la suite entera, que es justo lo que hace
+  que alguien acabe ignorando un rojo legítimo.
+- **Regla:** un stub se **crea limpio**, nunca se sobrescribe: `rm -f` + escribir + `chmod +x`.
+  Está en el helper `stub` de `run-tests.sh` para que no haya que recordarlo. Y la regla
+  general: si el resultado de un test depende de algo que el test no creó, ese algo es una
+  entrada no declarada. Corolario del helper: usa `printf '%b'`, no `'%s'` — con `%s` los `\n`
+  se escriben literales y el stub "funciona" de formas absurdas.
+- **Detector:** tools/tests/run-tests.sh (helper `stub`, usado por los 28 stubs de la suite) +
+  la propia suite corriendo en Linux y macOS en `.github/workflows/harness-ci.yml`
+- **Área:** tools/tests/

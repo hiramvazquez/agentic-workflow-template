@@ -29,7 +29,7 @@ _harness_sandbox() { # _harness_sandbox <función-a-ejecutar-dentro>
 # ════════════════════════════════════════════════════════════════════
 _case_lite_no_relaja_ratchet() {
   # Stub: el ratchet SIEMPRE falla (simula deuda que subió).
-  printf '#!/usr/bin/env bash\necho "❌ ratchet: subió"\nexit 1\n' > tools/drift-ratchet.sh
+  stub tools/drift-ratchet.sh '#!/usr/bin/env bash\necho "❌ ratchet: subió"\nexit 1\n'
   # Cambio staged de código de producto (no docs/tooling → sí requiere gate).
   mkdir -p src; echo "let x = 1" > src/App.swift; git add src/App.swift
   # Preset lite + intento de commit.
@@ -46,7 +46,7 @@ test_ratchet_duro_incluso_en_preset_lite() {
 _case_override_no_relaja_ratchet() {
   # REVIEWER_OVERRIDE es un escape hatch para el MARKER (juicio humano),
   # nunca para un detector mecánico. Un número objetivo no se negocia.
-  printf '#!/usr/bin/env bash\necho "❌ ratchet: subió"\nexit 1\n' > tools/drift-ratchet.sh
+  stub tools/drift-ratchet.sh '#!/usr/bin/env bash\necho "❌ ratchet: subió"\nexit 1\n'
   mkdir -p src; echo "let x = 1" > src/App.swift; git add src/App.swift
   echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
     | REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="urgencia" \
@@ -59,7 +59,7 @@ test_override_no_relaja_el_ratchet() {
 }
 
 _case_override_si_relaja_marker() {
-  printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
+  stub tools/drift-ratchet.sh '#!/usr/bin/env bash\nexit 0\n'
   mkdir -p src; echo "let x = 1" > src/App.swift; git add src/App.swift
   echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
     | WORKFLOW_PRESET=full REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="urgencia" \
@@ -134,7 +134,7 @@ test_marker_caduca_si_cambia_el_diff_staged() {
 
 _case_lite_si_relaja_marker() {
   # Ratchet OK, pero SIN marker de reviewer.
-  printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
+  stub tools/drift-ratchet.sh '#!/usr/bin/env bash\nexit 0\n'
   mkdir -p src; echo "let x = 1" > src/App.swift; git add src/App.swift
   echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
     | WORKFLOW_PRESET=lite bash scripts/agent-hooks/reviewer-gate.sh >/dev/null 2>&1
@@ -147,7 +147,7 @@ test_lite_avisa_pero_permite_sin_marker() {
 }
 
 _case_full_bloquea_sin_marker() {
-  printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
+  stub tools/drift-ratchet.sh '#!/usr/bin/env bash\nexit 0\n'
   mkdir -p src; echo "let x = 1" > src/App.swift; git add src/App.swift
   echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
     | WORKFLOW_PRESET=full bash scripts/agent-hooks/reviewer-gate.sh >/dev/null 2>&1
@@ -160,7 +160,7 @@ test_full_bloquea_sin_marker() {
 # FALSO POSITIVO guard: un cambio solo-docs NO es código de producto y no
 # puede exigir review — bloquearlo haría que el equipo desactivara el gate.
 _case_solo_docs_no_requiere_gate() {
-  printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
+  stub tools/drift-ratchet.sh '#!/usr/bin/env bash\nexit 0\n'
   mkdir -p docs; echo "# hola" > docs/x.md; git add docs/x.md
   echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m docs"}}' \
     | WORKFLOW_PRESET=full bash scripts/agent-hooks/reviewer-gate.sh >/dev/null 2>&1
@@ -288,7 +288,7 @@ test_muter_roto_no_se_disfraza_de_sin_runner() {
 # aflojar es una sugerencia.
 # ════════════════════════════════════════════════════════════════════
 _case_drift_update_no_sube() {
-  printf '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=5 warns=3"\n' > tools/check-drift.sh
+  stub tools/check-drift.sh '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=5 warns=3"\n'
   printf '{\n  "errors": 2,\n  "warns": 1\n}\n' > tools/drift-ratchet.json
   bash tools/drift-ratchet.sh --update >/dev/null 2>&1
   [ "$?" = "1" ] || { echo "    --update con el conteo por ENCIMA del techo no falló"; return 1; }
@@ -298,7 +298,7 @@ _case_drift_update_no_sube() {
 test_drift_update_nunca_sube_el_techo() { _harness_sandbox _case_drift_update_no_sube; }
 
 _case_drift_update_si_baja() {
-  printf '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=1 warns=0"\n' > tools/check-drift.sh
+  stub tools/check-drift.sh '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=1 warns=0"\n'
   printf '{\n  "errors": 2,\n  "warns": 1\n}\n' > tools/drift-ratchet.json
   bash tools/drift-ratchet.sh --update >/dev/null 2>&1
   [ "$?" = "0" ] || { echo "    --update con un conteo MEJOR falló (falso positivo)"; return 1; }
@@ -309,7 +309,7 @@ test_drift_update_si_puede_bajar() { _harness_sandbox _case_drift_update_si_baja
 
 # Primera adopción (JSON ausente): fijar el techo inicial ES legítimo.
 _case_drift_update_primera_vez() {
-  printf '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=7 warns=2"\n' > tools/check-drift.sh
+  stub tools/check-drift.sh '#!/usr/bin/env bash\necho "DRIFT_SUMMARY errors=7 warns=2"\n'
   rm -f tools/drift-ratchet.json
   bash tools/drift-ratchet.sh --update >/dev/null 2>&1
   [ "$?" = "0" ] || { echo "    primera adopción (sin JSON) fue rehusada"; return 1; }

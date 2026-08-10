@@ -25,8 +25,8 @@ _bm_sandbox() {
     printf '# skill\n' > .agents/skills/domain/SKILL.md
     printf 'let x = 1\n' > app/Domain/Movie.swift
     # Detectores en verde: aquí se prueba la matriz, no el resto del gate.
-    printf '#!/usr/bin/env bash\nexit 0\n' > tools/drift-ratchet.sh
-    printf '#!/usr/bin/env bash\nexit 0\n' > tools/check-layers.sh
+    stub tools/drift-ratchet.sh '#!/usr/bin/env bash\nexit 0\n'
+    stub tools/check-layers.sh '#!/usr/bin/env bash\nexit 0\n'
     rm -f tools/semgrep-scan.sh tools/check-review-marker.sh 2>/dev/null
     "$1"
   )

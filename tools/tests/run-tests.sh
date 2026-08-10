@@ -21,6 +21,29 @@ cd "$PROJECT_ROOT"
 FILTER="${1:-}"
 PASS=0; FAIL=0; FAILED_NAMES=()
 
+# ── Stub de scripts en el sandbox ───────────────────────────────────
+# `printf ... > tools/x.sh` sobre un archivo COPIADO hereda su modo y sus
+# flags. Eso hizo que la suite fuera verde en Linux y roja en macOS con
+# "Permission denied" AL ESCRIBIR el stub: los archivos habían llegado al
+# repo por un canal que los dejó en modo 700, y el sandbox los arrastró.
+#
+# Un test cuyo resultado depende de los PERMISOS del archivo que sobrescribe
+# no está probando lo que cree — y falla de forma intermitente entre máquinas,
+# que es la peor clase de test. `stub` elimina primero y crea limpio.
+#
+#   stub <ruta> <contenido-del-script>
+stub() {
+  local path="$1"; shift
+  mkdir -p "$(dirname "$path")" 2>/dev/null
+  rm -f "$path"
+  # %b (no %s): el contenido llega con \n literales, igual que en los
+  # `printf '...\n...'` que este helper sustituye. Con %s los stubs saldrían
+  # en una sola línea y "funcionarían" de formas absurdas.
+  printf '%b' "$*" > "$path"
+  chmod +x "$path" 2>/dev/null
+}
+export -f stub 2>/dev/null || true
+
 # ── Aserciones disponibles para los tests ───────────────────────────
 assert_eq() {
   if [ "$1" = "$2" ]; then return 0; fi
