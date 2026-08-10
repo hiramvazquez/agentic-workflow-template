@@ -37,7 +37,7 @@
 # Contrato: exit 0 = todo correcto (o reparado en --fix) · 1 = hay .sh sin +x.
 # Contrato de stdout:  EXECBITS_SUMMARY missing=<N>
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 MODE="${1:---staged}"
 

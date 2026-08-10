@@ -334,3 +334,57 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   `test_sync_jamas_pisa_contenido_del_proyecto`, `test_sync_registra_la_base_para_el_delta_futuro`,
   `test_sync_deja_los_cambios_staged_para_revision`)
 - **Área:** tools/upgrade.sh · docs/ADOPTION.md
+
+### [2026-08-09] Escribí el detector de "falla a medias y dice OK" y cometí ese error dos veces seguidas
+- **Qué pasó:** el modo sync de `upgrade.sh`, estrenado el mismo día, falló a medias dos veces
+  y reportó éxito las dos. (1) `git checkout -- <pathspec>` es **atómico**: un patrón sin
+  coincidencias abortaba TODO, y el `2>/dev/null` se comía el error — trajo los tests de tres
+  herramientas SIN las herramientas. (2) Al arreglarlo apareció el mismo fallo una capa más
+  abajo: `$SYNC_GLOBS` sin comillas lo expandía **bash contra el árbol LOCAL** antes de que git
+  lo viera, así que una herramienta nueva del template nunca entraba en la lista; y con
+  comillas, `git ls-tree` (plumbing) hace match por PREFIJO, no wildmatch, y devolvía menos
+  archivos sin error. Tres capas del mismo error.
+- **Causa raíz:** delegar el matching en semántica implícita de otra herramienta y creerse su
+  silencio. `2>/dev/null` sobre una operación cuyo resultado importa no es "limpiar ruido": es
+  apagar la única señal de que no hizo lo que creías.
+- **Regla:** (1) prohibido `2>/dev/null` sobre una operación cuyo éxito importa — captura el
+  error y decláralo. (2) Toda operación por lotes reporta **cuántos elementos procesó**, no
+  solo que "terminó": un resumen que no cuenta no puede detectar una ejecución parcial.
+  (3) Cuando el matching de rutas importa, **fíltralo tú** con reglas explícitas y testeables
+  en vez de confiar en el globbing del shell o en el pathspec de un comando plumbing.
+- **Detector:** tools/tests/test_upgrade.sh (`test_sync_no_se_salta_herramientas_en_silencio`,
+  `test_sync_no_pisa_maquinaria_con_fill`)
+- **Área:** tools/upgrade.sh
+
+### [2026-08-09] Maquinaria con secciones que el template espera que personalices
+- **Qué pasó:** el sync trajo `canon-enforce.sh` entero del template y **devolvió a comentario
+  el guard del `.pbxproj`** que un proyecto real había escrito en su §CHECK 5. Lo delataron los
+  tests de ese guard al fallar — la regla "una divergencia local sobrevive si lleva test" se
+  cobró su valor por primera vez.
+- **Causa raíz:** la clasificación binaria maquinaria/contenido no cubre los archivos de
+  **propiedad compartida**: `canon-enforce.sh`, `post-edit-verify.sh`, `lefthook.yml`, `ci/`
+  traen secciones `FILL` que el template ESPERA que el proyecto rellene. Son maquinaria en su
+  estructura y contenido del proyecto en su interior.
+- **Regla:** regla mecánica, sin listas que mantener — **si la versión del TEMPLATE trae un
+  marcador `FILL`, ese archivo no se pisa jamás: se reporta**. El template está declarando por
+  escrito que espera personalización; sobrescribirlo es siempre incorrecto.
+- **Detector:** tools/tests/test_upgrade.sh::test_sync_no_pisa_maquinaria_con_fill
+- **Área:** tools/upgrade.sh · scripts/agent-hooks/canon-enforce.sh
+
+### [2026-08-09] Pedirle ayuda al CLI del ledger corrompía el ledger
+- **Qué pasó:** `findings.sh add --help` interpretaba `--help` como flags de un alta y escribía
+  un hallazgo basura con `title="(sin título)"`. Además, `add` con un `--id` existente conservaba
+  el título viejo, así que **corregir un título fallaba en silencio** y el humano acababa
+  editando el `.jsonl` a mano — dos veces en un mismo día, en un archivo generado.
+- **Causa raíz:** el dispatch trataba cualquier argumento como datos. En un CLI que escribe la
+  fuente de accountability del proyecto, eso es fail-open en su forma más traicionera: el daño
+  lo hace la operación que el humano creía inofensiva.
+- **Regla:** `--help` cortocircuita SIEMPRE antes del dispatch; `add` exige `--title` y `--area`
+  y falla ruidoso en vez de inventar defaults; un `add` con id existente falla y apunta a
+  `update`; y existe `drop ID --reason` para retirar lo que nunca fue un hallazgo (distinto de
+  `close`, que afirma que hubo un problema y se resolvió). Retirar sin razón se rechaza:
+  quitar del ledger sin explicar por qué es borrar evidencia.
+- **Detector:** tools/tests/test_findings_cli.sh (`test_add_help_no_crea_hallazgo_basura`,
+  `test_add_sin_titulo_ni_area_falla_ruidoso`, `test_add_con_id_existente_falla_y_apunta_a_update`,
+  `test_drop_sin_razon_se_rechaza`)
+- **Área:** tools/findings/findings.sh

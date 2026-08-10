@@ -172,3 +172,64 @@ _case_grep_tolerante() {
   [ "$n" = "2" ] || { echo "    el grep tolerante contó $n de 2 abiertos"; return 1; }
 }
 test_grep_tolerante_cuenta_ambos_formatos() { _fcli_sandbox _case_grep_tolerante; }
+
+# ════════════════════════════════════════════════════════════════════
+# El CLI del ledger es la fuente de accountability: no puede ensuciarse
+# ════════════════════════════════════════════════════════════════════
+# Tres defectos que mordieron DOS VECES en el mismo proyecto real y que
+# obligaron a editar el .jsonl a mano — justo lo que un archivo generado no
+# debería necesitar nunca.
+_case_help_no_ensucia() {
+  # El peor de los tres: `add --help` interpretaba "--help" como flags de un
+  # alta y escribía un hallazgo BASURA. Pedirle AYUDA al CLI corrompía la
+  # fuente de verdad. Fail-open en su forma más traicionera: el daño lo hace
+  # la operación que el humano creía inofensiva.
+  bash tools/findings/findings.sh add --help >/dev/null 2>&1
+  local n; n="$(grep -c . tools/findings/ledger.jsonl 2>/dev/null || echo 0)"
+  [ "$n" = "0" ] || { echo "    'add --help' escribió $n entrada(s) en el ledger"; return 1; }
+}
+test_add_help_no_crea_hallazgo_basura() { _fcli_sandbox _case_help_no_ensucia; }
+
+_case_add_exige_lo_minimo() {
+  # Una entrada sin título ni área no es un hallazgo: es ruido que alguien
+  # tendrá que limpiar. Mejor fallar que inventar defaults.
+  bash tools/findings/findings.sh add --detail "algo" >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    un add sin --title/--area fue aceptado"; return 1; }
+  local n; n="$(grep -c . tools/findings/ledger.jsonl 2>/dev/null || echo 0)"
+  [ "$n" = "0" ] || { echo "    el add inválido igualmente escribió al ledger"; return 1; }
+}
+test_add_sin_titulo_ni_area_falla_ruidoso() { _fcli_sandbox _case_add_exige_lo_minimo; }
+
+_case_add_duplicado_no_pisa_en_silencio() {
+  # `add` con un id existente conservaba el title viejo: corregir un título
+  # fallaba EN SILENCIO y el humano acababa editando el JSONL a mano.
+  bash tools/findings/findings.sh add --id f-x --title "original" --area a >/dev/null 2>&1
+  bash tools/findings/findings.sh add --id f-x --title "corregido" --area a >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    un add con id existente se aceptó (y pisa/ignora en silencio)"; return 1; }
+  grep -q '"title":"original"' tools/findings/ledger.jsonl \
+    || { echo "    el add duplicado modificó la entrada existente"; return 1; }
+}
+test_add_con_id_existente_falla_y_apunta_a_update() {
+  _fcli_sandbox _case_add_duplicado_no_pisa_en_silencio
+}
+
+_case_update_corrige() {
+  bash tools/findings/findings.sh add --id f-y --title "mal" --area a >/dev/null 2>&1
+  bash tools/findings/findings.sh update f-y --title "bien" >/dev/null 2>&1
+  [ "$?" = "0" ] || { echo "    update falló sobre un id existente"; return 1; }
+  grep -q '"title":"bien"' tools/findings/ledger.jsonl \
+    || { echo "    update no cambió el título"; return 1; }
+}
+test_update_corrige_un_hallazgo_existente() { _fcli_sandbox _case_update_corrige; }
+
+_case_drop_exige_razon() {
+  # Retirar del ledger sin explicar por qué es borrar evidencia. `drop` no es
+  # `close`: cerrar afirma que hubo un problema y se resolvió; drop afirma
+  # que nunca lo hubo.
+  bash tools/findings/findings.sh add --id f-z --title "t" --area a >/dev/null 2>&1
+  bash tools/findings/findings.sh drop f-z >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    drop sin --reason fue aceptado (borrar evidencia sin explicación)"; return 1; }
+  grep -q 'f-z' tools/findings/ledger.jsonl \
+    || { echo "    el drop sin razón igualmente retiró la entrada"; return 1; }
+}
+test_drop_sin_razon_se_rechaza() { _fcli_sandbox _case_drop_exige_razon; }

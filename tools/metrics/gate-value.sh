@@ -29,7 +29,7 @@
 #
 #   bash tools/metrics/gate-value.sh
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 DETECTIONS="${DETECTIONS_LOG:-.agents/state/metrics/detections.jsonl}"
 LEDGER="${FINDINGS_LEDGER:-tools/findings/ledger.jsonl}"

@@ -121,16 +121,87 @@ def flag(rest, name):
     except (ValueError, IndexError):
         return None
 
+USAGE = """findings.sh — CLI portable del ledger (mismo esquema que findings.ts):
+  add --title T --area A [--id I] [--severity high|medium|low] [--tier auto-fix|owner-decision]
+      [--source S] [--detail D] [--effort S|M|L] [--links a,b]
+  update ID [--title T] [--area A] [--severity S] [--detail D] [--tier T] [--links a,b]
+  close ID --resolution "..."      accept ID --reason "..."
+  drop ID --reason "..."           (retira una entrada que NUNCA fue un hallazgo)
+  import batch.json                list [--status open] [--tier T] [--json]
+  render"""
+
 args = sys.argv[1:]
 cmd = args[0] if args else ""
 rest = args[1:]
+
+# --help NUNCA ejecuta nada. Antes, `add --help` interpretaba "--help" como
+# flags de un alta y escribía un hallazgo BASURA con title="(sin título)":
+# pedirle ayuda al CLI ENSUCIABA la fuente de accountability del proyecto.
+# Es fail-open en su peor forma — el daño lo hace la operación que el humano
+# creía inofensiva. Cortocircuita antes del dispatch, siempre.
+if not cmd or cmd in ("-h", "--help", "help") or "--help" in rest or "-h" in rest:
+    print(USAGE); sys.exit(0)
+
 items = load()
 
 if cmd == "add":
+    # Un `add` sin lo mínimo indispensable FALLA en vez de inventar defaults.
+    # Un ledger es accountability: una entrada con área "?" y sin título no
+    # es un hallazgo, es ruido que alguien tendrá que limpiar a mano.
+    if not flag(rest, "title") or not flag(rest, "area"):
+        print("❌ add requiere --title y --area (un hallazgo sin título ni área no es un hallazgo).",
+              file=sys.stderr)
+        print(USAGE, file=sys.stderr); sys.exit(2)
+    _id = flag(rest, "id")
+    if _id and any(i["id"] == _id for i in items):
+        # `add` con un id existente conservaba el title viejo, así que
+        # corregir un título fallaba EN SILENCIO: el humano acababa editando
+        # el .jsonl a mano — justo lo que un archivo generado no debería
+        # necesitar. Ahora se dice, y se apunta al comando correcto.
+        print(f"❌ ya existe un hallazgo con id '{_id}'. Para modificarlo:", file=sys.stderr)
+        print(f"   bash tools/findings/findings.sh update {_id} --title \"...\"", file=sys.stderr)
+        sys.exit(2)
     items = upsert(items, {k: flag(rest, k) for k in
         ("id","title","area","severity","tier","source","detail","effort","status")} |
         ({"links": flag(rest,"links").split(",")} if flag(rest,"links") else {}))
     save(items); render(items)
+elif cmd == "update":
+    if not rest or rest[0].startswith("--"):
+        print("❌ update requiere el ID del hallazgo.", file=sys.stderr); sys.exit(2)
+    target = rest[0]
+    hit = next((i for i in items if i["id"] == target), None)
+    if hit is None:
+        print(f"❌ no existe ningún hallazgo con id '{target}'.", file=sys.stderr); sys.exit(2)
+    changed = []
+    for k in ("title","area","severity","tier","source","detail","effort","status","resolution"):
+        v = flag(rest[1:], k)
+        if v is not None:
+            hit[k] = v; changed.append(k)
+    if flag(rest[1:], "links"):
+        hit["links"] = flag(rest[1:], "links").split(","); changed.append("links")
+    if not changed:
+        print("❌ update sin campos que cambiar (usa --title, --area, --detail, ...).",
+              file=sys.stderr); sys.exit(2)
+    hit["updatedAt"] = today
+    save(items); render(items)
+    print(f"✅ {target} actualizado: {', '.join(changed)}")
+elif cmd == "drop":
+    # Retirada limpia de una entrada que NUNCA fue un hallazgo (p.ej. la que
+    # creaba `add --help`). No es lo mismo que `close`: cerrar afirma que
+    # hubo un problema y se resolvió. Esto afirma que no lo hubo.
+    if not rest or rest[0].startswith("--"):
+        print("❌ drop requiere el ID a retirar.", file=sys.stderr); sys.exit(2)
+    if not flag(rest[1:], "reason"):
+        print("❌ drop requiere --reason: retirar del ledger sin explicar por qué es",
+              file=sys.stderr)
+        print("   exactamente como borrar evidencia. Queda en el historial de git.",
+              file=sys.stderr); sys.exit(2)
+    before = len(items)
+    items = [i for i in items if i["id"] != rest[0]]
+    if len(items) == before:
+        print(f"❌ no existe ningún hallazgo con id '{rest[0]}'.", file=sys.stderr); sys.exit(2)
+    save(items); render(items)
+    print(f"✅ {rest[0]} retirado del ledger — {flag(rest[1:], 'reason')}")
 elif cmd == "import":
     with open(rest[0], encoding="utf-8") as f: batch = json.load(f)
     for b in batch: items = upsert(items, b)
@@ -157,10 +228,6 @@ elif cmd == "list":
 elif cmd == "render":
     render(items)
 else:
-    print("""findings.sh — CLI portable del ledger (mismo esquema que findings.ts):
-  add --title T --area A [--id I] [--severity high|medium|low] [--tier auto-fix|owner-decision]
-      [--source S] [--detail D] [--effort S|M|L] [--links a,b]
-  close ID --resolution "..."      accept ID --reason "..."
-  import batch.json                list [--status open] [--tier T] [--json]
-  render""")
+    print(f"❌ comando desconocido: '{cmd}'", file=sys.stderr)
+    print(USAGE, file=sys.stderr); sys.exit(2)
 PYEOF

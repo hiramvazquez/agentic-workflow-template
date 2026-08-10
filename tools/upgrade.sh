@@ -13,6 +13,17 @@
 #   bash tools/upgrade.sh <url-del-template>   # primera vez (registra el remote)
 #   bash tools/upgrade.sh                      # siguientes veces
 #
+# ⚠️  ARRANQUE MANUAL, UNA SOLA VEZ, si tu copia es anterior a la
+# auto-actualización (o sea: si este bloque no está en TU tools/upgrade.sh).
+# Un script sin el mecanismo no puede traérselo a sí mismo — la pescadilla:
+#
+#     git fetch template
+#     git checkout template/main -- tools/upgrade.sh
+#     bash tools/upgrade.sh
+#
+# A partir de ahí se mantiene solo: comprueba su propia versión contra el
+# template antes de nada y se re-lanza actualizado.
+#
 # Reglas de resolución cuando haya conflicto (imprímelas mentalmente):
 #   · MAQUINARIA (scripts/, tools/*.sh, ci/, lefthook.yml, tests) → suele
 #     ganar el TEMPLATE: si no la personalizaste, acepta la suya (--theirs).
@@ -30,7 +41,11 @@ REMOTE="template"
 URL="${1:-}"
 
 # ── Guard 1: árbol limpio — un merge sobre trabajo a medias es dolor ─
+# Excepción: el propio upgrade.sh recién auto-actualizado (ver más abajo).
 DIRTY="$(git status --porcelain 2>/dev/null | grep -vE '^\?\?' || true)"
+if [ -n "${UPGRADE_SELF_UPDATED:-}" ]; then
+  DIRTY="$(printf '%s\n' "$DIRTY" | grep -v 'tools/upgrade\.sh$' || true)"
+fi
 if [ -n "$DIRTY" ]; then
   echo "❌ upgrade: hay cambios sin commitear. Commitea (o stashea) antes de traer el template." >&2
   exit 1
@@ -59,10 +74,57 @@ if [ -z "$BRANCH" ]; then
   echo "❌ upgrade: no encuentro main/master en '$REMOTE'. Indica la rama: TEMPLATE_BRANCH=<rama> bash tools/upgrade.sh" >&2
   exit 1
 fi
-NEW="$(git rev-list --count HEAD.."$REMOTE/$BRANCH" 2>/dev/null || echo 0)"
-if [ "${NEW:-0}" = "0" ]; then
-  echo "✅ upgrade: ya estás al día con $REMOTE/$BRANCH."
-  exit 0
+# ════════════════════════════════════════════════════════════════════
+# AUTO-ACTUALIZACIÓN: la herramienta que trae los arreglos no puede ser
+# la única que nunca los recibe
+# ════════════════════════════════════════════════════════════════════
+# Problema de arranque, cazado en vivo: se arregló `upgrade.sh` en el
+# template para soportar proyectos adoptados por copia... y el proyecto que
+# lo necesitaba seguía ejecutando SU copia vieja, que fallaba igual. El
+# arreglo estaba a un comando de distancia y era inalcanzable con el propio
+# mecanismo — como una actualización de software que solo se puede instalar
+# con la versión actualizada.
+#
+# Por eso este script se pone al día a sí mismo ANTES que nada y se re-lanza.
+# Se ejecuta un proceso NUEVO (`exec bash`) en vez de seguir con el archivo
+# reemplazado bajo los pies: bash lee los scripts de forma incremental y
+# sobrescribir el que está corriendo produce comportamientos absurdos.
+if [ -z "${UPGRADE_SELF_UPDATED:-}" ]; then
+  _SELF_NEW="$(mktemp)"
+  if git show "$REMOTE/$BRANCH:tools/upgrade.sh" > "$_SELF_NEW" 2>/dev/null \
+     && [ -s "$_SELF_NEW" ] && ! cmp -s "$_SELF_NEW" tools/upgrade.sh; then
+    cp "$_SELF_NEW" tools/upgrade.sh && chmod +x tools/upgrade.sh
+    rm -f "$_SELF_NEW"
+    echo "🔄 upgrade: tu tools/upgrade.sh estaba desactualizado. Lo he puesto al día"
+    echo "   desde el template y me re-lanzo con la versión nueva."
+    echo "   (Queda modificado en tu árbol: entra en el commit del upgrade.)"
+    echo ""
+    UPGRADE_SELF_UPDATED=1 exec bash tools/upgrade.sh "$@"
+  fi
+  rm -f "$_SELF_NEW"
+fi
+
+# La topología se detecta ANTES de decidir si hay novedades: sin ancestro
+# común, `rev-list HEAD..template` cuenta SIEMPRE todos los commits del
+# template (ninguno es alcanzable desde HEAD), así que "¿estoy al día?" se
+# responde con el SHA registrado, no con un conteo que nunca baja a cero.
+MERGE_BASE_OK=0
+git merge-base HEAD "$REMOTE/$BRANCH" >/dev/null 2>&1 && MERGE_BASE_OK=1
+SYNC_RECORD="tools/.template-sync"
+
+if [ "$MERGE_BASE_OK" = "1" ]; then
+  NEW="$(git rev-list --count HEAD.."$REMOTE/$BRANCH" 2>/dev/null || echo 0)"
+  if [ "${NEW:-0}" = "0" ]; then
+    echo "✅ upgrade: ya estás al día con $REMOTE/$BRANCH."
+    exit 0
+  fi
+else
+  _REC="$( [ -f "$SYNC_RECORD" ] && awk 'NR==1{print $1; exit}' "$SYNC_RECORD" 2>/dev/null || true)"
+  if [ -n "$_REC" ] && [ "$_REC" = "$(git rev-parse "$REMOTE/$BRANCH" 2>/dev/null)" ]; then
+    echo "✅ upgrade: ya estás al día con $REMOTE/$BRANCH (sync registrado: ${_REC:0:7})."
+    exit 0
+  fi
+  NEW="$(git rev-list --count "${_REC:+$_REC..}$REMOTE/$BRANCH" 2>/dev/null || echo '?')"
 fi
 echo "━━━ upgrade: $NEW commit(s) nuevos en el template ━━━"
 git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
@@ -87,15 +149,38 @@ git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
 # Con ese registro, la próxima vez se puede aplicar solo el DELTA real
 # (`git apply --3way`), que produce conflictos únicamente donde ambos lados
 # tocaron lo mismo — un merge de 3 vías de facto, sin ancestro compartido.
-MERGE_BASE_OK=0
-git merge-base HEAD "$REMOTE/$BRANCH" >/dev/null 2>&1 && MERGE_BASE_OK=1
-
+# (MERGE_BASE_OK y SYNC_RECORD ya se calcularon arriba, antes del "¿al día?")
+#
 # Maquinaria: se sincroniza. Es el harness, y su fuente de verdad es el
 # template (si la personalizaste, tu arreglo necesita SU test — lección del
 # archivo-por-fuera-de-upgrade; la verificación de abajo es la red).
 SYNC_PATHS="scripts ci lefthook.yml tools/tests tools/semgrep/rules tools/metrics .github/workflows"
 SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
-SYNC_RECORD="tools/.template-sync"
+
+# ⚠️  NO se delega el matching en git. Dos capas de fallo silencioso vividas
+# aquí, una debajo de la otra:
+#   1. `$SYNC_GLOBS` sin comillas → BASH lo expande contra el árbol LOCAL
+#      antes de que git lo vea, así que una herramienta NUEVA del template
+#      nunca entra en la lista. Nadie se entera.
+#   2. Con comillas, `git ls-tree` (plumbing) hace match por PREFIJO, no
+#      wildmatch: `tools/*.sh` no casa `tools/una-herramienta.sh`. Devuelve
+#      menos archivos de los que crees, sin error.
+# Solución: listar el árbol ENTERO del template una vez y filtrar aquí, con
+# reglas explícitas que se leen y se testean. Cero semántica implícita.
+_es_maquinaria() { # _es_maquinaria <ruta-en-el-template>
+  local f="$1" p
+  for p in $SYNC_PATHS; do
+    [ "$f" = "$p" ] && return 0
+    case "$f" in "$p"/*) return 0 ;; esac
+  done
+  set -f
+  for p in $SYNC_GLOBS; do
+    # shellcheck disable=SC2254  # el glob DEBE expandirse como patrón
+    case "$f" in $p) set +f; return 0 ;; esac
+  done
+  set +f
+  return 1
+}
 
 _report_no_sincronizado() {
   # Honestidad: lo que el template cambió y NO se ha tocado aquí. Sin esta
@@ -161,7 +246,7 @@ else
   if [ -n "$BASE_REC" ] && git cat-file -e "$BASE_REC^{commit}" 2>/dev/null; then
     echo "   Base registrada: $BASE_REC — aplico solo el DELTA de maquinaria."
     # shellcheck disable=SC2086  # los globs DEBEN expandirse aquí
-    if git diff "$BASE_REC" "$REMOTE/$BRANCH" -- $SYNC_PATHS $SYNC_GLOBS > /tmp/upgrade.patch.$$ 2>/dev/null \
+    if git diff "$BASE_REC" "$REMOTE/$BRANCH" -- $(git ls-tree -r --name-only "$REMOTE/$BRANCH" 2>/dev/null | while IFS= read -r _f; do _es_maquinaria "$_f" && printf '%s ' "$_f"; done) > /tmp/upgrade.patch.$$ 2>/dev/null \
        && [ -s /tmp/upgrade.patch.$$ ]; then
       if git apply --3way --whitespace=nowarn /tmp/upgrade.patch.$$ 2>/tmp/upgrade-apply-err.$$; then
         echo "   ✓ delta aplicado limpio."
@@ -197,17 +282,60 @@ else
     echo "   diff antes de commitear. La red es la verificación de abajo (suite +"
     echo "   selftest): un arreglo local con su test lo delata al fallar."
     echo ""
-    for p in $SYNC_PATHS; do
-      git checkout "$REMOTE/$BRANCH" -- "$p" 2>/dev/null && echo "   ✓ $p"
-    done
-    # shellcheck disable=SC2086
-    git checkout "$REMOTE/$BRANCH" -- $SYNC_GLOBS 2>/dev/null && echo "   ✓ tools/*.sh"
+    # UNO A UNO, y cada resultado se declara. La v1 hacía un solo
+    # `git checkout ... -- $SYNC_GLOBS 2>/dev/null`: el checkout con pathspec
+    # es ATÓMICO, así que un solo patrón sin coincidencias abortaba TODO —
+    # y el `2>/dev/null` se comía el error. Resultado real, cazado en el
+    # primer uso: trajo los tests de tres herramientas SIN las herramientas,
+    # y dijo que había ido bien. Es el mismo patrón que perseguimos todo el
+    # día (la operación falla a medias y reporta éxito), esta vez cometido
+    # por quien escribía el detector de ese patrón.
+    _SYNC_OK=0; _SYNC_FILL=0; _SYNC_FAIL=0; _FILL_LIST=""
+    # ARCHIVO a archivo, no path a path. Dos razones, ambas de errores reales
+    # cometidos en el primer uso de este modo:
+    #
+    # 1. `git checkout -- <pathspec>` es ATÓMICO: un patrón sin coincidencias
+    #    aborta TODO. Con `2>/dev/null`, en silencio. Trajo los tests de tres
+    #    herramientas SIN las herramientas, y reportó éxito.
+    # 2. Hay maquinaria con secciones que el template ESPERA que personalices
+    #    (`canon-enforce.sh` §CHECK 5, `post-edit-verify.sh`, `lefthook.yml`).
+    #    Traerlas enteras devolvió a comentario el guard del `.pbxproj` de un
+    #    proyecto real. Regla mecánica y sin listas que mantener: **si la
+    #    versión del TEMPLATE trae un marcador FILL, ese archivo es de
+    #    propiedad compartida y no se pisa jamás — se reporta.**
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      if git show "$REMOTE/$BRANCH:$f" 2>/dev/null | grep -q 'FILL'; then
+        if [ -f "$f" ]; then
+          _FILL_LIST="${_FILL_LIST}${f}"$'\n'; _SYNC_FILL=$((_SYNC_FILL+1)); continue
+        fi
+      fi
+      if git checkout "$REMOTE/$BRANCH" -- "$f" 2>/dev/null; then
+        _SYNC_OK=$((_SYNC_OK+1))
+      else
+        echo "   ❌ $f"; _SYNC_FAIL=$((_SYNC_FAIL+1))
+      fi
+    done < <(git ls-tree -r --name-only "$REMOTE/$BRANCH" 2>/dev/null | while IFS= read -r _f; do _es_maquinaria "$_f" && printf '%s\n' "$_f"; done)
+
+    echo "   ✓  $_SYNC_OK archivo(s) de maquinaria traídos del template"
+    if [ "$_SYNC_FILL" -gt 0 ]; then
+      echo ""
+      echo "   🔒 $_SYNC_FILL archivo(s) NO tocados: el template los trae con FILL, o sea"
+      echo "      que espera que TÚ los personalices. Pisarlos borraría tu configuración."
+      printf '%s' "$_FILL_LIST" | sed 's/^/      · /'
+      echo "      Si quieres las novedades del template en ellos, mézclalas a mano:"
+      echo "      git diff HEAD $REMOTE/$BRANCH -- <archivo>"
+    fi
+    if [ "$_SYNC_FAIL" -gt 0 ]; then
+      echo ""
+      echo "❌ upgrade: $_SYNC_FAIL archivo(s) fallaron. El sync está INCOMPLETO — no lo" >&2
+      echo "   commitees como si estuviera entero: arregla lo de arriba y re-córrelo." >&2
+      exit 1
+    fi
   fi
   printf '%s  # SHA del template sincronizado por tools/upgrade.sh — no editar a mano\n' \
     "$(git rev-parse "$REMOTE/$BRANCH")" > "$SYNC_RECORD"
-  git add -A -- $SYNC_PATHS $SYNC_RECORD 2>/dev/null
-  # shellcheck disable=SC2086
-  git add -A -- $SYNC_GLOBS 2>/dev/null
+  git add -A -- $SYNC_PATHS tools "$SYNC_RECORD" 2>/dev/null
   _report_no_sincronizado "${BASE_REC:-$REMOTE/$BRANCH}"
   echo ""
   echo "━━━ Cambios traídos (staged, SIN commitear a propósito) ━━━"

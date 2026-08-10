@@ -33,7 +33,7 @@
 #
 # Contrato de stdout:  ROTATE_SUMMARY vivas=<N> archivables=<M>
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 DOC="${LESSONS_DOC:-docs/process/lessons_learned.md}"
 ARCHIVE="${LESSONS_ARCHIVE:-docs/process/lessons_archive.md}"

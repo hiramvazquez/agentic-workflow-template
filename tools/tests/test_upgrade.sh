@@ -167,3 +167,70 @@ _case_sync_deja_staged_sin_commitear() {
 test_sync_deja_los_cambios_staged_para_revision() {
   _upg_sandbox_copia _case_sync_deja_staged_sin_commitear
 }
+
+# ── Auto-actualización: el arranque que casi nos deja fuera ──────────
+# Se arregló upgrade.sh en el template para soportar la adopción por copia,
+# y el proyecto que lo necesitaba seguía ejecutando SU copia vieja: el
+# arreglo estaba a un comando de distancia e inalcanzable con el propio
+# mecanismo. La herramienta que trae los arreglos no puede ser la única que
+# nunca los recibe.
+_case_se_autoactualiza() {
+  # OJO al alcance real, que el propio test nos obligó a precisar: la
+  # auto-actualización solo puede salvar a versiones que YA la llevan. Una
+  # copia anterior a este mecanismo no puede arreglarse a sí misma — de ahí
+  # el arranque manual documentado en la cabecera del script. Lo que este
+  # test fija es que a partir de aquí nadie se queda atrás: una versión con
+  # el mecanismo, pero distinta de la del template, se pone al día sola.
+  printf '\n# marca-local-antigua\n' >> tools/upgrade.sh
+  git add -A; git commit -qm "upgrade con marca local" 2>/dev/null
+  ( cd "$TPL_DIR" && mkdir -p tools \
+    && cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh \
+    && git add -A && git commit -qm "template: upgrade canonico" ) >/dev/null 2>&1
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'marca-local-antigua' tools/upgrade.sh \
+    && { echo "    upgrade.sh NO se auto-actualizó desde el template"; return 1; }
+  grep -q 'MERGE_BASE_OK' tools/upgrade.sh \
+    || { echo "    tras auto-actualizarse no quedó la versión del template"; return 1; }
+  return 0
+}
+test_upgrade_se_autoactualiza_antes_de_nada() {
+  _upg_sandbox_copia _case_se_autoactualiza
+}
+
+# ── Los dos fallos del PRIMER uso del modo sync (ambos: "a medias y dice OK") ──
+_case_sync_no_se_salta_nada_en_silencio() {
+  # `git checkout -- <pathspec>` es ATÓMICO: un patrón sin coincidencias
+  # abortaba TODO, y el 2>/dev/null lo ocultaba. Real: trajo los tests de
+  # tres herramientas SIN las herramientas, y reportó éxito.
+  ( cd "$TPL_DIR" && mkdir -p tools/tests \
+    && printf 'v2 herramienta\n' > tools/una-herramienta.sh \
+    && printf 'test\n' > tools/tests/test_una.sh \
+    && git add -A && git commit -qm "template: herramienta + su test" ) >/dev/null 2>&1
+  bash tools/upgrade.sh >/dev/null 2>&1
+  [ -f tools/una-herramienta.sh ] \
+    || { echo "    el sync trajo el test pero NO la herramienta (fallo silencioso del glob)"; return 1; }
+  [ -f tools/tests/test_una.sh ] \
+    || { echo "    el sync no trajo el test"; return 1; }
+}
+test_sync_no_se_salta_herramientas_en_silencio() {
+  _upg_sandbox_copia _case_sync_no_se_salta_nada_en_silencio
+}
+
+_case_sync_respeta_los_fill() {
+  # Maquinaria con secciones que el template ESPERA que personalices. Traerla
+  # entera devolvió a comentario el guard del .pbxproj de un proyecto real.
+  # Regla mecánica: si la versión del TEMPLATE trae FILL, es propiedad
+  # compartida y no se pisa.
+  ( cd "$TPL_DIR" && mkdir -p scripts \
+    && printf '#!/usr/bin/env bash\n# <!-- FILL: tus reglas -->\n' > scripts/canon.sh \
+    && git add -A && git commit -qm "template: canon con FILL" ) >/dev/null 2>&1
+  mkdir -p scripts
+  printf '#!/usr/bin/env bash\n# MI REGLA LOCAL del pbxproj\n' > scripts/canon.sh
+  git add -A; git commit -qm "proyecto: canon personalizado" 2>/dev/null
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'MI REGLA LOCAL' scripts/canon.sh \
+    || { echo "    el sync PISÓ un archivo que el template marca como FILL (tu config se pierde)"; return 1; }
+}
+test_sync_no_pisa_maquinaria_con_fill() {
+  _upg_sandbox_copia _case_sync_respeta_los_fill
+}

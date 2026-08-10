@@ -32,7 +32,7 @@
 # lite = declara), igual que con el marker de review.
 # Contrato de stdout:  RING3_SUMMARY remote=<yes|no> ci=<yes|no>
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 # Entrypoints que SÍ constituyen un Anillo 3: los gates completos de un
 # proyecto, o —en el repo del propio harness— la suite que verifica los
