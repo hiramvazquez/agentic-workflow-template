@@ -32,7 +32,7 @@
 #                             en cuanto mides una vez, medir pasa a ser obligatorio)
 #   AI_REVIEW_REQUIRED        default 1
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 FAIL=0
 step() { echo ""; echo "━━━ $1 ━━━"; }
 

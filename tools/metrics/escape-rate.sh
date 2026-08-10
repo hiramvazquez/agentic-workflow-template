@@ -24,7 +24,7 @@
 #   bash tools/metrics/escape-rate.sh            # resumen
 #   bash tools/metrics/escape-rate.sh --json     # para dashboards
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 LEDGER="${FINDINGS_LEDGER:-tools/findings/ledger.jsonl}"
 DETECTIONS="${DETECTIONS_LOG:-.agents/state/metrics/detections.jsonl}"

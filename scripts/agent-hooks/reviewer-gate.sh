@@ -72,6 +72,70 @@ while IFS= read -r seg; do
   _seg_is_git_sub "$seg" add && HAS_ADD=1
 done <<< "$(printf '%s' "$CMD" | tr ';&|' '\n')"
 
+# ── 0c. LA MATRIZ DE SKILLS TAMBIÉN VIGILA BASH ─────────────────────
+# El agujero: `skill-reminder` cuelga de `PreToolUse Edit|Write`, así que la
+# matriz §11 solo veía las tools de edición. Escribir con `sed -i`, `tee`,
+# una redirección o un `python3 -c` es escribir igual — y pasaba sin que
+# NADIE mirara. No es hipotético: por ahí se coló una decisión de
+# arquitectura real (el aislamiento de actores del target) en el primer
+# proyecto, sin mala intención: el agente simplemente usó la herramienta
+# equivocada para el trabajo.
+#
+# DISEÑO CONSERVADOR EN LA DETECCIÓN, no en el bloqueo. Solo se consideran
+# formas de escritura INEQUÍVOCAS, y el destino tiene que casar la matriz:
+#   ·  > archivo   ·  >> archivo      (redirección; `2>/dev/null` no casa nada)
+#   ·  sed -i / perl -i               ·  tee [-a] archivo
+#   ·  cp/mv ... destino
+# Un `grep patrón x.swift` o un `cat x.swift` NO escriben y NO disparan: la
+# ley del 10% manda, y aquí un falso positivo bloquearía comandos de lectura
+# legítimos, que es la forma más rápida de que alguien apague el gate entero.
+# La lógica de la matriz vive en lib/skill-matrix.sh — compartida con
+# skill-reminder, porque una regla implementada dos veces diverge.
+if [ -f "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh" ]; then
+  # shellcheck source=lib/skill-matrix.sh
+  . "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh"
+  # Sin la redirección a /dev/null: es escritura, sí, pero a la papelera.
+  # Contarla haría que CUALQUIER comando silenciado disparase el gate.
+  _CMD_CLEAN="$(printf '%s\n' "$CMD" | sed -E 's/2>&1//g; s/[0-9]?>>?[[:space:]]*\/dev\/null//g')"
+  # (a) redirección y tee: el destino es el token siguiente.
+  _WRITE_TARGETS="$(printf '%s\n' "$_CMD_CLEAN" \
+    | grep -oE '(>>?[[:space:]]*|tee[[:space:]]+(-a[[:space:]]+)?)[^[:space:]|;&<>"'"'"']+' \
+    | sed -E 's/^(>>?|tee)[[:space:]]*(-a[[:space:]]*)?//' | sort -u)"
+  # (b) edición IN-PLACE (`sed -i`, `perl -i`): el flag NO precede al archivo
+  #     — `sed -i s/a/b/ f.swift` pone el script en medio. Así que en estos
+  #     comandos se toman TODOS los tokens con pinta de ruta, que es
+  #     exactamente lo que `-i` va a reescribir.
+  case "$_CMD_CLEAN" in
+    *sed*-i*|*perl*-i*)
+      _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s\n' "$_CMD_CLEAN" | tr ' \t' '\n\n' \
+        | grep -E '(/|\.[A-Za-z0-9]+$)' | grep -vE '^-|^s/|/$' || true)" ;;
+  esac
+  # (c) cp/mv: el destino es el ÚLTIMO argumento.
+  case "$_CMD_CLEAN" in
+    *cp\ *|*mv\ *)
+      _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s' "$_CMD_CLEAN" | awk '{print $NF}')" ;;
+  esac
+  _MATRIX_BLOCK=""
+  while IFS= read -r _t; do
+    [ -z "$_t" ] && continue
+    _t="${_t#./}"
+    [ -e "$_t" ] || case "$_t" in */*) : ;; *) continue ;; esac
+    matrix_is_exempt "$_t" && continue
+    _miss="$(matrix_missing_refs "$_t" 2>/dev/null)"
+    [ -n "$_miss" ] && _MATRIX_BLOCK="${_MATRIX_BLOCK}  • ${_t}:"$'\n'"$(printf '%s' "$_miss" | sed 's/^/      - /')"$'\n'
+  done <<< "$_WRITE_TARGETS"
+  if [ -n "$_MATRIX_BLOCK" ]; then
+    hook_log_detection "skill-reminder" "bash-write" "matriz evadida por Bash" 1
+    hook_block_or_warn "🛑 Este comando ESCRIBE en rutas que exigen leer su referencia (AGENTS.md §11),
+y por Bash la matriz no te la había pedido todavía:
+
+${_MATRIX_BLOCK}
+Léelas con la tool Read y repite el comando. Y si lo que ibas a hacer era
+editar código, usa Edit en vez de \`sed -i\`: el harness ve esas ediciones,
+verifica el resultado en el mismo turno (post-edit-verify) y deja rastro."
+  fi
+fi
+
 # Solo gateamos `git commit`.
 [ "$IS_COMMIT" -eq 1 ] || hook_allow
 

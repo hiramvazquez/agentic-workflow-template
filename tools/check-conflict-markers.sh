@@ -19,7 +19,7 @@
 #
 # Contrato §14.3: exit 0 = limpio · 1 = marcadores commiteándose.
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 BAD=""
 while IFS= read -r f; do

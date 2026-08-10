@@ -9,7 +9,7 @@
 #
 # Sin candidatas (o sin backlog/): imprime nada y sale 0 — apto para cron.
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 [ -d backlog ] || exit 0
 

@@ -18,7 +18,7 @@
 #
 # Failure-open en parsing: si no puede leer counts, exit 0 (infra rota no traba).
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 JSON="tools/drift-ratchet.json"
 MODE="${1:---check}"

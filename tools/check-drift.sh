@@ -20,7 +20,7 @@
 #   - líneas de hallazgo con prefijo ❌ (error) o ⚠️ (warning)
 #   - última línea EXACTA:  DRIFT_SUMMARY errors=<N> warns=<M>
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 ERRORS=0; WARNS=0
 err() { echo "❌ $1"; ERRORS=$((ERRORS+1)); }

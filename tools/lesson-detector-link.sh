@@ -23,7 +23,7 @@
 #
 # Contrato de salida:  LESSONS_SUMMARY total=<N> sin_detector=<M>
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 DOC="${LESSONS_DOC:-docs/process/lessons_learned.md}"
 # El ARCHIVO se verifica igual que el doc vivo. Una lección archivada lo está

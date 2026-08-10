@@ -5,7 +5,7 @@
 #   - puntero a las reglas
 # Uso:  bash scripts/process-judge-context.sh [session_id]
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 SID="${1:-}"
 TRAJ_DIR=".agents/state/trajectory"
 

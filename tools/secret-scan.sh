@@ -12,7 +12,7 @@
 # Si gitleaks no está instalado: avisa cómo instalarlo y NO bloquea (failure-open
 # en local; en CI deberías hacerlo obligatorio — ver ci/run-gates.sh).
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 MODE="${1:---staged}"
 

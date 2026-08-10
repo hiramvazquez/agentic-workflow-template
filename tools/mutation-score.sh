@@ -22,7 +22,7 @@
 #   1. $MUTATION_SCORE_OVERRIDE  (tests del harness, o CI que ya lo calculó)
 #   2. el runner del stack, en la sección FILL de abajo
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 JSON="${MUTATION_RATCHET_JSON:-tools/mutation-ratchet.json}"
 MODE="${1:---check}"

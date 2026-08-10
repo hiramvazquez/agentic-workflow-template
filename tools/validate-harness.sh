@@ -20,7 +20,7 @@
 # Salida: exit 1 si algún check falla. Correr tras CADA update de
 # Claude Code / Cursor / Codex: sus contratos de hooks versionan rápido.
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 FAIL=0
 ok()   { echo "  ✅ $1"; }

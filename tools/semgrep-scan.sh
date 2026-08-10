@@ -32,7 +32,7 @@
 #
 # Contrato de stdout:  SEMGREP_SUMMARY errors=<N> warns=<M>
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 # Sin esto, semgrep intenta un version-check de red al arrancar y en redes
 # restringidas se CUELGA (no falla: espera). Misma lección que el bloque

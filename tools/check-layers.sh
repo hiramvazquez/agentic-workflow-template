@@ -13,7 +13,7 @@
 #   bash tools/check-layers.sh          # reporta y sale 1 si hay violaciones
 #   DRIFT_SRC_DIRS="app lib" bash …     # acota dónde buscar
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 CONF="${LAYERS_CONF:-tools/layers.conf}"
 ERRORS=0

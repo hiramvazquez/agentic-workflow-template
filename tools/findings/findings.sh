@@ -21,7 +21,7 @@
 #   bash tools/findings/findings.sh list [--status open] [--json]
 #   bash tools/findings/findings.sh render
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "❌ findings.sh necesita python3 (o usa findings.ts con Deno/Node)." >&2

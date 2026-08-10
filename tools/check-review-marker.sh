@@ -20,7 +20,7 @@
 #   bash tools/check-review-marker.sh --range    # sobre origin/main..HEAD (CI)
 #   REVIEWER_MARKER_TTL=1800 …                   # TTL en segundos (default 3600)
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 MODE="${1:---staged}"
 TTL="${REVIEWER_MARKER_TTL:-3600}"

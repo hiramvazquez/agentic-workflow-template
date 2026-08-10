@@ -16,7 +16,7 @@
 #   AI_REVIEW_REQUIRED 1 = su ausencia hace fallar el gate (default: 0 = avisa)
 #   AI_REVIEW_MODEL    modelo a usar (default: el de la config del runner)
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 BASE="${GATES_BASE_REF:-origin/main}"
 REQUIRED="${AI_REVIEW_REQUIRED:-0}"

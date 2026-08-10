@@ -388,3 +388,24 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   `test_add_sin_titulo_ni_area_falla_ruidoso`, `test_add_con_id_existente_falla_y_apunta_a_update`,
   `test_drop_sin_razon_se_rechaza`)
 - **Área:** tools/findings/findings.sh
+
+### [2026-08-09] La matriz de skills solo vigilaba las tools de edición, no Bash
+- **Qué pasó:** `skill-reminder` cuelga de `PreToolUse Edit|Write`, así que la matriz §11 solo
+  veía las tools de edición. Escribir con `sed -i`, `tee`, una redirección o un `python3 -c`
+  es escribir igual — y pasaba sin que NADIE mirara. Por ahí se coló una decisión de
+  arquitectura real (el cambio del aislamiento de actores del target) en el primer proyecto.
+  El agente no evadió nada a propósito: usó la herramienta equivocada para el trabajo.
+- **Causa raíz:** el gate se ató a una TOOL concreta en vez de a la ACCIÓN que quería vigilar.
+  Cualquier otra ruta hacia la misma acción queda fuera por construcción, y no se nota porque
+  el camino vigilado sigue funcionando perfectamente.
+- **Regla:** un gate se define por la acción (**escribir en un path de la matriz**), no por la
+  herramienta. Al añadir una defensa, la pregunta obligatoria es *¿de cuántas formas se puede
+  hacer esto?* — y hay que cubrirlas todas o declarar cuál queda fuera. Diseño: conservador en
+  la DETECCIÓN (solo formas de escritura inequívocas: `>`, `>>`, `sed -i`, `perl -i`, `tee`,
+  destino de `cp`/`mv`), no en el bloqueo. Un `cat` o un `grep` sobre el mismo archivo NO
+  disparan: bloquear lecturas legítimas es la vía más rápida a que alguien apague el gate
+  entero (ley del 10%). La lógica de la matriz vive en `lib/skill-matrix.sh`, compartida con
+  `skill-reminder` — implementarla dos veces habría reproducido el problema que la matriz
+  resolvió cuando vivía en cinco sitios y divergía.
+- **Detector:** tools/tests/test_bash_matrix.sh (9 tests, 5 de ellos de falso positivo)
+- **Área:** scripts/agent-hooks/reviewer-gate.sh §0c · scripts/agent-hooks/lib/skill-matrix.sh
