@@ -242,16 +242,25 @@ selftest() {
   # 3. secret-scan: un secreto con formato real staged DEBE bloquear.
   #    (La clave se ENSAMBLA para no dejar un patrón contiguo en este script.)
   #
-  #    ⚠️ La clave NO puede ser la CANÓNICA de la documentación de AWS (el
-  #    prefijo AKIA seguido de IOSFODNN7 y EXAMPLE — partida aquí a propósito,
-  #    ver abajo): es la de la documentación
-  #    oficial de AWS y gitleaks la ignora A PROPÓSITO (aparece en todos los
-  #    tutoriales). Con ella el selftest daba ❌ sobre un gate perfectamente
-  #    sano — verificado: misma clave en cualquier archivo → exit 0; cualquier
-  #    otra AKIA en el mismo archivo → exit 1. Un selftest con falsos positivos
-  #    se ignora entero, y entonces deja de proteger de los gates mudos, que es
-  #    justo para lo que existe (§14, ley del 10%).
-  #    Usa un formato válido pero NO canónico, como hace docs/ADOPTION.md §7.
+  #    ⚠️ La clave del fixture NO puede ser la CANÓNICA de la documentación de
+  #    AWS — el prefijo AKIA seguido de IOSFODNN7 y EXAMPLE. gitleaks la ignora
+  #    A PROPÓSITO (aparece en todos los tutoriales del mundo), así que con ella
+  #    el selftest daba ❌ sobre un gate perfectamente sano. Verificado en vivo:
+  #    esa misma clave en cualquier archivo → exit 0; cualquier otra AKIA en el
+  #    mismo archivo → exit 1. Un selftest con falsos positivos se ignora
+  #    entero, y entonces deja de proteger de los gates mudos, que es justo para
+  #    lo que existe (§14, ley del 10%). Usa un formato válido pero NO canónico,
+  #    como hace docs/ADOPTION.md §7.
+  #
+  #    ⚠️⚠️ Y POR ESO EL NOMBRE DE LA CLAVE VA PARTIDO ARRIBA, en trozos que no
+  #    forman el literal. NO lo "arregles" juntándolo para que se lea mejor:
+  #    `canon-enforce.sh` (CHECK 2) escanea los archivos recién escritos y una
+  #    clave AWS contigua en ESTE archivo bloquea el cierre de turno — incluido
+  #    el turno que la escribió. Le pasó a un agente en un proyecto real: vio el
+  #    nombre partido, lo unió por prolijidad, y se dejó el turno trabado.
+  #    La alternativa mala sería añadir este archivo a `is_detector_definition()`
+  #    del secret-scan: eso lo dejaría CIEGO a secretos de verdad para siempre.
+  #    Partir el literal cuesta una línea fea; cegar el detector cuesta el gate.
   if command -v gitleaks >/dev/null 2>&1; then
     ( cd "$SB/r" && printf 'aws_secret_access_key = "%s%s"\n' 'AKIA' '1234567890ABCDEF' > s.env.py \
       && git add s.env.py ) 2>/dev/null

@@ -4,6 +4,10 @@
 # al día", y el merge real de 3 vías — el cambio del template Y el relleno
 # local sobreviven juntos cuando no chocan.
 
+# El TEMPLATE trae `tools/upgrade.sh` desde su primer commit — como en la
+# realidad. Que el fixture lo omitiera escondía toda una clase de fallo: el
+# script NUNCA aparecía en el delta y por tanto nunca se probaba el caso en el
+# que la herramienta tiene que traerse a SÍ MISMA (f-upgrade-autoparcheo).
 _upg_sandbox() { # crea TEMPLATE (origen) y PROYECTO (clon) reales
   local base tpl prj
   base="$(mktemp -d)"; tpl="$base/tpl"; prj="$base/prj"
@@ -12,6 +16,7 @@ _upg_sandbox() { # crea TEMPLATE (origen) y PROYECTO (clon) reales
     cd "$tpl" || exit 1
     git init -q .; git config user.email t@t.t; git config user.name t
     stub scripts/gate.sh 'v1 maquinaria\n'
+    cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
     printf 'stack: <!-- FILL -->\n' > AGENTS.md
     git add -A; git commit -qm "template v1"
   )
@@ -20,16 +25,23 @@ _upg_sandbox() { # crea TEMPLATE (origen) y PROYECTO (clon) reales
     cd "$prj" || exit 1
     git config user.email p@p.p; git config user.name p
     git remote rename origin template 2>/dev/null
-    # upgrade.sh real + stubs de verificación en verde (aquí se prueba el
-    # flujo de merge, no la suite entera — esa tiene sus propios tests).
+    # stubs de verificación en verde (aquí se prueba el flujo de merge, no la
+    # suite entera — esa tiene sus propios tests). upgrade.sh viene del clone.
     mkdir -p tools/tests
-    cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
     printf '#!/usr/bin/env bash\nexit 0\n' > tools/tests/run-tests.sh
     stub tools/validate-harness.sh '#!/usr/bin/env bash\nexit 0\n'
-    git add -A; git commit -qm "proyecto: añade upgrade"
+    git add -A; git commit -qm "proyecto: stubs de verificación"
     TPL_DIR="$tpl" "$1"
   )
   local rc=$?; rm -rf "$base"; return $rc
+}
+
+_tpl_branch() { # nombre de la rama por defecto del remote 'template'
+  local b
+  for b in main master; do
+    git rev-parse -q --verify "refs/remotes/template/$b" >/dev/null 2>&1 && { printf '%s' "$b"; return 0; }
+  done
+  printf 'main'
 }
 
 _case_arbol_sucio_rehusa() {
@@ -101,6 +113,8 @@ _upg_sandbox_copia() { # TEMPLATE y PROYECTO con historias SEPARADAS
     cd "$tpl" || exit 1
     git init -q .; git config user.email t@t.t; git config user.name t
     stub scripts/gate.sh 'v2 maquinaria del template\n'
+    mkdir -p tools
+    cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
     printf 'stack: <!-- FILL -->\n' > AGENTS.md
     git add -A; git commit -qm "template"
   )
@@ -233,4 +247,103 @@ _case_sync_respeta_los_fill() {
 }
 test_sync_no_pisa_maquinaria_con_fill() {
   _upg_sandbox_copia _case_sync_respeta_los_fill
+}
+
+_case_fill_es_marcador_no_mencion() {
+  # La otra cara del test de arriba, y la que faltaba. `grep -q 'FILL'` a secas
+  # marcaba como "propiedad compartida" a cualquier archivo que solo NOMBRE la
+  # palabra: session-start.sh y inject-context.sh (que AVISAN de FILLs sin
+  # rellenar), bootstrap.sh, validate-harness.sh y el propio upgrade.sh. Esos
+  # cinco quedaban CONGELADOS para siempre en todo proyecto adoptado por copia
+  # — sin recibir un solo arreglo, y con el sync diciendo "🔒 no los toco, son
+  # tuyos" sobre archivos que nadie había personalizado nunca.
+  # Un marcador FILL es un COMENTARIO QUE EMPIEZA por `<!-- FILL`. Punto.
+  ( cd "$TPL_DIR" && mkdir -p scripts \
+    && stub scripts/detecta.sh '#!/usr/bin/env bash\ngrep -q "<!-- FILL" AGENTS.md && echo "te falta rellenar"\n# v2 del template\n' \
+    && git add -A && git commit -qm "template: detector que MENCIONA FILL" ) >/dev/null 2>&1
+  mkdir -p scripts
+  stub scripts/detecta.sh '#!/usr/bin/env bash\n# v1 vieja\n'
+  git add -A; git commit -qm "proyecto: version vieja del detector" 2>/dev/null
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'v2 del template' scripts/detecta.sh \
+    || { echo "    el sync saltó un archivo que solo MENCIONA FILL — queda congelado para siempre"; return 1; }
+}
+test_fill_es_un_marcador_no_una_mencion() {
+  _upg_sandbox_copia _case_fill_es_marcador_no_mencion
+}
+
+# ════════════════════════════════════════════════════════════════════
+# f-upgrade-autoparcheo — la herramienta no puede parchearse a sí misma
+# ════════════════════════════════════════════════════════════════════
+# Cazado en el SEGUNDO proyecto real, en la primera pasada. La v1 se
+# auto-actualizaba ESCRIBIENDO sobre `tools/upgrade.sh` en el árbol y
+# re-lanzándose desde ahí. Como `tools/*.sh` es maquinaria, el propio archivo
+# entraba en el delta — y `git apply --3way` exige worktree == índice para todo
+# lo que toca:
+#
+#     error: tools/upgrade.sh: does not match index
+#
+# El parche ENTERO abortaba. O sea: el mecanismo que reparte los arreglos se
+# rompía justo cuando el arreglo le tocaba a él. Estos tres tests cubren las
+# dos topologías + la transición desde la v1.
+_case_sync_delta_incluye_upgrade() {
+  bash tools/upgrade.sh >/dev/null 2>&1          # 1ª pasada: registra la base
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  ( cd "$TPL_DIR" && printf '\n# cambio-del-template-en-upgrade\n' >> tools/upgrade.sh \
+    && stub scripts/gate.sh 'v3 maquinaria\n' \
+    && git add -A && git commit -qm "template: toca upgrade.sh Y otra pieza" ) >/dev/null 2>&1
+  local out; out="$(bash tools/upgrade.sh 2>&1)"
+  case "$out" in *"does not match index"*)
+    echo "    el delta abortó: el script se parcheó a sí mismo mientras corría"; return 1 ;;
+  esac
+  grep -q 'v3 maquinaria' scripts/gate.sh \
+    || { echo "    el delta no llegó a aplicarse: $out"; return 1; }
+  grep -q 'cambio-del-template-en-upgrade' tools/upgrade.sh \
+    || { echo "    el delta no actualizó tools/upgrade.sh (la herramienta no se recibe a sí misma)"; return 1; }
+}
+test_sync_aplica_un_delta_que_incluye_al_propio_upgrade() {
+  _upg_sandbox_copia _case_sync_delta_incluye_upgrade
+}
+
+_case_merge_delta_incluye_upgrade() {
+  # La MISMA trampa en la otra topología, y con otro mensaje de error: con el
+  # archivo sucio, `git merge` se niega en seco ("your local changes would be
+  # overwritten") y el script lo reportaba como fallo fatal del merge.
+  ( cd "$TPL_DIR" && printf '\n# v-nueva-del-template\n' >> tools/upgrade.sh \
+    && stub scripts/gate.sh 'v2 maquinaria\n' \
+    && git add -A && git commit -qm "template v2 + upgrade" ) >/dev/null 2>&1
+  local out rc; out="$(bash tools/upgrade.sh 2>&1)"; rc=$?
+  case "$out" in *"overwritten by merge"*|*"does not match index"*)
+    echo "    el auto-parcheo bloqueó su propio merge"; return 1 ;;
+  esac
+  [ "$rc" = "0" ] || { echo "    el merge con upgrade.sh en el delta devolvió $rc: $out"; return 1; }
+  grep -q 'v-nueva-del-template' tools/upgrade.sh \
+    || { echo "    tras el merge NO llegó la versión nueva de upgrade.sh"; return 1; }
+  grep -q 'v2 maquinaria' scripts/gate.sh || { echo "    no llegó el resto de maquinaria"; return 1; }
+}
+test_merge_funde_un_delta_que_incluye_al_propio_upgrade() {
+  _upg_sandbox _case_merge_delta_incluye_upgrade
+}
+
+_case_puente_desde_la_v1() {
+  # La transición: un proyecto cuyo upgrade.sh es v1 se auto-parchea sobre el
+  # árbol y re-lanza con UPGRADE_SELF_UPDATED=1. La v2 tiene que salir de ese
+  # estado sola, en UNA pasada. Si no, el arreglo del auto-parcheo solo se
+  # instala... commiteando a mano el auto-parcheo. Que es el bug otra vez.
+  bash tools/upgrade.sh >/dev/null 2>&1
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  ( cd "$TPL_DIR" && printf '\n# v-nueva-del-template\n' >> tools/upgrade.sh \
+    && stub scripts/gate.sh 'v3 maquinaria\n' \
+    && git add -A && git commit -qm "template v3" ) >/dev/null 2>&1
+  git fetch -q template 2>/dev/null
+  git show "template/$(_tpl_branch):tools/upgrade.sh" > tools/upgrade.sh 2>/dev/null
+  local out; out="$(UPGRADE_SELF_UPDATED=1 bash tools/upgrade.sh 2>&1)"
+  case "$out" in *"does not match index"*|*"cambios sin commitear"*)
+    echo "    el puente desde la v1 no despeja el auto-parcheo: $out"; return 1 ;;
+  esac
+  grep -q 'v3 maquinaria' scripts/gate.sh \
+    || { echo "    tras el puente no llegó la maquinaria: $out"; return 1; }
+}
+test_puente_desde_el_mecanismo_viejo_de_autoactualizacion() {
+  _upg_sandbox_copia _case_puente_desde_la_v1
 }

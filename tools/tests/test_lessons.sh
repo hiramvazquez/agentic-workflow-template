@@ -93,6 +93,36 @@ _case_ejemplo_en_comentario_html() {
 }
 test_ejemplo_en_comentario_html_no_cuenta() { _lessons_sandbox _case_ejemplo_en_comentario_html; }
 
+_case_leccion_que_habla_de_comentarios_html() {
+  # Falso positivo REAL, y de los caros: al escribir la lección que explica la
+  # regla de los marcadores `<!-- FILL`, ese texto —entre acentos, en medio de
+  # una frase— abrió un "comentario HTML" para el filtro, que se tragó el resto
+  # del documento: el campo `Detector:` de esa lección Y la lección siguiente
+  # ENTERA. El gate reportó huérfana a una lección que sí tenía detector, y dejó
+  # de contar otra. Es exactamente el patrón que este harness persigue: el
+  # detector se disparó con el TEXTO QUE HABLA de la cosa, no con la cosa.
+  mkdir -p tools/semgrep/rules; echo 'rules: []' > tools/semgrep/rules/universal.yaml
+  _doc '# Lecciones
+
+### [2026-01-01] Un marcador es una forma, no una palabra
+- **Regla:** un marcador FILL es un comentario que EMPIEZA por `<!-- FILL`.
+- **Detector:** tools/semgrep/rules/universal.yaml
+- **Área:** tools/
+
+### [2026-01-02] La lección de después, que no debe desaparecer
+- **Detector:** tools/semgrep/rules/universal.yaml
+- **Área:** tools/'
+  local out; out="$(bash tools/lesson-detector-link.sh 2>&1)"
+  case "$out" in *"total=2"*) : ;; *)
+    echo "    el filtro se tragó una lección entera: $out"; return 1 ;; esac
+  case "$out" in *"sin_detector=0"*) return 0 ;; esac
+  echo "    FALSO POSITIVO: una lección que MENCIONA \`<!--\` perdió su Detector: $out"
+  return 1
+}
+test_mencionar_un_comentario_html_no_abre_un_comentario_html() {
+  _lessons_sandbox _case_leccion_que_habla_de_comentarios_html
+}
+
 _case_encabezado_de_prosa() {
   # El propio doc tiene encabezados `###` explicativos que NO son lecciones.
   # Contarlos fue un falso positivo real (PRD 0001 §18). Una entrada se

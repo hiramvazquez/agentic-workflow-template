@@ -38,13 +38,28 @@ ARCHIVE="${LESSONS_ARCHIVE:-docs/process/lessons_archive.md}"
 # lo que viva dentro de comentarios HTML (ejemplos del template) o de bloques
 # de código con ``` (la plantilla de entrada). Contar esos sería el clásico
 # falso positivo que mata la confianza en un detector.
+# Ojo al matiz, que costó un falso positivo real: la máquina de estados decide
+# sobre una versión SONDA de la línea, no sobre la línea cruda. Dos cosas se
+# borran de la sonda antes de mirar:
+#   · los spans de código `entre acentos` — una lección que HABLA de `<!-- FILL`
+#     no está abriendo un comentario. Sin esto, la primera lección que explicaba
+#     la regla de los marcadores FILL se tragó su propio campo `Detector:` y el
+#     gate la reportó como huérfana: el detector se disparó con el texto que
+#     habla de la cosa en vez de con la cosa.
+#   · los comentarios que abren y cierran en la MISMA línea — no abren bloque.
+# El `print` sigue siendo de la línea ORIGINAL: la sonda solo decide.
 _strip() {
   awk '
     /^[[:space:]]*```/ { fence = !fence; next }
     fence              { next }
-    /<!--/             { inc = 1 }
-    !inc               { print }
-    /-->/              { inc = 0 }
+    {
+      probe = $0
+      gsub(/`[^`]*`/, "", probe)
+      gsub(/<!--.*-->/, "", probe)
+      if (probe ~ /<!--/) inc = 1
+      if (!inc) print
+      if (probe ~ /-->/)  inc = 0
+    }
   ' "$1"
 }
 ACTIVE="$(_strip "$DOC")"

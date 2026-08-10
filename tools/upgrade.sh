@@ -41,7 +41,12 @@ REMOTE="template"
 URL="${1:-}"
 
 # ── Guard 1: árbol limpio — un merge sobre trabajo a medias es dolor ─
-# Excepción: el propio upgrade.sh recién auto-actualizado (ver más abajo).
+# Excepción ÚNICA y transitoria: `tools/upgrade.sh` sucio cuando venimos
+# re-lanzados por una copia v1, que se auto-parcheaba sobre el árbol. La v2 ya
+# no ensucia nada (corre desde /tmp), pero esta excepción tiene que seguir aquí
+# hasta que ningún proyecto arranque con una v1 — si la quitas, la pasada de
+# transición muere aquí mismo con "hay cambios sin commitear", que es
+# exactamente el mensaje menos útil posible para lo que está pasando.
 DIRTY="$(git status --porcelain 2>/dev/null | grep -vE '^\?\?' || true)"
 if [ -n "${UPGRADE_SELF_UPDATED:-}" ]; then
   DIRTY="$(printf '%s\n' "$DIRTY" | grep -v 'tools/upgrade\.sh$' || true)"
@@ -76,32 +81,72 @@ if [ -z "$BRANCH" ]; then
 fi
 # ════════════════════════════════════════════════════════════════════
 # AUTO-ACTUALIZACIÓN: la herramienta que trae los arreglos no puede ser
-# la única que nunca los recibe
+# la única que nunca los recibe — pero TAMPOCO puede parchearse a sí misma
 # ════════════════════════════════════════════════════════════════════
 # Problema de arranque, cazado en vivo: se arregló `upgrade.sh` en el
 # template para soportar proyectos adoptados por copia... y el proyecto que
 # lo necesitaba seguía ejecutando SU copia vieja, que fallaba igual. El
 # arreglo estaba a un comando de distancia y era inalcanzable con el propio
 # mecanismo — como una actualización de software que solo se puede instalar
-# con la versión actualizada.
+# con la versión actualizada. De ahí la auto-actualización.
 #
-# Por eso este script se pone al día a sí mismo ANTES que nada y se re-lanza.
-# Se ejecuta un proceso NUEVO (`exec bash`) en vez de seguir con el archivo
-# reemplazado bajo los pies: bash lee los scripts de forma incremental y
-# sobrescribir el que está corriendo produce comportamientos absurdos.
-if [ -z "${UPGRADE_SELF_UPDATED:-}" ]; then
-  _SELF_NEW="$(mktemp)"
-  if git show "$REMOTE/$BRANCH:tools/upgrade.sh" > "$_SELF_NEW" 2>/dev/null \
-     && [ -s "$_SELF_NEW" ] && ! cmp -s "$_SELF_NEW" tools/upgrade.sh; then
-    cp "$_SELF_NEW" tools/upgrade.sh && chmod +x tools/upgrade.sh
-    rm -f "$_SELF_NEW"
-    echo "🔄 upgrade: tu tools/upgrade.sh estaba desactualizado. Lo he puesto al día"
-    echo "   desde el template y me re-lanzo con la versión nueva."
-    echo "   (Queda modificado en tu árbol: entra en el commit del upgrade.)"
+# La v1 de esa auto-actualización la hacía ESCRIBIENDO sobre `tools/upgrade.sh`
+# en el árbol y re-lanzándose desde ahí. Sonaba razonable y era el bug: el
+# archivo quedaba SUCIO respecto al índice, y más abajo (modo SYNC) el delta
+# se aplica con `git apply --3way`, que exige worktree == índice para todo lo
+# que toca. Como `tools/*.sh` es maquinaria, el delta incluía este archivo y
+# git abortaba el parche ENTERO:
+#
+#     error: tools/upgrade.sh: does not match index
+#
+# O sea: el mecanismo que reparte los arreglos se rompía a sí mismo justo
+# cuando el arreglo le tocaba a él. Cazado en el segundo proyecto real, en la
+# primera pasada (f-upgrade-autoparcheo).
+#
+# La regla que queda, y que vale para cualquier herramienta que se actualice
+# a sí misma: **el proceso que corre nunca escribe sobre su propio archivo.**
+# Ejecutamos la versión nueva desde una copia TEMPORAL (`exec bash /tmp/...`)
+# y dejamos que `tools/upgrade.sh` llegue al árbol por el mismo camino que
+# todas las demás piezas de maquinaria — el sync/merge de abajo. Un camino
+# menos, y encima el que tenía el caso especial.
+#
+# (`exec` y no `source`: bash lee los scripts de forma incremental por offset,
+# así que reemplazar el archivo en ejecución produce comportamientos absurdos.)
+_SELF="tools/upgrade.sh"
+
+if [ -z "${UPGRADE_SELF_TMP:-}" ]; then
+  _SELF_NEW="$(mktemp)"; _REEXEC=0
+  if git show "$REMOTE/$BRANCH:$_SELF" > "$_SELF_NEW" 2>/dev/null && [ -s "$_SELF_NEW" ]; then
+    cmp -s "$_SELF_NEW" "$_SELF" || _REEXEC=1
+  fi
+  # PUENTE desde la v1: si una copia anterior ya se auto-parcheó sobre el
+  # árbol y nos re-lanzó desde ahí, seguimos corriendo desde el archivo del
+  # repo. Hay que salir de él igual, o el `git apply` de abajo aborta. Este
+  # bloque es lo único que hace que la transición de v1 a v2 sea una sola
+  # pasada en vez de un "commitea el auto-parche y vuelve a correr".
+  if ! git diff --quiet -- "$_SELF" 2>/dev/null; then
+    [ -s "$_SELF_NEW" ] || cp "$_SELF" "$_SELF_NEW"
+    _REEXEC=1
+  fi
+  if [ "$_REEXEC" = "1" ] && [ -s "$_SELF_NEW" ]; then
+    chmod +x "$_SELF_NEW"
+    echo "🔄 upgrade: corro la versión del template desde una copia temporal."
+    echo "   Tu tools/upgrade.sh NO se toca aquí — llega por el propio sync,"
+    echo "   como cualquier otra pieza de maquinaria."
     echo ""
-    UPGRADE_SELF_UPDATED=1 exec bash tools/upgrade.sh "$@"
+    UPGRADE_SELF_UPDATED=1 UPGRADE_SELF_TMP="$_SELF_NEW" exec bash "$_SELF_NEW" "$@"
   fi
   rm -f "$_SELF_NEW"
+else
+  # Somos el proceso re-lanzado: la copia temporal es nuestra y se va con nosotros.
+  trap 'rm -f "$UPGRADE_SELF_TMP"' EXIT
+  # Segunda mitad del puente: ya NO corremos desde el archivo del repo, así que
+  # devolverlo a su estado commiteado es seguro. Sin esto, el auto-parche de la
+  # v1 seguiría ensuciando el índice y el delta seguiría abortando.
+  if ! git diff --quiet -- "$_SELF" 2>/dev/null; then
+    git checkout -q -- "$_SELF" 2>/dev/null \
+      && echo "🔁 upgrade: deshecho el auto-parcheo de $_SELF en tu árbol (llegará por el sync)."
+  fi
 fi
 
 # La topología se detecta ANTES de decidir si hay novedades: sin ancestro
@@ -156,6 +201,27 @@ git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
 # archivo-por-fuera-de-upgrade; la verificación de abajo es la red).
 SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/tests tools/semgrep/rules tools/metrics .github/workflows"
 SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
+
+# ── Qué cuenta como marcador FILL (y qué NO) ────────────────────────
+# Un marcador FILL es un COMENTARIO QUE EMPIEZA por `<!-- FILL`. Ni la palabra
+# suelta, ni un `grep` que la busque, ni una mención en prosa.
+#
+# La primera versión era `grep -q 'FILL'` a secas, y ese matiz no es cosmético:
+# con esa regla quedaban marcados como "propiedad compartida" —y por tanto
+# CONGELADOS para siempre, sin volver a recibir un solo arreglo— cinco archivos
+# de maquinaria pura que solo NOMBRAN la palabra:
+#
+#   · scripts/agent-hooks/session-start.sh   (avisa de FILLs sin rellenar)
+#   · scripts/agent-hooks/inject-context.sh  (idem)
+#   · scripts/bootstrap.sh                   (`grep -rn 'FILL:'` en un echo)
+#   · tools/validate-harness.sh              (comprueba si run-gates sigue en FILL)
+#   · tools/upgrade.sh                       (este archivo, en su cabecera)
+#
+# El daño es del peor tipo que persigue este harness: silencioso, permanente y
+# con cara de éxito — el sync decía "🔒 no tocados, son tuyos" sobre archivos
+# que nadie había personalizado nunca. Y la ironía: quien más lo sufría era el
+# VERIFICADOR (validate-harness) y el propio upgrade.
+FILL_MARKER='^[[:space:]]*([#;]|//|--)?[[:space:]]*<!--[[:space:]]*FILL'
 
 # ⚠️  NO se delega el matching en git. Dos capas de fallo silencioso vividas
 # aquí, una debajo de la otra:
@@ -305,7 +371,7 @@ else
     #    propiedad compartida y no se pisa jamás — se reporta.**
     while IFS= read -r f; do
       [ -z "$f" ] && continue
-      if git show "$REMOTE/$BRANCH:$f" 2>/dev/null | grep -q 'FILL'; then
+      if git show "$REMOTE/$BRANCH:$f" 2>/dev/null | grep -qE "$FILL_MARKER"; then
         if [ -f "$f" ]; then
           _FILL_LIST="${_FILL_LIST}${f}"$'\n'; _SYNC_FILL=$((_SYNC_FILL+1)); continue
         fi

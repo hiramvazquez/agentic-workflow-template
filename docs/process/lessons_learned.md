@@ -510,3 +510,94 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   bloque) + el propio `_comment_findings_allow` de .claude/settings.json, que documenta por qué
   este allow no contradice el invariante nº1
 - **Área:** .claude/settings.json · tools/findings/
+
+### [2026-08-10] La herramienta que reparte los arreglos no puede parchearse a sí misma
+- **Qué pasó:** `tools/upgrade.sh` se auto-actualizaba **escribiendo sobre su propio archivo**
+  en el árbol y re-lanzándose desde ahí. Como `tools/*.sh` es maquinaria, el propio script
+  entraba en el delta del sync, y `git apply --3way` —que exige worktree == índice para todo lo
+  que toca— abortaba el parche ENTERO con `error: tools/upgrade.sh: does not match index`. En la
+  otra topología el síntoma era distinto y el diagnóstico peor: `git merge` se negaba con
+  *"your local changes would be overwritten"* y el script lo reportaba como fallo fatal del
+  merge. Cazado en el segundo proyecto real, en la primera pasada de un upgrade.
+- **Causa raíz:** el mecanismo se dio a sí mismo un camino especial. Todo lo demás llega al
+  árbol por el sync/merge; solo este archivo se traía a mano, antes de tiempo, y esa excepción
+  ensuciaba el índice justo para la operación que venía después. Un caso especial creado para
+  resolver un problema de arranque real (una v1 no puede traerse los arreglos de la v2) acabó
+  rompiendo el caso normal.
+- **Regla:** **un proceso nunca escribe sobre el archivo que está ejecutando.** Si una
+  herramienta debe correr una versión más nueva de sí misma, extrae esa versión a una copia
+  temporal y `exec` sobre ella (`exec`, no `source`: bash lee los scripts por offset y
+  reemplazar el archivo en ejecución produce comportamientos absurdos). El archivo del árbol se
+  actualiza por el mismo camino que todas las demás piezas. Corolario de diseño: **cuando algo
+  necesita una excepción al camino común, el sitio donde la excepción se cruza con el camino
+  común es donde va a romper** — y ahí es donde hay que poner el test.
+- **Detector:** tools/tests/test_upgrade.sh::test_sync_aplica_un_delta_que_incluye_al_propio_upgrade
+  + ::test_merge_funde_un_delta_que_incluye_al_propio_upgrade
+  + ::test_puente_desde_el_mecanismo_viejo_de_autoactualizacion (los tres reproducen el error
+  literal contra la versión vieja; el fixture ahora incluye `upgrade.sh` en el template, que es
+  lo que escondía la clase entera de fallo)
+- **Área:** tools/upgrade.sh
+
+### [2026-08-10] Un marcador es una FORMA, no una palabra: `grep FILL` congeló media maquinaria
+- **Qué pasó:** el sync protege de sobreescritura todo archivo que el template marque con un
+  `<!-- FILL -->` (la regla de propiedad compartida, escrita tras pisar el guard del `.pbxproj`
+  de un proyecto real). Estaba implementada como `grep -q 'FILL'` a secas. Resultado: quedaban
+  marcados como "tuyos, no los toco" cinco archivos de maquinaria pura que solo NOMBRAN la
+  palabra — `session-start.sh` e `inject-context.sh`, que precisamente **avisan** de FILLs sin
+  rellenar; `bootstrap.sh`, que la cita en un `echo`; `validate-harness.sh`, que comprueba si
+  `run-gates.sh` sigue en FILL; y el propio `upgrade.sh`, que la menciona en su cabecera. Esos
+  cinco no habrían vuelto a recibir un solo arreglo en ningún proyecto adoptado por copia.
+- **Causa raíz:** el detector buscaba el **tema** en vez de la **forma**. Es la misma familia
+  que `grep 'try!'` matcheando el comentario que dice "no uses try!" (§14.2, por lo que los
+  patrones viven en Semgrep y no en grep), pero con el signo del daño invertido: en vez de ruido
+  visible, silencio permanente con cara de éxito — el sync reportaba "🔒 no tocados, son tuyos"
+  sobre archivos que nadie había personalizado nunca. Y la ironía: los que más lo sufrían eran
+  el verificador y el propio actualizador.
+- **Regla:** un marcador se reconoce por su forma completa y anclada, no por su palabra clave.
+  Aquí: **un marcador FILL es un COMENTARIO QUE EMPIEZA por `<!-- FILL`**
+  (`^[[:space:]]*([#;]|//|--)?[[:space:]]*<!--[[:space:]]*FILL`). Una mención en prosa, un
+  `grep` que lo busca o un fixture de test NO lo son. Regla general: **si un detector puede
+  dispararse con el texto que HABLA de la cosa, no está mirando la cosa.**
+- **Detector:** tools/tests/test_upgrade.sh::test_fill_es_un_marcador_no_una_mencion (un archivo
+  del template que solo menciona FILL DEBE sincronizarse) junto a ::test_sync_no_pisa_maquinaria_con_fill
+  (la otra cara: un marcador de verdad NO se pisa). Los dos juntos fijan la frontera.
+- **Área:** tools/upgrade.sh
+
+### [2026-08-10] Un literal partido a propósito lleva escrito POR QUÉ, o el siguiente lo junta
+- **Qué pasó:** en `validate-harness.sh` el nombre de la clave AWS del fixture va partido en
+  trozos que no forman el literal contiguo. El comentario decía "partida aquí a propósito, ver
+  abajo" — y abajo no había nada. Un agente en un proyecto real lo vio, lo unió por prolijidad,
+  y `canon-enforce.sh` (CHECK 2, que escanea lo recién escrito) le trabó el cierre de turno. El
+  arreglo local que explicaba el porqué no estaba en el template, así que la divergencia
+  reaparecía en cada sync y cada vez había que volver a decidir lo mismo.
+- **Causa raíz:** el código feo sin su razón se lee como código feo. Una defensa cuyo motivo no
+  está a la vista se percibe como un descuido, y limpiarla parece una mejora.
+- **Regla:** todo literal deliberadamente partido, silenciado o retorcido lleva **en la línea de
+  al lado** qué lo rompe si lo juntas. Y el corolario que ya estaba y ahora está escrito donde
+  se necesita: la salida fácil —añadir el archivo a `is_detector_definition()` del secret-scan—
+  deja ese archivo CIEGO a secretos de verdad para siempre. Partir el literal cuesta una línea
+  fea; cegar el detector cuesta el gate.
+- **Detector:** tools/validate-harness.sh (el propio comentario, ahora completo) +
+  tools/tests/test_secret_scan.sh (fija que una clave AWS no canónica en un archivo cualquiera
+  bloquea, o sea: que juntar el literal aquí volvería a trabar el turno)
+- **Área:** tools/validate-harness.sh · docs/ADOPTION.md §7
+
+### [2026-08-10] El filtro del propio verificador de lecciones se tragó una lección
+- **Qué pasó:** al escribir la entrada de arriba sobre los marcadores FILL, el texto citaba
+  ese marcador entre acentos, en medio de una frase. `lesson-detector-link.sh` filtra los
+  ejemplos que viven dentro de comentarios HTML con una máquina de estados por líneas, y esa
+  mención le abrió un comentario que nunca se cerraba: se tragó el campo `Detector:` de esa
+  lección **y la lección siguiente entera**. El gate reportó huérfana una entrada que sí tenía
+  detector, y bajó el total sin que nadie lo notara.
+- **Causa raíz:** la misma de la entrada anterior, una capa más arriba y cometida al
+  documentarla: un filtro que decide sobre el texto crudo se dispara con el texto que **habla**
+  del marcado. Y el modo de fallo elegido —tragarse el resto— convierte un falso positivo local
+  en un apagón silencioso del resto del documento.
+- **Regla:** un filtro de marcado decide sobre una versión **sonda** de la línea, no sobre la
+  línea cruda: fuera los spans de código entre acentos y fuera los comentarios que abren y
+  cierran en la misma línea. Y regla de diseño para cualquier máquina de estados que "salta"
+  contenido: **prefiere el modo de fallo que muestra de más al que oculta de más** — de más se
+  ve y se corrige; de menos se parece a que no había nada.
+- **Detector:** tools/tests/test_lessons.sh::test_mencionar_un_comentario_html_no_abre_un_comentario_html
+  (una lección que menciona un comentario HTML conserva su Detector Y no borra la siguiente)
+- **Área:** tools/lesson-detector-link.sh
