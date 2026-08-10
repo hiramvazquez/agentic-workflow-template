@@ -35,12 +35,15 @@
       "Bash(bash tools/drift-ratchet.sh --check)",
       "Bash(bash tools/validate-harness.sh)",
       "Bash(bash ci/run-gates.sh)",
+      "Bash(bash tools/findings/findings.sh:*)",
+      "Bash(bash tools/check-diff-nature.sh:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)"
     ]
   },
 
+  "_comment_findings_allow": "findings.sh está en `allow` A PROPÓSITO, y no contradice el principio de desconfiar de la evidencia escrita por el modelo: el ledger NO es evidencia, es un INVENTARIO que AGENTS.md §10 obliga al agente a mantener (\"reportar = loguear al ledger\"). Los archivos de los que sí desconfiamos —el marker de review y los trinquetes— siguen denegados. Sin este allow, un run headless no podía usar el CLI y escribía el JSONL A MANO: exactamente lo que no queremos, porque el CLI valida esquema, deduplica por id y protege los estados terminales, y la escritura a mano no hace nada de eso. Denegar la herramienta segura no impide la escritura: la empuja al camino inseguro.",
   "_comment_ratchets": "Los dos *-ratchet.json y tools/preset están en `deny` de Write/Edit a propósito: son TRINQUETES y el interruptor de los gates. Los ratchets solo los actualiza su propio script (`--update`), que impone la dirección permitida — drift solo baja, mutación solo sube. Nota: `--update` de drift-ratchet NO está en allow a propósito: aflojar un trinquete requiere intervención del humano.",
 
   "_comment_marker_deny": "`.agents/state/**` y `Bash(*reviewer_run.txt*)` son mitigación PARCIAL, declarada como tal: frenan un `cat > marker` naive, pero una redirección construida dinámicamente las rodea (ver f-marker-spoof en tools/findings/). Efecto secundario conocido: los patrones de Bash no distinguen leer de escribir, así que también bloquean `cat marker`. Para INSPECCIONAR el marker usa la tool Read, que no está denegada. La defensa real contra un agente adversario no es esto: es el Anillo 3, donde el marker no viaja.",

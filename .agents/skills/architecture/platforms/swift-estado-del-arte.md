@@ -102,3 +102,32 @@ sección estable si aplican.
 ---
 *Fuentes del snapshot: swift.org (Swift 6.2 released), guías de Approachable Concurrency,
 resúmenes WWDC26. Verifica contra la doc oficial al refrescar.*
+
+## ⚠️ `switch try await` rompe el parser de semgrep (y con él, el nivel 2 del archivo ENTERO)
+
+Confirmado con fixtures aislados en un proyecto real:
+
+| Código | Errores de parseo | ¿Detecta un `try!` en el mismo archivo? |
+|---|---:|---|
+| `switch try await load() { … }` | 1 | ❌ **no** |
+| `let x = try await load(); switch x { … }` | 0 | ✅ sí |
+
+Es **peor** que el caso de `#Preview`: aquel solo perdía lo que iba detrás de la macro; este
+deja **el archivo completo sin escanear**. Y es Swift perfectamente idiomático, así que nadie
+sospecharía de él.
+
+**Convención mientras la gramática de semgrep no lo soporte:** liga el resultado a una
+variable antes del `switch`.
+
+```swift
+// ❌ el archivo entero deja de escanearse en el nivel 2
+switch try await repository.fetchMovies() { … }
+
+// ✅ mismo comportamiento, y el archivo sí se escanea
+let outcome = try await repository.fetchMovies()
+switch outcome { … }
+```
+
+No es un capricho de estilo: la alternativa es tener un archivo de producto donde ninguna
+regla AST corre y nadie te lo dice. Cuando `semgrep-scan` avise de `PartialParsing`, mira si
+hay un `switch try` antes de asumir que es un `#Preview`.

@@ -1,0 +1,37 @@
+# ════════════════════════════════════════════════════════════════════
+# .semgrepignore — qué NO escanea el nivel 2
+# ════════════════════════════════════════════════════════════════════
+# El daño de no tener este archivo no es el TIEMPO, es el RUIDO. Sin él,
+# semgrep escaneaba copias enteras del proyecto que viven dentro del repo
+# —worktrees del backlog runner, la copia `_mutated` que genera muter (20 MB
+# en un caso real)— y los avisos de PartialParsing salían mezclados con
+# archivos ajenos al cambio. Un aviso ruidoso se deja de leer, y así es
+# exactamente como se pierde el aviso de verdad (ley del 10%, AGENTS §14.2).
+#
+# Regla para ampliarlo: aquí van COPIAS y ARTEFACTOS, jamás código fuente
+# que quieras excluir porque "da muchos hallazgos". Eso último es desactivar
+# el gate con otro nombre.
+
+# ── Copias del propio proyecto que viven dentro del repo ─────────────
+.agents/worktrees/
+*_mutated/
+.muter/
+
+# ── Estado local del harness (gitignored, no es código) ──────────────
+.agents/state/
+
+# ── Artefactos de build por plataforma ───────────────────────────────
+.build/
+DerivedData/
+build/
+Pods/
+Carthage/
+node_modules/
+dist/
+target/
+.gradle/
+vendor/
+
+# ── Dependencias gestionadas ─────────────────────────────────────────
+*.xcframework/
+Packages/

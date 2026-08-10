@@ -71,6 +71,11 @@ fi
 OUT="$(mktemp)"; trap 'rm -f "$OUT"' EXIT
 
 # --error hace que semgrep salga !=0 con findings; lo gestionamos nosotros.
+# `--no-git-ignore` a propósito (queremos ver archivos no trackeados), pero
+# eso NO desactiva `.semgrepignore`, que es donde declaramos las COPIAS del
+# proyecto que viven dentro del repo (worktrees del backlog, la copia
+# `_mutated` de muter). Sin ese archivo, los avisos de PartialParsing salían
+# mezclados con código ajeno al cambio — y un aviso ruidoso se deja de leer.
 semgrep scan \
   --config "$RULES_DIR" \
   --json --quiet --no-git-ignore \

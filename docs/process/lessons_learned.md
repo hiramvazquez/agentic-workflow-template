@@ -462,3 +462,51 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   (un grep produciría ruido). La red real: `tools/tests/test_upgrade.sh` fija que AMBAS
   topologías funcionan, así que el documento puede describirlas sin mentir.
 - **Área:** docs/ADOPTION.md §1 y §9b
+
+### [2026-08-09] Sin `.semgrepignore`, el nivel 2 escaneaba copias del propio proyecto
+- **Qué pasó:** semgrep escaneaba 22 `.swift` de más, entre ellos una copia `_mutated` de muter
+  de 20 MB que vive **dentro** del repo, y los worktrees del backlog runner. El daño real no
+  fue el tiempo: los avisos de `PartialParsing` salían mezclados con archivos ajenos al cambio.
+- **Causa raíz:** el harness genera copias del proyecto dentro del propio repo (worktrees para
+  aislar historias, copias mutadas para el nivel 4) y nunca le dijo al escáner que las ignorara.
+  Una herramienta que crea artefactos tiene que declararlos a las que leen el árbol.
+- **Regla:** `.semgrepignore` versionado con las copias y artefactos. Y el criterio para
+  ampliarlo: ahí van COPIAS y ARTEFACTOS, **jamás** código fuente que excluyas porque "da
+  muchos hallazgos" — eso es desactivar el gate con otro nombre. El corolario general:
+  **un aviso ruidoso se deja de leer, y así es como se pierde el aviso de verdad.**
+- **Detector:** .semgrepignore versionado + tools/semgrep-scan.sh (documenta que
+  `--no-git-ignore` NO desactiva el ignore) + tools/tests/test_shell_hygiene.sh
+- **Área:** .semgrepignore · tools/semgrep-scan.sh
+
+### [2026-08-09] Un test que se cuelga es peor que un test que falla
+- **Qué pasó:** al inyectar un mutante en el guard de reentrada de un ViewModel, el test entró
+  en deadlock y **colgó la suite** en vez de fallarla. Hubo que repetir con
+  `-test-timeouts-enabled YES`. En CI eso habría consumido el job entero sin decir nada.
+- **Causa raíz:** el runner asumía que un test termina. Un rojo te dice qué pasa en segundos;
+  un cuelgue no dice nada durante una hora, y encima parece "está trabajando".
+- **Regla:** todo runner de tests impone un límite por test. En el harness lo hace un perro
+  guardián en segundo plano (`_run_test` en `run-tests.sh`), no `timeout`: los tests son
+  FUNCIONES de shell y `timeout` solo ejecuta binarios. Y ojo al detalle que colgó el primer
+  intento — los hijos en background deben ir con stdout DESATADO del pipe del llamador, o la
+  sustitución de comandos espera al perro guardián y el mecanismo anti-cuelgue cuelga la suite.
+  En proyectos Swift: `-test-timeouts-enabled YES` en el comando de tests de AGENTS.md §2.
+- **Detector:** tools/tests/run-tests.sh (`_run_test`, verificado con un test que duerme más
+  que el límite: devuelve 124 y explica que se colgó)
+- **Área:** tools/tests/run-tests.sh · AGENTS.md §2
+
+### [2026-08-09] Denegar la herramienta segura no impide la escritura: la empuja al camino inseguro
+- **Qué pasó:** `findings.sh` no estaba en el `allow` de permisos, así que un run headless no
+  podía usar el CLI del ledger — y escribió el JSONL **a mano**. Salió bien (28 entradas, 0
+  inválidas), pero por suerte: la escritura directa no valida esquema, no deduplica por id y no
+  protege los estados terminales.
+- **Causa raíz:** se confundió el ledger con la evidencia. El harness desconfía —con razón— de
+  los archivos de evidencia escritos por el modelo (el marker de review, los trinquetes). Pero
+  el ledger **no es evidencia: es un inventario que §10 OBLIGA al agente a mantener**. Aplicarle
+  la desconfianza del marker prohibió la vía segura sin prohibir la escritura.
+- **Regla:** antes de denegar una herramienta, pregunta **qué hará el agente si no la tiene**.
+  Si la respuesta es "lo mismo, peor y sin validación", el `deny` no protege: degrada. Denegar
+  tiene sentido cuando la alternativa es *no hacerlo*, no cuando es *hacerlo a mano*.
+- **Detector:** tools/tests/test_hook_events.sh::test_permissions_sin_sintaxis_inerte (valida el
+  bloque) + el propio `_comment_findings_allow` de .claude/settings.json, que documenta por qué
+  este allow no contradice el invariante nº1
+- **Área:** .claude/settings.json · tools/findings/

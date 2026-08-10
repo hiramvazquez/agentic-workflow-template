@@ -154,7 +154,7 @@ git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
 # Maquinaria: se sincroniza. Es el harness, y su fuente de verdad es el
 # template (si la personalizaste, tu arreglo necesita SU test — lección del
 # archivo-por-fuera-de-upgrade; la verificación de abajo es la red).
-SYNC_PATHS="scripts ci lefthook.yml tools/tests tools/semgrep/rules tools/metrics .github/workflows"
+SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/tests tools/semgrep/rules tools/metrics .github/workflows"
 SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
 
 # ⚠️  NO se delega el matching en git. Dos capas de fallo silencioso vividas

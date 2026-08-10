@@ -21,6 +21,38 @@ cd "$PROJECT_ROOT"
 FILTER="${1:-}"
 PASS=0; FAIL=0; FAILED_NAMES=()
 
+# ── Watchdog por test (sin depender de `timeout`, que macOS no trae) ──
+# Un test que se CUELGA no falla: bloquea la suite y, en CI, el job entero
+# hasta el límite del runner. Es peor que un rojo — un rojo te dice qué pasa
+# en segundos; un cuelgue no dice nada durante una hora. Cazado en vivo: un
+# mutante del guard de reentrada de un ViewModel produjo un deadlock y colgó
+# la suite en vez de fallarla.
+#
+# Se implementa con un perro guardián en segundo plano en vez de con
+# `timeout`: el test es una FUNCIÓN de shell, y `timeout` solo sabe ejecutar
+# binarios — envolverla en `bash -c` la dejaría fuera de alcance. Además así
+# no hay dependencia externa que pueda faltar.
+TEST_TIMEOUT_SECS="${TEST_TIMEOUT_SECS:-120}"
+_run_test() { # _run_test <nombre-de-función> → imprime salida, devuelve rc (124 = colgado)
+  local fn="$1" tmp pid wd rc
+  tmp="$(mktemp)"
+  # Ambos hijos van con stdout/stderr DESATADOS del pipe del llamador. Sin
+  # esto, `out="$( _run_test … )"` esperaría a que el perro guardián cerrara
+  # el pipe — o sea, los 120s completos en CADA test. El primer intento colgó
+  # la suite entera justo con el mecanismo que existe para evitar cuelgues.
+  ( "$fn" >"$tmp" 2>&1 ) >/dev/null 2>&1 & pid=$!
+  ( sleep "$TEST_TIMEOUT_SECS"; kill -9 "$pid" 2>/dev/null ) >/dev/null 2>&1 & wd=$!
+  wait "$pid" 2>/dev/null; rc=$?
+  kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+  if [ "$rc" -ge 128 ]; then
+    printf '    ⏱  el test se COLGÓ (>%ss) — no falló, se quedó esperando.\n' "$TEST_TIMEOUT_SECS"
+    printf '    Un cuelgue en CI consume el job entero sin decir nada. Busca\n'
+    printf '    deadlocks, esperas sin timeout, o algo que pida stdin.\n'
+    rm -f "$tmp"; return 124
+  fi
+  cat "$tmp"; rm -f "$tmp"; return "$rc"
+}
+
 # ── Stub de scripts en el sandbox ───────────────────────────────────
 # `printf ... > tools/x.sh` sobre un archivo COPIADO hereda su modo y sus
 # flags. Eso hizo que la suite fuera verde en Linux y roja en macOS con
@@ -109,7 +141,7 @@ for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
     if [ "$FILE_MATCH" -eq 0 ]; then
       case "$t" in *"$FILTER"*) : ;; *) unset -f "$t"; continue ;; esac
     fi
-    out="$( "$t" 2>&1 )"; rc=$?
+    out="$( _run_test "$t" )"; rc=$?
     if [ $rc -eq 0 ]; then
       PASS=$((PASS+1)); printf '  ✅ %s\n' "$t"
     else
