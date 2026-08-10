@@ -311,3 +311,26 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** tools/tests/test_verdict.sh (`test_contrato_no_es_veredicto`,
   `test_veredicto_no_es_contrato`, `test_contrato_mencionado_en_prosa_no_cuenta`)
 - **Área:** .claude/agents/reviewer.md · tools/backlog/run.sh · scripts/agent-hooks/lib/verdict.sh
+
+### [2026-08-09] El camino de upgrade estaba roto justo para la ruta de adopción que la doc recomienda
+- **Qué pasó:** el primer `bash tools/upgrade.sh` real sobre un proyecto adoptado murió con
+  `fatal: refusing to merge unrelated histories`. La cabecera del script asumía *"tu proyecto
+  nació de un clone del template"*, pero `docs/ADOPTION.md` documenta —y la realidad impone—
+  **copiar el harness dentro de un proyecto que ya existe**: la app siempre existe antes que el
+  harness. Esos dos repos no comparten ancestro y `git merge` se niega. El upgrade llevaba
+  meses roto para su propia ruta principal, y nadie lo supo porque nunca se había usado.
+- **Segundo defecto, encadenado:** el script trató el fallo FATAL como si fueran conflictos.
+  Imprimió una lista de archivos vacía y pidió "resuélvelos". Un diagnóstico equivocado cuesta
+  más que ninguno: manda al humano a buscar un problema que no existe mientras el real sigue ahí.
+- **Regla:** (1) toda herramienta que asume una TOPOLOGÍA de repo debe detectarla, no darla por
+  supuesta — aquí: con ancestro común → merge de 3 vías; sin él → sync de maquinaria + registro
+  del SHA en `tools/.template-sync` para que la próxima vez se aplique solo el delta.
+  (2) Un fallo de una herramienta externa nunca se reetiqueta como el error que esperábamos:
+  si `git merge` falla y no hay archivos en conflicto, **no son conflictos** — dilo, aborta y
+  deja el árbol como estaba. (3) El sync trae MAQUINARIA y jamás pisa contenido del proyecto,
+  y no commitea: stagea y enseña el diff, porque commitear lo que nadie ha visto es una
+  sobreescritura silenciosa con otro nombre.
+- **Detector:** tools/tests/test_upgrade.sh (`test_sync_trae_la_maquinaria_sin_ancestro_comun`,
+  `test_sync_jamas_pisa_contenido_del_proyecto`, `test_sync_registra_la_base_para_el_delta_futuro`,
+  `test_sync_deja_los_cambios_staged_para_revision`)
+- **Área:** tools/upgrade.sh · docs/ADOPTION.md

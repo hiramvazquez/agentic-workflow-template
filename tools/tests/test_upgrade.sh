@@ -83,3 +83,87 @@ _case_conflicto_clasificado() {
   git merge --abort 2>/dev/null; return 0
 }
 test_upgrade_conflicto_queda_clasificado() { _upg_sandbox _case_conflicto_clasificado; }
+
+# ════════════════════════════════════════════════════════════════════
+# MODO SYNC — adopción por COPIA (historias no relacionadas)
+# ════════════════════════════════════════════════════════════════════
+# El camino que docs/ADOPTION.md recomienda de verdad: copiar el harness a un
+# proyecto que YA existe. Esos dos repos no comparten ancestro y `git merge`
+# se niega ("refusing to merge unrelated histories"). Durante meses el script
+# solo contemplaba el clone, así que su upgrade estaba roto justo para su ruta
+# de adopción principal — y encima reportaba el fallo fatal como "conflictos",
+# mandando al humano a resolver algo que no existía.
+_upg_sandbox_copia() { # TEMPLATE y PROYECTO con historias SEPARADAS
+  local base tpl prj
+  base="$(mktemp -d)"; tpl="$base/tpl"; prj="$base/prj"
+  mkdir -p "$tpl/tools/tests" "$tpl/scripts"
+  (
+    cd "$tpl" || exit 1
+    git init -q .; git config user.email t@t.t; git config user.name t
+    printf 'v2 maquinaria del template\n' > scripts/gate.sh
+    printf 'stack: <!-- FILL -->\n' > AGENTS.md
+    git add -A; git commit -qm "template"
+  )
+  mkdir -p "$prj/tools/tests" "$prj/scripts"
+  (
+    cd "$prj" || exit 1
+    git init -q .; git config user.email p@p.p; git config user.name p
+    printf 'app\n' > App.swift
+    printf 'v1 maquinaria copiada\n' > scripts/gate.sh
+    printf 'stack: iOS real\n' > AGENTS.md
+    cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
+    printf '#!/usr/bin/env bash\nexit 0\n' > tools/tests/run-tests.sh
+    printf '#!/usr/bin/env bash\nexit 0\n' > tools/validate-harness.sh
+    git add -A; git commit -qm "proyecto con harness COPIADO"
+    git remote add template "$tpl"
+    TPL_DIR="$tpl" "$1"
+  )
+  local rc=$?; rm -rf "$base"; return $rc
+}
+
+_case_sync_trae_maquinaria() {
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'v2 maquinaria del template' scripts/gate.sh \
+    || { echo "    MODO SYNC no trajo la maquinaria del template"; return 1; }
+}
+test_sync_trae_la_maquinaria_sin_ancestro_comun() {
+  _upg_sandbox_copia _case_sync_trae_maquinaria
+}
+
+_case_sync_no_pisa_contenido() {
+  # LO MÁS IMPORTANTE: el contenido del proyecto es SUYO. Si el sync tocara
+  # AGENTS.md, cada upgrade borraría los rellenos reales del adoptante — el
+  # daño exacto que hace que nadie vuelva a correr el upgrade.
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'stack: iOS real' AGENTS.md \
+    || { echo "    el sync PISÓ AGENTS.md con el FILL del template"; return 1; }
+  [ -f App.swift ] || { echo "    el sync tocó código de la app"; return 1; }
+}
+test_sync_jamas_pisa_contenido_del_proyecto() {
+  _upg_sandbox_copia _case_sync_no_pisa_contenido
+}
+
+_case_sync_registra_base() {
+  # Sin registro no hay delta posible la próxima vez: se volvería a traer la
+  # maquinaria entera para siempre, pisando arreglos locales cada vez.
+  bash tools/upgrade.sh >/dev/null 2>&1
+  [ -f tools/.template-sync ] || { echo "    el sync no registró el SHA del template"; return 1; }
+  grep -qE '^[0-9a-f]{7,40}' tools/.template-sync \
+    || { echo "    el registro no contiene un SHA: $(cat tools/.template-sync)"; return 1; }
+}
+test_sync_registra_la_base_para_el_delta_futuro() {
+  _upg_sandbox_copia _case_sync_registra_base
+}
+
+_case_sync_deja_staged_sin_commitear() {
+  # El sync NO commitea por ti: trae, stagea y te enseña el diff. Commitear
+  # solo lo que un humano ha visto es la diferencia entre un upgrade y una
+  # sobreescritura silenciosa.
+  local rc; bash tools/upgrade.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "2" ] || { echo "    el sync devolvió $rc (esperaba 2: hay que revisar y commitear)"; return 1; }
+  git diff --cached --name-only 2>/dev/null | grep -q 'scripts/gate.sh' \
+    || { echo "    el sync no dejó los cambios staged para revisión"; return 1; }
+}
+test_sync_deja_los_cambios_staged_para_revision() {
+  _upg_sandbox_copia _case_sync_deja_staged_sin_commitear
+}
