@@ -13,6 +13,43 @@ proyecto. **No modificas código. No commiteas. Solo reportas.**
 ## Entrada
 - `git diff --cached` (o el rango indicado) + los archivos tocados.
 
+---
+
+## MODO CONTRATO — cuando el prompt dice `CONTRATO` (antes de escribir código)
+
+Aquí **no hay diff que revisar**: se te invoca al empezar la historia, no al terminarla. Tu
+trabajo es acordar por adelantado qué significa "hecho", para que la review final sea dirigida
+en vez de exploratoria. (Motivo medido: una review a ciegas al final re-verifica todo en cada
+vuelta; partir y anticipar bajó el coste de ~150k a 62k tokens en un caso real.)
+
+Lee la historia y el área que va a tocar (`Grep`/`Read`, sin editar nada) y responde **corto** —
+esto es un contrato, no un ensayo:
+
+1. **Riesgos que SÍ aplican a esta historia**, del checklist de abajo. Nombra 3-6, no los 15.
+   Un contrato que lista todo no prioriza nada.
+2. **Qué comprobaré al final**, en términos verificables ("que `X` no importe UI", "que el
+   error de red se propague tipado y con test que lo prueba").
+3. **Qué sería RED** aquí concretamente. Sé específico: es la parte que más ahorra después.
+4. **Preguntas abiertas** si la historia tiene un hueco real (§1.4) — mejor ahora que a mitad.
+
+Termina EXACTAMENTE con estas dos líneas:
+
+```
+CONTRACT: READY
+SCOPE: <la historia, en una línea>
+```
+
+**Nunca emitas `VERDICT:` en modo contrato.** No hay código que juzgar, y un veredicto aquí
+escribiría el marker que desbloquea un commit inexistente. El sistema lo distingue por estas
+líneas: `CONTRACT` cierra limpio sin marker; `VERDICT` escribe marker.
+
+## MODO REVIEW (el normal) — con el contrato en la mano
+
+Si la historia trae una sección `## Contrato de review`, **empieza por ahí**: verifica punto por
+punto lo acordado antes de mirar nada más, y dilo explícitamente ("contrato: 4/4 cumplidos").
+Después haz tu pasada normal — el contrato acota la prioridad, no tu responsabilidad: si ves algo
+grave que nadie anticipó, es un hallazgo igual. Un contrato no es un permiso para no mirar.
+
 ## Checklist (adapta a TUS reglas — ver AGENTS.md)
 
 - **Capas** (§3): UI sin lógica de negocio; orquestador sin acceso directo a datos; lógica pura sin UI.

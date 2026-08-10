@@ -258,6 +258,14 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   se repite es un bug en tu tooling*). Corolario del diseño: el gate necesitó su exención desde
   el minuto uno (las libs que se SOURCEAN no llevan `+x`), porque un gate con falso positivo
   permanente se desactiva entero y protege menos que el aviso al que sustituyó.
+- **Segunda vuelta (mismo día): un gate correcto puede ser el instrumento equivocado.** El gate
+  bloqueó DOS commits seguidos por la misma causa, y las dos veces el remedio era idéntico y
+  mecánico: `chmod +x` sobre unos archivos concretos. Ahí el gate estaba haciendo pagar a un
+  humano por un problema del CANAL de entrega. **Un gate bloquea cuando la respuesta correcta
+  requiere JUICIO; cuando el remedio es determinista y único, repara** — la misma lógica por la
+  que un formateador formatea en vez de quejarse. Lo innegociable es que reparar NUNCA sea
+  silencioso: el aviso ruidoso conserva la señal de que el canal pierde permisos, que es el
+  problema de verdad. Modo estricto intacto para CI y auditoría.
 - **Detector:** tools/tests/test_exec_bits.sh (gate: `exec-bits` en lefthook →
   `tools/check-exec-bits.sh`; auditoría del repo entero en validate-harness §9)
 - **Área:** lefthook.yml · tools/check-exec-bits.sh · flujo inverso
@@ -282,3 +290,24 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** tools/metrics/gate-value.sh (ritual mensual; sale en el harness-report §5c, que
   es la superficie que el humano sí lee — una métrica que hay que recordar correr no se corre)
 - **Área:** tools/metrics/ · docs/process/ · ritual de mantenimiento
+
+### [2026-08-09] La review llegaba a ciegas al final, y por eso cada vuelta costaba lo mismo
+- **Qué pasó:** en el primer proyecto real, un commit de adopción necesitó **tres vueltas de
+  ~150k tokens y 17 minutos cada una**. Los tres RED eran correctos y distintos, así que el
+  problema no era el reviewer. Partido por naturaleza, el mismo trabajo costó 62k y salió GREEN
+  a la primera. Pero nada en el harness empujaba a partir ni a anticipar: el owner tuvo que
+  decirlo a mano.
+- **Causa raíz:** el reviewer se invocaba SOLO al final, sin saber de antemano qué importaba en
+  ese cambio. Cada vuelta re-verificaba el diff entero desde cero, así que el coste escalaba con
+  el tamaño del lote y no con lo que había cambiado desde la vuelta anterior. Una review
+  exploratoria es cara por construcción.
+- **Regla:** el evaluador y el generador **acuerdan qué significa "hecho" ANTES de escribir
+  código** (modo `CONTRATO` del `reviewer`, paso 1b del runner): riesgos que aplican, qué se
+  comprobará, qué sería RED. Va en la sección `## Contrato de review` de la historia. La review
+  final verifica primero contra el contrato y luego hace su pasada — el contrato acota la
+  prioridad, nunca la responsabilidad: lo grave no anticipado sigue siendo hallazgo.
+  Invariante que lo hace seguro: un contrato **jamás** escribe marker. Si lo hiciera, pedirlo
+  desbloquearía el commit del código que todavía no existe.
+- **Detector:** tools/tests/test_verdict.sh (`test_contrato_no_es_veredicto`,
+  `test_veredicto_no_es_contrato`, `test_contrato_mencionado_en_prosa_no_cuenta`)
+- **Área:** .claude/agents/reviewer.md · tools/backlog/run.sh · scripts/agent-hooks/lib/verdict.sh

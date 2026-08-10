@@ -52,6 +52,33 @@ paths:
 - [ ] ¿Input externo se valida/sanitiza? (inyección, XSS, deserialización)
 - [ ] ¿Se añadió una dependencia que toca cripto/secretos sin auditar?
 - [ ] ¿`.gitignore` cubre los archivos de secretos nuevos?
+- [ ] **Trifecta letal (agentes y MCP):** ¿este cambio le da a un agente las TRES a la vez?
+
+### La trifecta letal — el riesgo no está en las tools, está en su combinación
+
+Vocabulario de riesgo del equipo de MCP, y la razón por la que auditar tools de una en una no
+sirve: ninguna de estas tres capacidades es peligrosa por separado, y juntas son exfiltración.
+
+1. **Acceso a datos privados** (tu repo, tu DB, el Keychain, variables de entorno).
+2. **Exposición a contenido no confiable** (una página web, un issue de GitHub, un PDF, la
+   respuesta de una API, el output de otra herramienta) — cualquier texto que un tercero
+   controla y que el agente va a leer.
+3. **Capacidad de comunicar hacia fuera** (una petición HTTP, `git push`, enviar un mensaje,
+   escribir en un recurso compartido).
+
+Con las tres, una instrucción escondida en (2) puede hacer que el agente lea (1) y lo mande por
+(3), sin que ninguna tool haya hecho nada que su descripción no permitiera. Es prompt injection
+convertida en canal de salida.
+
+**Cómo se revisa en la práctica:** al añadir un MCP, una tool o un permiso, pregunta cuál de los
+tres vértices añade y si el agente ya tenía los otros dos. **Romper un vértice basta** y casi
+siempre el más barato es el tercero: red restringida por allowlist, `git push` en `ask`,
+sin credenciales de escritura en el entorno del agente. Cuando no puedas romper ninguno, que la
+acción sea la que pida aprobación humana — y que quede auditada.
+
+> En este harness: el Anillo 0 ya pone `git push` y los publish en `ask`, y deniega la lectura
+> de `.env`/secretos. Eso rompe (1) y (3) parcialmente **por defecto**. Lo que introduce riesgo
+> nuevo es casi siempre un MCP añadido sin pensar en el vértice (2).
 
 ## §Por plataforma
 

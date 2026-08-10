@@ -67,6 +67,21 @@ VERDICT="$(verdict_parse "$MSG")"
 SCOPE="$(verdict_scope "$MSG")";     : "${SCOPE:=(sin scope declarado)}"
 FINDINGS="$(verdict_findings "$MSG")"; : "${FINDINGS:=?}"
 
+# ── MODO CONTRATO: cierre legítimo SIN veredicto y SIN marker ──────
+# El reviewer invocado antes de que exista el código no puede emitir un
+# veredicto (no hay nada que juzgar) y NO debe escribir marker: si lo
+# hiciera, pedir el contrato desbloquearía el commit del código que aún no
+# se ha escrito — justo el agujero que el invariante nº1 existe para tapar.
+# Sale por aquí, arriba del bloqueo por "sin veredicto", y termina limpio.
+if [ -z "$VERDICT" ] && [ -n "$(contract_parse "$MSG")" ]; then
+  hook_context "$EV" "📋 Contrato de review acordado para «${SCOPE}» — ANTES de escribir código.
+No se ha escrito marker (no lo hay que escribir: aún no existe el diff).
+Guarda el contrato en la sección '## Contrato de review' de la historia y
+commitéalo: la review final lo leerá y verificará contra él en vez de
+explorar desde cero, que es lo que hace cara cada vuelta."
+  hook_allow
+fi
+
 # ── Sin contrato → bloquear el cierre y reinyectar el formato ───────
 if [ -z "$VERDICT" ]; then
   hook_json_block "$EV" "🛑 \`$AGENT\` terminó SIN emitir el contrato de veredicto.

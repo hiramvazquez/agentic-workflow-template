@@ -51,6 +51,34 @@ verdict_findings() {
     | sed -E 's/[^0-9]*([0-9]+).*/\1/'
 }
 
+# ── MODO CONTRATO: el review que ocurre ANTES de que exista el código ──
+# El coste de una review crece con TODO el diff y cada vuelta re-verifica
+# desde cero: medido en el primer proyecto real, tres vueltas de ~150k tokens
+# para un cambio que, partido, costó 62k. La causa no era el reviewer: era
+# que llegaba a ciegas al final, sin saber qué importaba de antemano.
+#
+# El contrato invierte el orden (patrón de harness-design de Anthropic:
+# generador y evaluador acuerdan qué significa "hecho" ANTES de escribir
+# código). El reviewer lee la historia y el área, y declara por adelantado
+# qué riesgos aplican y qué sería RED. La review final deja de ser
+# exploratoria y pasa a ser dirigida.
+#
+# Es un contrato DISTINTO del veredicto y por eso tiene su propia línea: un
+# contrato JAMÁS puede escribir el marker que desbloquea un commit — si
+# compartieran línea, pedir el contrato desbloquearía el commit del código
+# que aún no existe. Fijado por tools/tests/test_verdict.sh.
+#
+#     CONTRACT: READY
+#
+# contract_parse <texto> → imprime READY, o vacío.
+contract_parse() {
+  printf '%s\n' "${1:-}" \
+    | grep -iE '^[[:space:]]*CONTRACT[[:space:]]*:[[:space:]]*READY[[:space:]]*$' \
+    | tail -1 \
+    | sed -E 's/.*:[[:space:]]*//; s/[[:space:]]*$//' \
+    | tr '[:lower:]' '[:upper:]'
+}
+
 # verdict_is_markable <veredicto> → exit 0 si permite escribir marker.
 # GREEN y AMBER marcan (AMBER = hallazgos menores, se atienden y se commitea).
 # RED, valor inválido y vacío NO marcan.

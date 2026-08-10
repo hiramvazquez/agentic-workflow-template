@@ -107,6 +107,16 @@ $(cat "$WT/$STORY")
 
 CONTRATO (no negociable — AGENTS.md es la fuente canónica y sus gates están activos):
 1. Lee AGENTS.md y la skill del área que toques (§11) antes de editar.
+1b. ACUERDA EL CONTRATO DE REVIEW ANTES DE ESCRIBIR CÓDIGO: invoca al
+   sub-agente \`reviewer\` con la palabra CONTRATO y esta historia. Te
+   devolverá los riesgos que aplican, qué comprobará y qué sería RED, y
+   cerrará con \`CONTRACT: READY\` (sin veredicto y sin marker: correcto,
+   aún no hay diff). Pega su respuesta en una sección
+   '## Contrato de review' de la historia y commitéala antes de programar.
+   Motivo: una review que llega a ciegas al final re-verifica todo en cada
+   vuelta; con el contrato acordado, la final es dirigida y mucho más barata.
+   Si algo del contrato contradice la historia, es una Open Question para el
+   owner (§1.4) — no lo resuelvas tú.
 2. TDD estricto: cada criterio de aceptación se convierte PRIMERO en un test
    que falla, luego la implementación mínima, luego refactor (§5).
 3. Scope EXCLUSIVO: los archivos que la historia lista (frontmatter \`scope\`

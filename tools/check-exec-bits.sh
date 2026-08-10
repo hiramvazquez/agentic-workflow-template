@@ -19,7 +19,22 @@
 # es una concesión, es la regla correcta. Sin esta exención el gate tendría
 # falsos positivos permanentes y acabaría desactivado (ley del 10%, §14).
 #
-# Contrato: exit 0 = todo correcto · 1 = hay .sh staged sin +x.
+# MODOS:
+#   --staged  (default)  audita lo staged y BLOQUEA. Contrato estricto.
+#   --all                audita el repo entero (validate-harness §9).
+#   --fix                repara y re-stagea, con AVISO visible. Es el que usa
+#                        lefthook, y la razón es doctrinal, no comodidad:
+#
+# Un gate debe bloquear cuando la respuesta correcta requiere JUICIO. Aquí no
+# lo requiere: el remedio es `chmod +x` sobre unos archivos concretos, es
+# determinista y no tiene alternativas. Obligar a un humano a teclear lo que
+# la máquina puede hacer sola es fricción sin valor — la misma lógica por la
+# que un formateador formatea en vez de quejarse. Lo que NO se pierde es la
+# señal: cada reparación se anuncia a gritos, porque el bit que falta es el
+# síntoma de un canal de entrega que pierde permisos, y ese sí es un dato que
+# el humano tiene que ver. Reparar en silencio sería el error opuesto.
+#
+# Contrato: exit 0 = todo correcto (o reparado en --fix) · 1 = hay .sh sin +x.
 # Contrato de stdout:  EXECBITS_SUMMARY missing=<N>
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -45,6 +60,24 @@ done < <(_candidates)
 N="$(printf '%s' "$BAD" | grep -c . || true)"
 echo "EXECBITS_SUMMARY missing=${N:-0}"
 [ "${N:-0}" -eq 0 ] && exit 0
+
+# ── --fix: repara, re-stagea, y AVISA (nunca en silencio) ───────────
+# Solo toca archivos que YA estaban staged: no amplía el commit del humano,
+# solo corrige el modo de lo que él mismo eligió incluir.
+if [ "$MODE" = "--fix" ]; then
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    chmod +x "$f" 2>/dev/null && git add -- "$f" 2>/dev/null
+  done < <(printf '%s' "$BAD")
+  {
+    echo "🔧 exec-bits: reparado el bit +x de ${N} script(s) y re-staged:"
+    printf '%s' "$BAD" | sed 's/^/   · /'
+    echo "   NO es cosmético: significa que estos archivos llegaron por FUERA de"
+    echo "   git (puente, cp, descarga) y ese canal pierde permisos. Si el aviso"
+    echo "   se repite en cada commit, arregla el CANAL, no los archivos."
+  } >&2
+  exit 0
+fi
 
 {
   echo "❌ exec-bits: ${N} script(s) .sh sin bit de ejecución:"

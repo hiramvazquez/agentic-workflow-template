@@ -71,3 +71,42 @@ _case_modo_all_ve_el_repo_entero() {
   [ "$?" = "1" ] || { echo "    --all no detectó un script YA commiteado sin +x"; return 1; }
 }
 test_modo_all_detecta_lo_ya_commiteado() { _eb_sandbox _case_modo_all_ve_el_repo_entero; }
+
+_case_fix_repara_y_restagea() {
+  # El modo que usa lefthook: repara lo staged, lo vuelve a stagear, y deja
+  # el commit seguir. Sin esto, el humano teclea a mano un remedio que la
+  # máquina sabe hacer — fricción sin valor (el gate bloqueó dos commits
+  # seguidos por lo mismo antes de este cambio).
+  printf '#!/usr/bin/env bash\necho hola\n' > script.sh
+  chmod -x script.sh
+  git add script.sh
+  local rc; bash tools/check-exec-bits.sh --fix >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || { echo "    --fix devolvió $rc (esperaba 0: repara, no bloquea)"; return 1; }
+  [ -x script.sh ] || { echo "    --fix no puso el bit +x"; return 1; }
+  git ls-files -s script.sh 2>/dev/null | grep -q '^100755' \
+    || { echo "    --fix no re-stageó el modo corregido (el commit lo perdería)"; return 1; }
+}
+test_fix_repara_el_bit_y_lo_restagea() { _eb_sandbox _case_fix_repara_y_restagea; }
+
+_case_fix_avisa_siempre() {
+  # Reparar EN SILENCIO sería el error opuesto: el bit que falta es el
+  # síntoma de un canal de entrega que pierde permisos, y ese dato tiene que
+  # llegar al humano aunque el commit no se pare.
+  printf '#!/usr/bin/env bash\n' > script.sh
+  chmod -x script.sh
+  git add script.sh
+  local out; out="$(bash tools/check-exec-bits.sh --fix 2>&1)"
+  printf '%s' "$out" | grep -q 'reparado' \
+    || { echo "    --fix reparó en silencio: se pierde la señal del canal roto"; return 1; }
+}
+test_fix_nunca_repara_en_silencio() { _eb_sandbox _case_fix_avisa_siempre; }
+
+_case_staged_sigue_bloqueando() {
+  # El modo estricto NO se relaja: CI y validate-harness auditan, no reparan.
+  printf '#!/usr/bin/env bash\n' > script.sh
+  chmod -x script.sh
+  git add script.sh
+  bash tools/check-exec-bits.sh --staged >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    --staged dejó de bloquear al añadir --fix"; return 1; }
+}
+test_modo_estricto_sigue_bloqueando() { _eb_sandbox _case_staged_sigue_bloqueando; }

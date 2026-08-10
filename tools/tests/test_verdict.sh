@@ -75,3 +75,43 @@ test_verdict_valor_invalido_se_rechaza() {
 test_verdict_tolera_minusculas_y_espacios() {
   assert_eq "GREEN" "$(verdict_parse '   verdict:   green   ')"
 }
+
+# ════════════════════════════════════════════════════════════════════
+# MODO CONTRATO — el review que ocurre ANTES de que exista el código
+# ════════════════════════════════════════════════════════════════════
+# Invierte el orden (patrón de harness-design de Anthropic): el evaluador
+# acuerda qué es "hecho" antes de que se escriba nada, y la review final deja
+# de ser exploratoria. El riesgo del mecanismo es UNO y es grave: si el
+# contrato pudiera escribir marker, pedirlo desbloquearía el commit del
+# código que aún no existe — el agujero exacto que el invariante nº1 tapa.
+test_contrato_ready_se_reconoce() {
+  local out; out="$(contract_parse 'Riesgos: capas, TDD.
+
+CONTRACT: READY
+SCOPE: historia 0005')"
+  [ "$out" = "READY" ] || { echo "    CONTRACT: READY no se reconoció (obtuve '$out')"; return 1; }
+}
+
+test_contrato_no_es_veredicto() {
+  # LO MÁS IMPORTANTE DE ESTE ARCHIVO: un contrato NO puede producir marker.
+  local v; v="$(verdict_parse 'CONTRACT: READY
+SCOPE: historia 0005')"
+  [ -z "$v" ] || { echo "    un CONTRACT produjo veredicto '$v' — escribiría marker sin código"; return 1; }
+  verdict_is_markable "$v" && { echo "    un contrato vacío resultó markable"; return 1; }
+  return 0
+}
+
+test_veredicto_no_es_contrato() {
+  # Y la simétrica: una review normal no debe leerse como contrato, o el
+  # cierre saldría por la rama equivocada y no escribiría el marker legítimo.
+  local c; c="$(contract_parse 'VERDICT: GREEN
+FINDINGS: 0
+SCOPE: x')"
+  [ -z "$c" ] || { echo "    un VERDICT se leyó como contrato ('$c')"; return 1; }
+}
+
+test_contrato_mencionado_en_prosa_no_cuenta() {
+  # Mismo rigor que el veredicto: solo la línea al inicio, nunca la prosa.
+  local out; out="$(contract_parse 'te dejo el contract: ready cuando quieras')"
+  [ -z "$out" ] || { echo "    una mención en prosa se leyó como contrato ('$out')"; return 1; }
+}

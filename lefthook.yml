@@ -60,8 +60,12 @@ pre-commit:
     # Los archivos que entran por fuera de git pierden permisos. Se avisó
     # durante días y aun así un commit del harness metió SEIS mode changes
     # 100755 => 100644. Un problema que reaparece no necesita otro aviso.
+    # `--fix`: repara y re-stagea con aviso ruidoso, en vez de bloquear. El
+    # remedio es determinista y sin juicio (`chmod +x`), así que exigirlo a
+    # mano es fricción sin valor. El modo estricto sigue vivo en CI y en
+    # validate-harness §9, donde auditar sí es el objetivo.
     - name: exec-bits
-      run: bash tools/check-exec-bits.sh --staged
+      run: bash tools/check-exec-bits.sh --fix
 
     # ── Review marker: ¿este cambio fue REALMENTE revisado? ──────────
     # Antes esto vivía SOLO en el Anillo 2 (hooks de Claude/Cursor), así que
