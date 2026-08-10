@@ -294,7 +294,8 @@
   gate, más ruidoso debe ser su modo de fallo — el coste de un mensaje engañoso se multiplica
   por el tiempo que costó llegar a él.
 - **Regla 3 — el fixture del selftest no puede ser famoso:** el primer selftest usaba
-  `AKIAIOSFODNN7EXAMPLE`, la clave de ejemplo de la documentación de AWS, que gitleaks ignora
+  la clave canónica de la documentación de AWS (prefijo `AKIA` + `IOSFODNN7` + `EXAMPLE`,
+  partida aquí a propósito), que gitleaks ignora
   a propósito. Daba ❌ sobre un gate perfectamente sano. Es la lección del fixture-con-formato-
   real por el otro lado, y en un selftest duele más: **un verificador con falsos positivos se
   ignora entero**, y entonces deja de proteger justo de aquello para lo que existe.

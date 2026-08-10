@@ -242,7 +242,9 @@ selftest() {
   # 3. secret-scan: un secreto con formato real staged DEBE bloquear.
   #    (La clave se ENSAMBLA para no dejar un patrón contiguo en este script.)
   #
-  #    ⚠️ La clave NO puede ser `AKIAIOSFODNN7EXAMPLE`: es la de la documentación
+  #    ⚠️ La clave NO puede ser la CANÓNICA de la documentación de AWS (el
+  #    prefijo AKIA seguido de IOSFODNN7 y EXAMPLE — partida aquí a propósito,
+  #    ver abajo): es la de la documentación
   #    oficial de AWS y gitleaks la ignora A PROPÓSITO (aparece en todos los
   #    tutoriales). Con ella el selftest daba ❌ sobre un gate perfectamente
   #    sano — verificado: misma clave en cualquier archivo → exit 0; cualquier

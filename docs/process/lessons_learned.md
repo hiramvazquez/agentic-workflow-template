@@ -428,3 +428,37 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** tools/tests/run-tests.sh (helper `stub`, usado por los 28 stubs de la suite) +
   la propia suite corriendo en Linux y macOS en `.github/workflows/harness-ci.yml`
 - **Área:** tools/tests/
+
+### [2026-08-09] El template arrastraba un secreto que disparaba su propio detector
+- **Qué pasó:** un comentario de `validate-harness.sh` —escrito por mí para explicar **por qué
+  no usar** la clave canónica de AWS en el fixture del selftest— contenía esa clave **entera**.
+  Casa con el patrón `AKIA[0-9A-Z]{16}` de `canon-enforce` CHECK 2, así que bloqueaba el cierre
+  de turno cada vez que ese archivo entraba en un cambio: en cada sync de cada proyecto.
+- **Causa raíz:** un texto que advierte sobre una clave contiene, por necesidad, algo con forma
+  de clave. Es la misma familia que la lección del doc que enseñaba el simulacro de gitleaks y
+  llevaba el secreto contiguo dentro. La advertencia y el ejemplo son el mismo objeto para un
+  detector léxico.
+- **Regla:** cualquier literal con forma de secreto —**también en comentarios y en prosa**— se
+  parte (`'AKIA' 'XXXX'`, o describirlo en palabras). Lo que NO se hace jamás es añadir el
+  archivo a `is_detector_definition()` para silenciarlo: eso lo dejaría ciego a un secreto REAL
+  para siempre, cambiando un aviso molesto por un agujero permanente.
+- **Detector:** scripts/agent-hooks/canon-enforce.sh CHECK 2 (el propio gate que lo cazó, con
+  su test en tools/tests/test_canon_enforce.sh)
+- **Área:** tools/validate-harness.sh · docs/
+
+### [2026-08-09] La guía de adopción decía dos cosas incompatibles sobre el mismo flujo
+- **Qué pasó:** `ADOPTION.md` §1 mandaba `rm -rf .git && git init` —que corta el parentesco con
+  el template— y §9b prometía que el upgrade sería "un merge de 3 vías normal", que necesita
+  justo ese parentesco. Un adoptante seguía el paso 1 al pie de la letra y se quedaba con un
+  camino de actualización imposible.
+- **Causa raíz:** las dos secciones se escribieron en momentos distintos y nadie leyó el
+  documento como lo lee un adoptante: de principio a fin y haciendo lo que dice. Arreglar la
+  HERRAMIENTA (el modo sync de `upgrade.sh`) no arregló el DOCUMENTO — y el documento es lo que
+  la gente ejecuta.
+- **Regla:** cuando un flujo tiene dos caminos posibles, la doc los nombra **los dos**, dice a
+  cuál pertenece el lector y qué implica cada uno más adelante. Y al arreglar una herramienta
+  por un caso de uso, se revisa qué documento prometía otra cosa sobre ese mismo caso.
+- **Detector:** n/a-manual — es coherencia de prosa entre secciones, no un patrón mecanizable
+  (un grep produciría ruido). La red real: `tools/tests/test_upgrade.sh` fija que AMBAS
+  topologías funcionan, así que el documento puede describirlas sin mentir.
+- **Área:** docs/ADOPTION.md §1 y §9b

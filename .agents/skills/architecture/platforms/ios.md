@@ -99,3 +99,19 @@ Tokens (color/tipografía/spacing/radius) en un namespace único. **Prohibido** 
 ## iPhone ↔ iPad
 
 La adaptación vive DENTRO del componente reutilizable, no como `if idiom == .pad` repetido en pantallas.
+
+## ⚠️ Nada de `.gitkeep` en proyectos Xcode 16+
+
+Con `PBXFileSystemSynchronizedRootGroup` (el default desde Xcode 16), **todo archivo bajo la
+carpeta del target entra al target automáticamente**. Cuatro `.gitkeep` en cuatro subcarpetas
+producen cuatro recursos que quieren copiarse al mismo destino, `App.app/.gitkeep`, y el build
+falla con un error de duplicados que no menciona `.gitkeep` por ningún lado.
+
+Pasó en el primer proyecto real: **rompió el build con los nueve niveles del harness en verde**,
+porque ningún detector mira el grafo de recursos de Xcode y el paso de build no estaba cableado
+todavía. Es el caso de manual de "cázalo en la capa más barata": aquí la capa más barata es
+*no crear el archivo*.
+
+Y no hacen falta: **git no trackea directorios vacíos**, así que la carpeta aparecerá sola en
+cuanto tenga su primer archivo real. Si necesitas la estructura visible antes de tener código,
+crea directamente el primer archivo de verdad (el puerto, el fixture, el test que va a fallar).

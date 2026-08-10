@@ -115,6 +115,14 @@ if [ -f "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh" ]; then
     *cp\ *|*mv\ *)
       _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s' "$_CMD_CLEAN" | awk '{print $NF}')" ;;
   esac
+  # SANEO + DEDUP antes de decidir nada. Sin esto el mensaje del bloqueo salía
+  # con la cola del payload pegada al path (`Repo.swift"}}'`) y con la misma
+  # ruta repetida tres veces, una por cada extractor que la encontró. En un
+  # gate BLOQUEANTE eso no es cosmético: un mensaje sucio hace dudar de si el
+  # gate está bien, y la duda sobre un gate acaba en "desactívalo".
+  _WRITE_TARGETS="$(printf '%s\n' "$_WRITE_TARGETS" \
+    | sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^["'"'"'(]+//; s/["'"'"')}\;,]+$//' \
+    | grep -v '^$' | sort -u)"
   _MATRIX_BLOCK=""
   while IFS= read -r _t; do
     [ -z "$_t" ] && continue
@@ -151,6 +159,16 @@ if [ "$HAS_ADD" -eq 1 ]; then
 fi
 if printf '%s' "$CMD" | grep -qE 'git commit[^;|&]*(\s-a[m]?(\s|$)|--all)'; then
   hook_block_or_warn "🛑 reviewer-gate: \`git commit -a/-am\` stagea en el momento del commit — el marker de review liga el sha del diff que YA estaba staged, no ese. Stagea explícito, revisa, y commitea sin \`-a\`."
+fi
+
+# ── 0d. ¿El lote mezcla naturalezas? AVISO, jamás bloqueo ───────────
+# Llega tarde (la review ya ocurrió), pero el aprendizaje sirve para el
+# commit siguiente — y es el único punto del flujo donde el harness ve el
+# lote completo. El sitio donde de verdad ahorra es ANTES de invocar al
+# reviewer: eso lo pide el paso 1b del runner.
+if [ -f tools/check-diff-nature.sh ]; then
+  _nat="$(bash tools/check-diff-nature.sh --staged 2>&1 >/dev/null || true)"
+  [ -n "$_nat" ] && printf '%s\n' "$_nat" >&2
 fi
 
 # ── 1. Detectores mecánicos — DUROS, sin excepción ──────────────────

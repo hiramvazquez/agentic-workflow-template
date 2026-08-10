@@ -23,13 +23,37 @@
 > dice **qué niveles de la pirámide están MUDOS** en tu máquina. Confía en ese reporte, no en
 > tu memoria: un gate anunciado y no operativo es peor que uno ausente.
 
-## 1. Clonar y renombrar
+## 1. Traer el harness a tu proyecto
+
+**Elige tu caso — y ten claro qué implica cada uno para los upgrades futuros**, porque hasta
+hoy este documento decía una cosa aquí y la contraria en §9b, y el adoptante se quedaba con un
+camino de actualización que no podía funcionar.
+
+**Caso A — proyecto NUEVO, desde el template.** Conserva el parentesco: es lo que permite que
+`upgrade.sh` haga un merge de 3 vías de verdad, donde git funde solo lo que no choca.
 
 ```bash
 git clone <este-template> mi-proyecto && cd mi-proyecto
-rm -rf .git && git init
-bash scripts/bootstrap.sh        # reemplaza <PROJECT>, plataformas, y elige preset full/lite
+git remote rename origin template          # NO `rm -rf .git`: eso corta el parentesco
+git remote add origin <tu-repo-nuevo>
+bash scripts/bootstrap.sh                  # reemplaza <PROJECT>, plataformas, preset full/lite
 ```
+
+**Caso B — proyecto que YA EXISTE** (lo normal: la app existe antes que el harness). Copia el
+harness dentro y registra el template como remote. Los dos repos no comparten historia, así que
+`upgrade.sh` entrará en **MODO SYNC** — trae la maquinaria, nunca toca tu contenido, y registra
+el SHA sincronizado para aplicar solo el delta la próxima vez.
+
+```bash
+cd mi-proyecto-existente
+git clone --depth 1 <este-template> /tmp/awt && rm -rf /tmp/awt/.git
+cp -R /tmp/awt/. .                         # revisa el diff antes de commitear
+git remote add template <este-template>
+bash scripts/bootstrap.sh
+```
+
+> Si hiciste `rm -rf .git && git init` (lo que decía la versión anterior de esta guía), no has
+> roto nada: estás en el Caso B y el modo sync te cubre. Solo añade el remote `template`.
 
 ## 2. Instalar los gates locales
 
@@ -93,6 +117,10 @@ Prioridad de relleno (en orden de impacto — es la pirámide de
    distingue un test que verifica de uno escrito para pasar.
 4. `.agents/skills/architecture/SKILL.md` + `platforms/<tu-plataforma>.md` + `domain/SKILL.md`.
 5. `tools/layers.conf` — las reglas de capas de TUS rutas (grafo de imports).
+   ⚠️  **Se AMPLÍA, no se reescribe.** Conserva los globs universales que trae
+   (`*/Domain/*`, `*/domain/*`…) y añade los tuyos debajo. Sustituirlos rompe cinco tests
+   del propio harness, que copian este conf a un sandbox con rutas genéricas (`src/Domain/`)
+   — y el fallo aparece lejos del cambio, en la suite, no en tu proyecto.
 6. `tools/semgrep/rules/` — tus anti-patrones como reglas AST. **Ejecuta el scan una vez**
    (`bash tools/semgrep-scan.sh`): `--validate` solo valida el YAML, no el parseo por
    lenguaje — nos pasó (PRD 0001 §18 G15).
