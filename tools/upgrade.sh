@@ -248,21 +248,58 @@ _es_maquinaria() { # _es_maquinaria <ruta-en-el-template>
   return 1
 }
 
+_REPORTADO=0
 _report_no_sincronizado() {
   # Honestidad: lo que el template cambió y NO se ha tocado aquí. Sin esta
   # lista, "upgrade OK" leería como "traído todo", que es justo la clase de
   # falsa confianza que este harness persigue.
+  #
+  # ⚠️ SE IMPRIME SIEMPRE, también cuando la pasada acaba en conflicto o en
+  # fallo. Antes solo salía por el camino feliz, y el resultado fue exactamente
+  # el silencio que este bloque existía para evitar: en una pasada que terminó
+  # con conflictos, un adoptante se quedó sin saber que le esperaban dos
+  # arreglos en `.agents/skills/` y en `docs/` — los descubrió semanas después
+  # comparando a mano contra el template. Un aviso que solo aparece cuando todo
+  # va bien no es un aviso: es una felicitación.
+  [ "$_REPORTADO" = "1" ] && return 0
+  _REPORTADO=1
   local base="$1" changed
+  # Sin base registrada (primera sincronización) no hay "qué cambió desde X":
+  # las historias no están relacionadas y un diff contra el template listaría
+  # el repo entero. Se dice lo que SÍ es cierto, en una línea.
+  if [ -z "$base" ]; then
+    echo ""
+    echo "📋 Primera sincronización: solo he tocado MAQUINARIA. Todo lo demás del"
+    echo "   template (skills, docs, AGENTS.md, backlog) sigue siendo tuyo y no se"
+    echo "   ha traído. Si quieres ver qué trae de nuevo:"
+    echo "   git diff HEAD $REMOTE/$BRANCH -- .agents/skills docs AGENTS.md"
+    return 0
+  fi
   changed="$(git diff --name-only "$base" "$REMOTE/$BRANCH" 2>/dev/null \
     | grep -vE '^(scripts/|ci/|tools/tests/|tools/semgrep/rules/|tools/metrics/|\.github/workflows/)' \
     | grep -vE '^tools/[A-Za-z0-9_-]+\.sh$' \
-    | grep -vE '^tools/findings/[A-Za-z0-9_-]+\.(sh|ts)$' || true)"
+    | grep -vE '^tools/findings/[A-Za-z0-9_-]+\.(sh|ts)$' \
+    | grep -vE '^\.claude/settings\.json$' || true)"
   [ -z "$changed" ] && return 0
   echo ""
   echo "📋 El template también cambió esto, y NO lo he tocado (es tuyo o es a juicio):"
   printf '%s\n' "$changed" | sed 's/^/   · /'
   echo "   Míralo con:  git diff HEAD $REMOTE/$BRANCH -- <archivo>"
   echo "   Incorpora a mano solo lo que te interese. Tu contenido no se pisa nunca."
+}
+
+_fundir_settings() {
+  # `.claude/settings.json` es la ÚNICA parte de `.claude/` que es maquinaria:
+  # dentro viven los hooks (Anillo 2) y los permisos (Anillo 0). No se puede
+  # traer con checkout (pisaría los permisos del proyecto) ni dejar fuera
+  # (se queda atrás en silencio, y un gate que no se actualiza no avisa de
+  # que no se actualizó). Se funde por claves, y SOLO añadiendo.
+  [ -f tools/merge-claude-settings.sh ] || return 0
+  local out rc
+  out="$(bash tools/merge-claude-settings.sh "$REMOTE/$BRANCH" 2>&1)"; rc=$?
+  printf '%s\n' "$out" | grep -v '^SETTINGS_MERGE' | sed 's/^/   /'
+  [ "$rc" = "1" ] && echo "   ⚠️  el merge de settings.json falló — arréglalo antes de confiar en el Anillo 2." >&2
+  return 0
 }
 
 if [ "$MERGE_BASE_OK" = "1" ]; then
@@ -327,11 +364,16 @@ else
           echo "   en silencio (lección del archivo-por-fuera-de-upgrade)."
           echo "   Luego: git add -A && git commit — y RE-CORRE este script."
           rm -f /tmp/upgrade.patch.$$ /tmp/upgrade-apply-err.$$
+          # El conflicto NO cancela el informe: es justo cuando más falta hace,
+          # porque la pasada termina antes de tiempo y sin él te quedas sin
+          # saber qué más te espera.
+          _report_no_sincronizado "$BASE_REC"
           exit 2
         fi
         echo "❌ upgrade: no pude aplicar el delta de maquinaria:" >&2
         sed 's/^/   /' /tmp/upgrade-apply-err.$$ >&2 2>/dev/null
         rm -f /tmp/upgrade.patch.$$ /tmp/upgrade-apply-err.$$
+        _report_no_sincronizado "$BASE_REC"
         exit 1
       fi
     else
@@ -396,13 +438,15 @@ else
       echo ""
       echo "❌ upgrade: $_SYNC_FAIL archivo(s) fallaron. El sync está INCOMPLETO — no lo" >&2
       echo "   commitees como si estuviera entero: arregla lo de arriba y re-córrelo." >&2
+      _report_no_sincronizado "$BASE_REC"
       exit 1
     fi
   fi
+  _fundir_settings
   printf '%s  # SHA del template sincronizado por tools/upgrade.sh — no editar a mano\n' \
     "$(git rev-parse "$REMOTE/$BRANCH")" > "$SYNC_RECORD"
-  git add -A -- $SYNC_PATHS tools "$SYNC_RECORD" 2>/dev/null
-  _report_no_sincronizado "${BASE_REC:-$REMOTE/$BRANCH}"
+  git add -A -- $SYNC_PATHS tools .claude/settings.json "$SYNC_RECORD" 2>/dev/null
+  _report_no_sincronizado "$BASE_REC"
   echo ""
   echo "━━━ Cambios traídos (staged, SIN commitear a propósito) ━━━"
   git diff --cached --stat | tail -20

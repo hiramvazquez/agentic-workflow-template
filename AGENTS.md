@@ -162,7 +162,20 @@ actualiza la tabla en el mismo commit (antes la matriz vivía en cinco sitios y 
 | `**/Domain/**` | `.agents/skills/domain/SKILL.md` + `process/references/tdd-workflow.md` |
 | `**/Data/**`, `<migraciones-db>/**` | `domain/SKILL.md` (puertos) + `security/SKILL.md` |
 | `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |
-| `tools/**`, `ci/**`, `scripts/agent-hooks/**` | `process/references/verification-loop.md` (y §8: requiere aprobación del owner) |
+
+**Esta tabla es exactamente el conf, ni una fila más.** La coherencia entre ambos la verifica
+`tools/check-skill-matrix-doc.sh` comparando el conjunto de referencias de los dos lados; si
+añades una lectura obligatoria aquí y no al conf, falla. Y falla *en esa dirección a propósito*:
+una fila aquí sin respaldo en el conf es una defensa **anunciada que no existe**, que es el
+único pecado que este harness no comete (§14.4).
+
+> Tocar `tools/**`, `ci/**` o `scripts/agent-hooks/**` **no** está en la tabla, y no es un
+> olvido: `skill-reminder` excluye esas rutas a propósito (editar la doc o el tooling de un área
+> no es editar el código de ese área — era un falso positivo real, fijado por
+> `test_skill_reminder.sh`). Su gate es otro y es más fuerte: §8 exige **aprobación explícita del
+> owner** para tocar tooling compartido. La lectura recomendada antes de hacerlo sigue siendo
+> `process/references/verification-loop.md`, pero es una recomendación, no un bloqueo — y
+> decirlo así es la diferencia entre documentar un gate y fingirlo.
 
 > El **gate duro** es el hook `skill-reminder` (lee `tools/skill-matrix.conf`). Como camino
 > feliz, `.claude/rules/*.md` puede inyectar recordatorios por path en Claude Code. Nota

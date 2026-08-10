@@ -601,3 +601,164 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** tools/tests/test_lessons.sh::test_mencionar_un_comentario_html_no_abre_un_comentario_html
   (una lección que menciona un comentario HTML conserva su Detector Y no borra la siguiente)
 - **Área:** tools/lesson-detector-link.sh
+
+### [2026-08-10] `.claude/settings.json` es maquinaria viviendo en una carpeta de contenido
+- **Qué pasó:** el sync excluye `.claude/`, `.agents/` y `docs/` a propósito — ahí vive lo del
+  proyecto. Pero dentro de `.claude/settings.json` están los **hooks (Anillo 2)** y los
+  **permisos (Anillo 0)**. De una tanda de tres arreglos del template, solo uno llegó solo; el
+  `allow` de `findings.sh` y una nota de una skill hubo que traerlos a mano, y únicamente
+  porque a alguien se le ocurrió comparar contra `template/main`. Peor: en la pasada que acabó
+  en conflicto, el informe de "esto cambió y no lo he tocado" no llegó a imprimirse, así que no
+  había ni la pista.
+- **Causa raíz:** dos. La clasificación era por CARPETA cuando la propiedad es por CONTENIDO —
+  un archivo de maquinaria dentro de una carpeta de contenido cae en la grieta. Y el informe de
+  honestidad solo salía por el camino feliz: un aviso que aparece solo cuando todo va bien no
+  es un aviso, es una felicitación.
+- **Regla:** para lo que es maquinaria y vive mezclado, ni `checkout` (pisa lo del proyecto) ni
+  exclusión (se queda atrás en silencio): **merge de claves que SOLO AÑADE**, imprimiendo cada
+  añadido para que entre en el diff que el humano revisa. En `deny` eso significa que las
+  prohibiciones solo crecen, como los trinquetes de §9 — la dirección correcta para
+  equivocarse. Y el corolario general: **todo informe de "esto no lo he traído" se imprime en
+  TODOS los caminos de salida, sobre todo en los que fallan.**
+- **Detector:** tools/tests/test_settings_merge.sh (5 casos: solo añade, idempotente, JSON local
+  roto NO se pisa, ausente se copia, template sin el archivo no rompe) +
+  tools/tests/test_upgrade.sh::test_sync_funde_settings_sin_pisar_lo_del_proyecto +
+  ::test_el_informe_sale_tambien_cuando_la_pasada_falla
+- **Área:** tools/upgrade.sh · tools/merge-claude-settings.sh · .claude/settings.json
+
+### [2026-08-10] "Esto lo caza el test X" — y el test X no lo cazaba
+- **Qué pasó:** la cabecera de `tools/skill-matrix.conf` afirmaba que la divergencia entre la
+  tabla de `AGENTS.md §11` y el conf la cazaba `test_skill_matrix.sh`. No era cierto: ese test
+  comprueba que las refs EXISTAN y sean registrables, y nunca compara tabla contra conf. Al
+  escribir el detector de verdad, la primera pasada encontró **dos divergencias vivas**: la
+  tabla exigía leer `platforms/ios.md` antes de tocar una View y el conf no lo pedía (defensa
+  anunciada que no existe), y tenía una fila `tools/**` → `verification-loop.md` que
+  `skill-reminder` NO PUEDE cumplir porque excluye esas rutas a propósito.
+- **Causa raíz:** una afirmación de cobertura escrita de buena fe y nunca comprobada. Es peor
+  que no tener nada: se lee, se cree, y nadie vuelve a mirar — la documentación se convierte en
+  el sitio donde el agujero se esconde.
+- **Regla:** si escribes "esto lo caza X", **abre X y compruébalo en ese momento**. Y cuando
+  mecanices la comparación entre un doc y su fuente, compara el conjunto que IMPORTA (aquí, las
+  referencias), no la forma literal: la tabla agrupa globs y usa prosa a propósito, así que
+  exigir igualdad literal daría un hallazgo por fila y el detector duraría una semana (ley del
+  10%, §14.2). Dirección del fallo: una fila en el doc sin respaldo en el conf es más grave que
+  al revés — es anunciar una defensa que no existe (§14.4).
+- **Detector:** tools/check-skill-matrix-doc.sh +
+  tools/tests/test_skill_matrix.sh::test_la_tabla_y_el_conf_de_ESTE_repo_coinciden (más los tres
+  casos de sandbox y el guard de falso positivo del glob que acaba en `.md`)
+- **Área:** tools/skill-matrix.conf · AGENTS.md §11
+
+### [2026-08-10] Un manifiesto mantenido a mano no puede vigilarse a sí mismo
+- **Qué pasó:** `test_meta_fp.sh` exige que todo detector tenga tests de falso positivo, pero
+  solo mira lo que está EN su manifiesto. Al revisarlo había **cinco detectores fuera**
+  (`check-conflict-markers`, `check-exec-bits`, `check-diff-nature`, `check-ring3` y el propio
+  `check-skill-matrix-doc`), todos con sus tests de FP ya escritos y ninguno declarado. El
+  meta-test daba verde porque lo que faltaba no se contaba a sí mismo.
+- **Causa raíz:** la lista era la fuente de verdad de su propia cobertura. Un inventario que se
+  mantiene a mano mide lo que recuerdas, no lo que hay.
+- **Regla:** todo manifiesto/inventario de cobertura necesita un check que lo compare contra la
+  **realidad del disco**, no solo contra sí mismo. Y ojo al criterio de exención: aquí no hizo
+  falta ninguna (todos los `tools/check-*.sh` son detectores), y eso es bueno — una lista de
+  exenciones se convierte enseguida en la vía para silenciar el meta-detector.
+- **Detector:** tools/tests/test_meta_fp.sh::test_ningun_detector_se_queda_fuera_del_manifiesto
+  (recorre `tools/check-*.sh` del disco y exige que cada uno esté declarado)
+- **Área:** tools/tests/test_meta_fp.sh
+
+### [2026-08-10] Una regla de adopción que solo vive en un doc se descubre tarde
+- **Qué pasó:** `ADOPTION.md` decía que `tools/layers.conf` se AMPLÍA y no se reescribe.
+  Un adoptante lo reescribió con las rutas de su proyecto y le reventaron cinco tests del
+  harness, que copian ese conf a un sandbox con rutas genéricas (`src/Domain/`). Cinco rojos
+  que no mencionaban `layers.conf` por ninguna parte: perdió una tarde.
+- **Causa raíz:** la regla estaba escrita donde se lee UNA vez (la guía de adopción) y se
+  necesitaba en el momento de editar, semanas después. Y el fallo aparecía lejos de la causa.
+- **Regla:** una regla de adopción con consecuencia mecánica va acompañada de su detector, y el
+  mensaje del detector lleva la CAUSA, no solo el síntoma. El doc explica el porqué; el test lo
+  dice cuando importa.
+- **Detector:** tools/tests/test_layers.sh::test_layers_conf_conserva_los_globs_universales
+- **Área:** tools/layers.conf · docs/ADOPTION.md §4
+
+### [2026-08-10] El estado real de una historia no vive donde el selector miraba
+- **Qué pasó:** el runner del backlog marca `in-review` **dentro** de la rama `story/NNNN`.
+  Desde `develop`, una historia terminada y esperando merge sigue diciendo `ready`, así que
+  `next.sh` la devolvía otra vez. `backlog/README` promete que una rama en `in-review` no se
+  re-trabaja; el selector no podía cumplirlo porque el marcador vive donde no miraba. Con
+  `story/0005` terminada, un run desatendido habría rehecho ~500 líneas ya verificadas — y
+  mientras tanto el backlog no avanzaba a la 0006.
+- **Causa raíz:** una promesa escrita en un doc cuyo mecanismo estaba en otra capa. Y el
+  agravante: cuanto más tarda el humano en mergear, más probable es el destrozo — o sea, el
+  fallo escala justo en el escenario para el que existe un runner desatendido.
+- **Regla:** cuando un estado se escribe en un sitio y se lee en otro, **lee el hecho
+  observable**, no el registro que puede estar desincronizado: aquí, la RAMA. Y ojo al arreglo
+  ingenuo, que era mi primer instinto: "saltar si existe la rama" deja huérfana para siempre
+  una historia cuyo run se cortó a medias. Hay que distinguir `in-review` (terminada → saltar y
+  seguir con la siguiente) de cualquier otro estado (a medias → devolverla para retomar). Ante
+  la duda, devolver: retomar es reversible; olvidar una historia, no.
+- **Detector:** tools/tests/test_backlog.sh::test_historia_terminada_en_rama_no_se_reofrece_y_avanza
+  + ::test_historia_a_medias_se_sigue_ofreciendo_para_retomarla (la otra cara)
+  + ::test_mergeada_sin_marcar_done_se_avisa + ::test_sin_ramas_el_selector_no_cambia (FP guard)
+- **Área:** tools/backlog/next.sh
+
+### [2026-08-10] Un `||` que no distingue "no pude mirar" de "encontré algo"
+- **Qué pasó:** buscando por qué el escaneo de secretos daba rojo perpetuo apareció algo peor
+  en el mismo archivo. `secret-scan.sh --range` era
+  `gitleaks … --log-opts=RANGO 2>/dev/null || gitleaks --staged …`. Las dos ramas del `||` son
+  exit != 0, pero significan cosas opuestas: "el rango no se resuelve" y "gitleaks **encontró
+  un secreto**". Ante una fuga real en el rango, el script se iba al fallback, escaneaba el
+  índice —vacío en CI— y salía 0. **El gate de secretos daba verde sobre una fuga**, y el
+  `2>/dev/null` borraba el motivo.
+- **Causa raíz:** el mismo error que el harness persigue todo el día (la operación falla y
+  reporta éxito), escrito dentro del gate que más caro sale que falle así. El `||` de shell
+  colapsa todos los fallos en uno solo; el contrato de §14.3 existe precisamente para no
+  colapsarlos.
+- **Regla:** un fallback nunca se cuelga de un exit code genérico. Se valida la
+  **precondición** por separado (aquí: resolver el rango con `git rev-list --count`) y, si no
+  se cumple, se sale con **3** — "no pude mirar" — que en local avisa y en CI bloquea. Jamás se
+  escanea otra cosa en su lugar: un scan que no miró lo que debía no puede parecerse a un scan
+  limpio. Corolario para los tests: el fake tiene que **distinguir** los casos que el bug
+  confundía. El primer intento de este test devolvía lo mismo siempre y pasaba con el bug
+  puesto — un test que no reproduce el fallo no es un test.
+- **Detector:** tools/tests/test_secret_scan.sh::test_un_hallazgo_en_el_rango_nunca_sale_verde
+  + ::test_rango_irresoluble_devuelve_3_no_0 + ::test_range_usa_gates_base_ref_cuando_no_hay_upstream
+- **Área:** tools/secret-scan.sh · ci/run-gates.sh
+
+### [2026-08-10] Un gate en rojo perpetuo es peor que un gate ausente
+- **Qué pasó:** el paso 2 de CI escaneaba el historial COMPLETO en cada corrida. El commit de
+  scaffold del template contiene el literal del simulacro de `ADOPTION §7` — una clave falsa
+  *detectable a propósito*, porque si no lo fuera el simulacro no probaría que el Anillo 1
+  bloquea. Resultado: rojo permanente en el template y en todos sus clones.
+- **Causa raíz:** el gate respondía la pregunta equivocada. "¿Queda algo enterrado de antes?"
+  no es la pregunta de un gate por cambio; la suya es "¿ESTE cambio mete un secreto?". Mezclar
+  las dos convierte un hallazgo antiguo en un bloqueo eterno de trabajo ajeno.
+- **Regla:** cada gate responde UNA pregunta, y la frecuencia se elige por la pregunta:
+  por-cambio lo que depende del cambio, programado lo que depende del historial. Y sobre el
+  arreglo tentador: **allowlistear el valor del simulacro habría dejado mudos el propio
+  simulacro y el selftest de `validate-harness`**, que usan ese mismo literal para demostrar
+  que el detector VE — un gate que se prueba a sí mismo con un valor que ignora no prueba nada.
+  Reescribir el historial tampoco: cambiaría todos los SHAs y rompería el remote `template` y
+  el `.template-sync` de cada adoptante. Va al baseline, que es deuda DECLARADA.
+- **Detector:** tools/tests/test_secret_scan.sh::test_el_valor_del_simulacro_nunca_se_allowlistea
+  (falla si alguien mete ese literal en el allowlist de .gitleaks.toml) + tools/secret-baseline.sh
+- **Área:** ci/run-gates.sh · .gitleaks.toml · docs/ADOPTION.md §6
+
+### [2026-08-10] El guard colgaba del exit code de jq, y jq cambió de opinión entre versiones
+- **Qué pasó:** `semgrep-scan.sh` protege contra el fallo más caro posible —la herramienta
+  revienta, no escribe JSON, todos los `jq` caen a su fallback `0` y el resultado es
+  indistinguible de "todo limpio"—. El guard era `jq -e . "$OUT"`. Pero **`jq -e .` sobre un
+  archivo VACÍO devuelve 0 en jq 1.6 y 4 en jq 1.7**. En cualquier máquina con jq 1.6 (Ubuntu
+  22.04, muchos Homebrew) el guard estaba INERTE: un semgrep reventado salía
+  `SEMGREP_SUMMARY errors=0 warns=0` con exit 0. Verde sobre un scan que nunca corrió.
+  El test que lo cubría existía desde hacía semanas y pasaba — en la máquina de quien lo
+  escribió, que tenía jq 1.7. Se cazó al correr la suite completa en OTRA máquina.
+- **Causa raíz:** delegar la SEMÁNTICA del guard en el exit code de una herramienta externa. El
+  archivo vacío es precisamente el síntoma de "no corrió", y era justo el caso donde las dos
+  versiones discrepan. (La basura no-JSON la cazan ambas: 4 y 5.)
+- **Regla:** comprueba la condición **con bash** cuando puedas —`[ ! -s "$OUT" ]` es una línea y
+  no tiene versiones— y usa la herramienta externa solo para lo que solo ella sabe hacer. Y para
+  el test: si el guard depende de una herramienta de terceros, **stubéala con la semántica
+  PERMISIVA** en vez de confiar en la que tengas instalada; si no, el test solo prueba tu
+  portátil. Tercera vez que un bug de este harness vive únicamente en una plataforma concreta
+  (antes: `stat -c/-f`, y los permisos heredados por los stubs).
+- **Detector:** tools/tests/test_fail_closed.sh::test_el_guard_de_json_no_depende_de_la_version_de_jq
+  (instala un `jq` de mentira que aprueba todo; el gate debe seguir dando exit 3) junto a
+  ::test_semgrep_que_revienta_no_pasa_por_limpio
+- **Área:** tools/semgrep-scan.sh

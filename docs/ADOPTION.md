@@ -121,6 +121,9 @@ Prioridad de relleno (en orden de impacto — es la pirámide de
    (`*/Domain/*`, `*/domain/*`…) y añade los tuyos debajo. Sustituirlos rompe cinco tests
    del propio harness, que copian este conf a un sandbox con rutas genéricas (`src/Domain/`)
    — y el fallo aparece lejos del cambio, en la suite, no en tu proyecto.
+   Ya no depende de que leas esto: `test_layers.sh::test_layers_conf_conserva_los_globs_universales`
+   falla con la causa en el mensaje. Una regla de adopción que solo vive en un doc la
+   descubre el adoptante *después* de perder la tarde; con detector, la descubre al minuto.
 6. `tools/semgrep/rules/` — tus anti-patrones como reglas AST. **Ejecuta el scan una vez**
    (`bash tools/semgrep-scan.sh`): `--validate` solo valida el YAML, no el parseo por
    lenguaje — nos pasó (PRD 0001 §18 G15).
@@ -174,11 +177,30 @@ cada `SessionStart`, que es la única forma honesta de operar sin él.
 ## 6. Baseline de secretos (solo si el repo ya tiene historial)
 
 ```bash
-gitleaks detect --source . --report-format json --report-path .gitleaks-baseline.json
+bash tools/secret-baseline.sh
+bash tools/secret-baseline.sh --show
 git add .gitleaks-baseline.json
 ```
 
-Rota cualquier credencial aún válida. El baseline es **deuda**, no exención: encógelo con el tiempo.
+Rota cualquier credencial aún válida **antes** de escribir el baseline. Silenciar una
+credencial viva es peor que no tener el gate: te deja creyendo que estás cubierto. El baseline
+es **deuda**, no exención: encógelo con el tiempo.
+
+**Si clonaste este template, tienes un hallazgo heredado y es esperable.** El commit de
+scaffold contiene el literal del simulacro del §7 — una clave falsa que es *detectable a
+propósito*, porque si no lo fuera el §7 no probaría nada. No se arregla con un allowlist de ese
+valor: dejaría mudos el propio simulacro y el selftest de `validate-harness`, que lo usan para
+demostrar que el detector VE (lo fija
+`test_secret_scan.sh::test_el_valor_del_simulacro_nunca_se_allowlistea`). Tampoco reescribiendo
+el historial: cambiaría todos los SHAs y rompería el remote `template` y el registro
+`tools/.template-sync` de cada proyecto. Va al baseline, que es donde va la deuda declarada.
+
+> **Y por eso el paso 2 de CI escanea el RANGO del cambio, no el historial.** Preguntar "¿queda
+> algo enterrado de antes?" en cada PR deja el gate en rojo perpetuo por un hallazgo antiguo —
+> y un gate siempre rojo es peor que uno ausente: se aprende a ignorar, y con él se ignora el
+> rojo del día que importa. El historial se escanea aquí (una vez) y en un job **programado**
+> con `GATES_SECRET_MODE=history`. El secreto que entra hoy lo cazan igual el Anillo 1 y el
+> escaneo del rango.
 
 ## 7. Primer commit de prueba
 

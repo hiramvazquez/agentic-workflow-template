@@ -50,9 +50,27 @@ else
 fi
 
 # 2) Secretos — OBLIGATORIO en CI (a diferencia de local, aquí sí bloquea).
-step "2/8 secret-scan (gitleaks)"
+#
+# ⚠️ MODO `range`, NO `history`, y la razón importa: este paso responde a
+# "¿ESTE cambio mete un secreto?". El historial completo responde a otra
+# pregunta —"¿queda algo enterrado de antes?"— y responderla en cada PR tiene
+# un efecto perverso demostrado en vivo: un hallazgo antiguo (en el template,
+# el literal del simulacro de ADOPTION §7, del commit de scaffold) deja el paso
+# 2 en ROJO PERPETUO para el repo y para todos sus clones. Y un gate siempre
+# rojo es peor que un gate ausente: se aprende a ignorar, y con él se ignora el
+# rojo del día que sí importa (ley del 10%, AGENTS §14.2).
+#
+# El historial se escanea donde corresponde: UNA vez al adoptar y luego en un
+# job PROGRAMADO (`GATES_SECRET_MODE=history`), donde un hallazgo se tría una
+# vez y se registra en `.gitleaks-baseline.json` — ver `tools/secret-baseline.sh`.
+# El secreto que se introduce HOY lo cazan igual el Anillo 1 (pre-commit) y
+# este paso; el historial no añade nada a esa pregunta.
+step "2/8 secret-scan (gitleaks · modo ${GATES_SECRET_MODE:-range})"
 if command -v gitleaks >/dev/null 2>&1; then
-  bash tools/secret-scan.sh "--${GATES_SECRET_MODE:-history}" || FAIL=1
+  bash tools/secret-scan.sh "--${GATES_SECRET_MODE:-range}"; _rc=$?
+  # exit 3 = "el detector no pudo mirar" (rango irresoluble). En CI eso BLOQUEA:
+  # el fail-open local de §14.3 solo es legítimo porque este backstop existe.
+  [ "$_rc" -ne 0 ] && FAIL=1
 else
   echo "❌ gitleaks ausente en CI — instálalo en el runner (es obligatorio aquí)."; FAIL=1
 fi

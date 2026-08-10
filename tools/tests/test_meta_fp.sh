@@ -31,6 +31,11 @@ scripts/agent-hooks/post-edit-verify.sh      :: test_post_edit_verify.sh
 scripts/agent-hooks/drift-stop.sh            :: test_drift_stop.sh
 scripts/agent-hooks/session-start.sh         :: test_session_start.sh
 tools/check-layers.sh                        :: test_layers.sh
+tools/check-conflict-markers.sh              :: test_conflict_markers.sh
+tools/check-exec-bits.sh                     :: test_exec_bits.sh
+tools/check-diff-nature.sh                   :: test_diff_nature.sh
+tools/check-ring3.sh                         :: test_ring3.sh
+tools/check-skill-matrix-doc.sh              :: test_skill_matrix.sh
 tools/check-drift.sh                         :: test_drift_aggregation.sh
 tools/check-review-marker.sh                 :: test_review_marker_preset.sh
 tools/drift-ratchet.sh                       :: test_ratchets.sh
@@ -77,7 +82,31 @@ test_todo_detector_tiene_tests_de_falso_positivo() {
 test_el_manifiesto_no_esta_vacio() {
   local n
   n="$(printf '%s\n' "$MANIFEST" | grep -c '::' || true)"
-  [ "${n:-0}" -ge 14 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥14) — ¿se rompió el formato?"; return 1; }
+  [ "${n:-0}" -ge 20 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥20) — ¿se rompió el formato?"; return 1; }
+}
+
+# ── El manifiesto tampoco puede quedarse ATRÁS (f-meta-fp-manifiesto) ──
+# Un manifiesto que se mantiene a mano es una lista que alguien tiene que
+# acordarse de actualizar — y este test solo mira lo que hay EN la lista, así
+# que un detector ausente es invisible para el meta-detector. Se comprobó y
+# había cinco fuera (conflict-markers, exec-bits, diff-nature, ring3 y el
+# propio skill-matrix-doc): todos con tests de FP escritos, ninguno declarado.
+# Es el modo de fallo de siempre — la cobertura parecía completa porque lo que
+# faltaba no se contaba a sí mismo.
+test_ningun_detector_se_queda_fuera_del_manifiesto() {
+  local f fuera=""
+  for f in "$PROJECT_ROOT"/tools/check-*.sh; do
+    [ -f "$f" ] || continue
+    local rel="tools/$(basename "$f")"
+    printf '%s' "$MANIFEST" | grep -q "^${rel} " || fuera="${fuera}      $rel"$'\n'
+  done
+  [ -z "$fuera" ] && return 0
+  echo "    Detectores que existen pero NO están en el manifiesto:"
+  printf '%s' "$fuera"
+  echo "    Añádelos arriba con su archivo de tests de FP. Un detector fuera del"
+  echo "    manifiesto es invisible para este meta-test: la cobertura parece"
+  echo "    completa justo porque lo que falta no se cuenta a sí mismo."
+  return 1
 }
 
 # ── FALSO POSITIVO guard del propio meta-detector (f-meta-fp-self) ──

@@ -115,6 +115,7 @@ _upg_sandbox_copia() { # TEMPLATE y PROYECTO con historias SEPARADAS
     stub scripts/gate.sh 'v2 maquinaria del template\n'
     mkdir -p tools
     cp "$PROJECT_ROOT/tools/upgrade.sh" tools/upgrade.sh
+    cp "$PROJECT_ROOT/tools/merge-claude-settings.sh" tools/merge-claude-settings.sh
     printf 'stack: <!-- FILL -->\n' > AGENTS.md
     git add -A; git commit -qm "template"
   )
@@ -346,4 +347,61 @@ _case_puente_desde_la_v1() {
 }
 test_puente_desde_el_mecanismo_viejo_de_autoactualizacion() {
   _upg_sandbox_copia _case_puente_desde_la_v1
+}
+
+# ════════════════════════════════════════════════════════════════════
+# .claude/settings.json: la única parte de `.claude/` que es maquinaria
+# ════════════════════════════════════════════════════════════════════
+# `SYNC_PATHS` excluye `.claude/` con razón (ahí vive contenido del proyecto),
+# pero dentro de settings.json están los HOOKS (Anillo 2) y los PERMISOS
+# (Anillo 0). Al quedar fuera se quedaban atrás en silencio: de tres arreglos
+# de una tanda, solo uno llegó solo — el `allow` de findings.sh hubo que
+# traerlo a mano. (f-sync-no-cubre-claude.)
+_case_sync_funde_settings() {
+  mkdir -p .claude
+  printf '%s\n' '{"permissions":{"allow":["Bash(mi-comando:*)"],"deny":["Read(./secretos/**)"]},"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"mio.sh"}]}]}}' > .claude/settings.json
+  git add -A; git commit -qm "proyecto: sus permisos" 2>/dev/null
+  ( cd "$TPL_DIR" && mkdir -p .claude \
+    && printf '%s\n' '{"permissions":{"allow":["Bash(bash tools/findings/findings.sh:*)"],"deny":["Write(./tools/preset)"]},"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"canon-enforce.sh"}]}]}}' > .claude/settings.json \
+    && git add -A && git commit -qm "template: hooks y permisos" ) >/dev/null 2>&1
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'mi-comando' .claude/settings.json \
+    || { echo "    el merge PISÓ el allow del proyecto"; return 1; }
+  grep -q 'findings.sh' .claude/settings.json \
+    || { echo "    no llegó el allow del template (el Anillo 0 se queda atrás)"; return 1; }
+  grep -q 'mio.sh' .claude/settings.json \
+    || { echo "    el merge borró un hook del proyecto"; return 1; }
+  grep -q 'canon-enforce.sh' .claude/settings.json \
+    || { echo "    no llegó el hook del template (el Anillo 2 se queda atrás)"; return 1; }
+  grep -q 'tools/preset' .claude/settings.json \
+    || { echo "    no llegó el deny del template (las prohibiciones solo crecen)"; return 1; }
+}
+test_sync_funde_settings_sin_pisar_lo_del_proyecto() {
+  _upg_sandbox_copia _case_sync_funde_settings
+}
+
+_case_informe_sale_aunque_haya_conflicto() {
+  # El informe de "cambió en el template y NO lo he tocado" solo salía por el
+  # camino feliz. En una pasada que acabó en conflicto, un adoptante se quedó
+  # sin saber que le esperaban arreglos en .agents/skills/ y docs/. Un aviso
+  # que solo aparece cuando todo va bien no es un aviso.
+  bash tools/upgrade.sh >/dev/null 2>&1
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  # El template toca maquinaria Y una skill; el proyecto toca la MISMA línea
+  # de esa maquinaria → el delta entra en conflicto y la pasada acaba antes.
+  ( cd "$TPL_DIR" && mkdir -p .agents/skills scripts \
+    && stub scripts/gate.sh 'version del TEMPLATE\n' \
+    && printf 'nota nueva del template\n' > .agents/skills/swift.md \
+    && git add -A && git commit -qm "template: maquinaria + skill" ) >/dev/null 2>&1
+  stub scripts/gate.sh 'version del PROYECTO\n'
+  git add -A; git commit -qm "proyecto: su gate" 2>/dev/null
+  local out; out="$(bash tools/upgrade.sh 2>&1)"
+  case "$out" in *"NO lo he tocado"*".agents/skills/swift.md"*) return 0 ;; esac
+  case "$out" in *"conflicto"*|*"no pude aplicar"*) : ;; *)
+    echo "    el escenario no acabó en conflicto; el test no prueba nada: $out"; return 1 ;; esac
+  echo "    la pasada acabó pronto y NO informó de lo que espera sin traer"
+  return 1
+}
+test_el_informe_sale_tambien_cuando_la_pasada_falla() {
+  _upg_sandbox_copia _case_informe_sale_aunque_haya_conflicto
 }

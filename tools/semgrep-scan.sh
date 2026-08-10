@@ -95,7 +95,17 @@ fi
 # indistinguible de "todo limpio". Es la variante más severa del mismo fallo
 # que el de las reglas rotas — no es "una regla no carga", es "la herramienta
 # no corrió". Se valida el JSON ANTES de confiar en cualquier conteo derivado.
-if ! jq -e . "$OUT" >/dev/null 2>&1; then
+# ⚠️ EL `[ ! -s ]` VA PRIMERO Y NO ES REDUNDANTE — es el guard entero.
+# `jq -e .` sobre un archivo VACÍO devuelve exit 0 en jq 1.6 y exit 4 en jq 1.7.
+# O sea que en jq 1.6 (Ubuntu 22.04, muchos Homebrew) esta protección estaba
+# INERTE: un semgrep que revienta dejaba $OUT vacío, jq decía "válido", y el
+# scan salía `errors=0 warns=0` con exit 0. Verde sobre un scan que no corrió,
+# en unas máquinas sí y en otras no — el peor sabor de bug, porque el test que
+# lo cubría pasaba en el portátil de quien lo escribió. Se cazó corriendo la
+# suite en OTRA máquina con jq 1.6.
+# (La basura no-JSON sí la cazan las dos versiones: 4 y 5. La divergencia es
+# exclusivamente el archivo vacío, que es justo el síntoma de "no corrió".)
+if [ ! -s "$OUT" ] || ! jq -e . "$OUT" >/dev/null 2>&1; then
   {
     echo "❌ semgrep: no produjo JSON válido — el detector NO corrió."
     echo "   Causas típicas: crash (OOM), flag inválido, binario corrupto."

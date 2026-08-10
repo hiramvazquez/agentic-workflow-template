@@ -79,3 +79,25 @@ _case_contrato_de_salida() {
   echo "    falta la línea LAYERS_SUMMARY. salida: $out"; return 1
 }
 test_emite_contrato_layers_summary() { _layers_sandbox _case_contrato_de_salida; }
+
+# ── El conf se AMPLÍA, nunca se reescribe (f-25418f4c) ──────────────
+# Al adoptar el harness, la tentación es sustituir estos globs por los de tu
+# proyecto. Rompe CINCO tests de este archivo, que copian el conf real a un
+# sandbox con rutas genéricas (`src/Domain/`) — y el fallo aparece lejos de la
+# causa: cinco rojos que no mencionan layers.conf por ninguna parte. Le pasó a
+# un adoptante real, que perdió una tarde en ello.
+# ADOPTION.md §4 punto 5 lo dice en prosa; esto lo dice cuando importa, con la
+# causa en el mensaje. Es la diferencia entre una nota y un detector.
+test_layers_conf_conserva_los_globs_universales() {
+  local g faltan=""
+  for g in '*/Domain/*' '*/domain/*'; do
+    grep -qF "$g" tools/layers.conf 2>/dev/null || faltan="$faltan $g"
+  done
+  [ -z "$faltan" ] && return 0
+  echo "    tools/layers.conf ya no cubre:$faltan"
+  echo "    El conf se AMPLÍA, no se reescribe: conserva los globs universales"
+  echo "    que trae el template y añade los TUYOS debajo. Los tests de este"
+  echo "    archivo montan un sandbox con rutas genéricas (src/Domain/), así"
+  echo "    que sustituirlos deja el nivel 6 sin probar y sin que se note."
+  return 1
+}

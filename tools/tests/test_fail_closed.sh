@@ -255,3 +255,35 @@ _case_hallazgo_real_da_exit_1() {
   [ "$rc" = "1" ] || { echo "    un hallazgo real no dio exit 1 (obtenido: $rc)"; return 1; }
 }
 test_hallazgo_real_da_exit_1_no_3() { _fc_sandbox _case_hallazgo_real_da_exit_1; }
+
+# ── El guard no puede depender de la VERSIÓN de jq ──────────────────
+# `jq -e .` sobre un archivo VACÍO devuelve 0 en jq 1.6 y 4 en jq 1.7. El
+# chequeo de "semgrep produjo JSON válido" colgaba de ese exit code, así que en
+# jq 1.6 estaba INERTE: un semgrep reventado salía `errors=0 warns=0`, exit 0.
+# El test de arriba lo cazaba… solo en máquinas con jq 1.7. Este lo caza en
+# todas, porque instala un `jq` de mentira con la semántica PERMISIVA: aunque
+# jq jure que un archivo vacío es JSON válido, el gate no puede aprobar.
+_case_guard_no_depende_de_la_version_de_jq() {
+  cat > bin/semgrep <<'EOF'
+#!/usr/bin/env bash
+echo "Fatal error: out of memory" >&2
+exit 2
+EOF
+  chmod +x bin/semgrep
+  # jq "1.6": todo lo que le pasen es válido y vacío.
+  cat > bin/jq <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x bin/jq
+  echo "rules: []" > tools/semgrep/rules/dummy.yaml
+  local out rc; out="$(bash tools/semgrep-scan.sh 2>/dev/null)"; rc=$?
+  [ "$rc" = "3" ] || {
+    echo "    con un jq permisivo (1.6), un semgrep REVENTADO salió con exit $rc"
+    echo "    y '$out' — el gate aprueba un scan que nunca corrió, en unas"
+    echo "    máquinas sí y en otras no. El guard no puede colgar del exit de jq."
+    return 1; }
+}
+test_el_guard_de_json_no_depende_de_la_version_de_jq() {
+  _fc_sandbox _case_guard_no_depende_de_la_version_de_jq
+}

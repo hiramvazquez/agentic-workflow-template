@@ -165,3 +165,78 @@ EOF
     || { echo "    una historia SIN criterios de aceptación no quedó blocked (§1.4: no se improvisa)"; return 1; }
 }
 test_historia_sin_criterios_queda_blocked() { _bl_sandbox _case_sin_criterios_se_bloquea; }
+
+# ════════════════════════════════════════════════════════════════════
+# f-runner-retrabaja — el estado real no está solo en la rama base
+# ════════════════════════════════════════════════════════════════════
+# El `in-review` lo commitea el runner DENTRO de story/NNNN, así que desde
+# develop una historia terminada sigue diciendo `ready` y el selector la
+# devolvía otra vez. Con el humano tardando en mergear —el escenario para el
+# que existe un runner desatendido— eso es rehacer trabajo ya verificado, y
+# mientras tanto no avanzar a la siguiente.
+_rama_con_estado() { # _rama_con_estado <rama> <archivo> <estado>
+  local actual; actual="$(git rev-parse --abbrev-ref HEAD)"
+  git checkout -q -b "$1" 2>/dev/null || git checkout -q "$1"
+  sed -i.bak "s/^status: .*/status: $3/" "$2" && rm -f "$2.bak"
+  git add -A >/dev/null 2>&1; git commit -qm "estado $3 en $1" >/dev/null 2>&1
+  git checkout -q "$actual"
+}
+
+_case_terminada_en_su_rama_no_se_reofrece() {
+  _story 0005-e.md 0005 ready ""
+  _story 0006-f.md 0006 ready ""
+  git add -A >/dev/null 2>&1; git commit -qm "backlog" >/dev/null 2>&1
+  _rama_con_estado story/0005-e backlog/0005-e.md in-review
+  local out; out="$(bash tools/backlog/next.sh 2>/dev/null)"
+  case "$out" in *0005-e.md)
+    echo "    re-ofreció una historia TERMINADA que espera merge (~rehacerla desde cero)"; return 1 ;;
+  esac
+  case "$out" in *0006-f.md) return 0 ;; esac
+  echo "    saltó la 0005 pero tampoco avanzó a la 0006 (el backlog se para): '$out'"
+  return 1
+}
+test_historia_terminada_en_rama_no_se_reofrece_y_avanza() {
+  _bl_sandbox _case_terminada_en_su_rama_no_se_reofrece
+}
+
+_case_trabajo_a_medias_si_se_retoma() {
+  # La otra cara, y la que hace peligroso el arreglo ingenuo ("saltar si existe
+  # la rama"): un run que se cortó deja la rama en `in-progress`. Si el selector
+  # la saltara, esa historia quedaría huérfana PARA SIEMPRE — nadie la volvería
+  # a ofrecer nunca. Se devuelve: run.sh sabe retomar el worktree.
+  _story 0005-e.md 0005 ready ""
+  git add -A >/dev/null 2>&1; git commit -qm "backlog" >/dev/null 2>&1
+  _rama_con_estado story/0005-e backlog/0005-e.md in-progress
+  local out; out="$(bash tools/backlog/next.sh 2>/dev/null)"
+  case "$out" in *0005-e.md) return 0 ;; esac
+  echo "    una historia a MEDIAS quedó huérfana: nadie la volverá a ofrecer ('$out')"
+  return 1
+}
+test_historia_a_medias_se_sigue_ofreciendo_para_retomarla() {
+  _bl_sandbox _case_trabajo_a_medias_si_se_retoma
+}
+
+_case_mergeada_sin_marcar_avisa() {
+  # Si el humano mergea y olvida poner `done` en la base, las dependientes no
+  # se desbloquean nunca y el backlog se para sin que nadie vea por qué.
+  _story 0005-e.md 0005 in-review ""
+  _story 0006-f.md 0006 ready "0005"
+  git add -A >/dev/null 2>&1; git commit -qm "backlog" >/dev/null 2>&1
+  local err; err="$(bash tools/backlog/next.sh 2>&1 >/dev/null)"
+  case "$err" in *"MERGEADA"*|*"status: done"*) return 0 ;; esac
+  echo "    no avisó de la historia mergeada sin marcar (el backlog se para en silencio)"
+  return 1
+}
+test_mergeada_sin_marcar_done_se_avisa() { _bl_sandbox _case_mergeada_sin_marcar_avisa; }
+
+_case_sin_ramas_todo_igual() {
+  # FALSO POSITIVO guard: sin ninguna rama story/*, el selector se comporta
+  # exactamente como antes. El arreglo no puede cambiar el caso normal.
+  _story 0001-a.md 0001 done ""
+  _story 0002-b.md 0002 ready ""
+  git add -A >/dev/null 2>&1; git commit -qm "backlog" >/dev/null 2>&1
+  local out; out="$(bash tools/backlog/next.sh 2>/dev/null)"
+  case "$out" in *0002-b.md) return 0 ;; esac
+  echo "    sin ramas, el selector cambió de comportamiento: '$out'"; return 1
+}
+test_sin_ramas_el_selector_no_cambia() { _bl_sandbox _case_sin_ramas_todo_igual; }
