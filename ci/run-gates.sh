@@ -112,11 +112,14 @@ step "6/8 build & tests"
 if [ "${GATES_SKIP_TESTS:-0}" = "1" ]; then
   echo "(saltado por GATES_SKIP_TESTS=1)"
 else
-  # <!-- FILL: invoca el build/test de tu(s) plataforma(s). Ejemplos: -->
-  # ./gradlew testDebugUnitTest || FAIL=1
-  # xcodebuild -scheme <Scheme> -destination '...' test || FAIL=1
-  # npm ci && npm test || FAIL=1
-  echo "<!-- FILL: añade build/test de tu stack en ci/run-gates.sh paso 6 -->"
+  # El comando vive en `tools/verify.conf` — FUENTE ÚNICA, compartida con el
+  # gate local (`tools/verify-run.sh`). Antes era un FILL aquí dentro: solo en
+  # CI, y en local NADA ataba un build verde al diff que se commiteaba.
+  bash tools/verify-run.sh --ci; _rc=$?
+  # exit 3 = sin comando cableado. En CI eso BLOQUEA: un repo donde nadie
+  # compila no puede dar el job por verde (§14.3 — el fail-open local solo es
+  # legítimo porque este backstop existe).
+  [ "$_rc" -ne 0 ] && FAIL=1
 fi
 
 # 7) Mutation score — ¿los tests COMPRUEBAN algo?

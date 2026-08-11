@@ -862,3 +862,48 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   maquinaria). Ojo al matiz que el propio test tuvo que aprender: capturar "hasta el final" de
   la salida incluía el `git diff --cached --stat`, donde lo traído aparece por definición.
 - **Área:** tools/upgrade.sh
+
+### [2026-08-11] El invariante nº1 estaba aplicado al reviewer y no a los tests
+- **Qué pasó:** `check-review-marker.sh` liga el review a `sha256(diff staged)` — un review de otro
+  diff no vale, y eso lleva meses funcionando. Pero **ninguna ejecución de build o de tests estaba
+  ligada a ese mismo diff.** Se podía commitear un árbol que nadie llegó a compilar con todos los
+  gates en verde, porque el reviewer no compila, los trinquetes no compilan y las capas no
+  compilan. El comando de build vivía como un FILL dentro de `ci/run-gates.sh`: solo en CI, y solo
+  como plantilla.
+- **Causa raíz:** se aplicó el rigor al eslabón que se estaba diseñando (el review, donde la
+  desconfianza era obvia porque el que afirma es un modelo) y no al que ya se daba por hecho. Un
+  comando que devuelve 0 también es una afirmación si nadie registra CONTRA QUÉ lo devolvió.
+- **Regla:** toda evidencia se liga al artefacto que la produce — `sha256(diff staged)` + HEAD +
+  TTL — y la firma quien EJECUTA, nunca quien narra. Corolarios que salieron al construirlo y que
+  son la mitad del valor: un build que falla **no firma nada** (un marker tras un fallo convierte
+  el gate en un sello), y no se firma con cambios **sin stagear**, porque entonces lo compilado no
+  es lo que se commitea. Y el comando vive en **un** sitio (`tools/verify.conf`), consumido por el
+  gate local y por CI: dos copias del comando de build divergen igual que dos copias de cualquier
+  otra regla.
+- **Detector:** tools/tests/test_verify_marker.sh (10 casos: sin ejecución no se commitea, el
+  marker caduca al cambiar el diff, un marker a mano se rechaza, un build rojo no firma, no firma
+  sin stagear; más los cuatro falsos positivos — docs, sin comando cableado, preset lite y merge)
+- **Área:** tools/verify-run.sh · tools/check-verify-marker.sh · tools/verify.conf · AGENTS.md §13
+
+### [2026-08-11] Un gate que lee TEXTO como si fuera sintaxis enseña a evadirlo
+- **Qué pasó:** el write-gate de Bash extraía rutas del comando CRUDO, así que un `>` o una ruta
+  dentro de una cadena entrecomillada o de un heredoc contaban como escritura real. Tres falsos
+  positivos en un mismo día en un proyecto real: un mensaje de commit, un comentario dentro de un
+  heredoc, y —el que lo retrata— **el propio comando que registraba el hallazgo en el ledger**. El
+  agente acabó escribiendo la ruta incompleta para poder pasar.
+- **Causa raíz:** confundir el texto de un comando con su sintaxis. Todo lo que va entre comillas
+  o en un heredoc son DATOS: el shell no los interpreta, y el gate tampoco debería.
+- **Regla:** antes de analizar un comando, quítale lo que es texto — cuerpos de heredoc y cadenas
+  entrecomilladas— y analiza lo que queda. Y ancla los patrones de comando al principio de un
+  comando (inicio de línea o tras `;` `&&` `||` `|`): `*cp\ *` casaba la subcadena en cualquier
+  sitio, así que un `--detail "...cp ..."` convertía el último token en un "destino de copia".
+  Lo importante no es el bug: es que **tres falsos positivos en un día ya produjeron evasión**,
+  que es exactamente lo que la ley del 10% predice y por lo que un gate ruidoso es peor que
+  ninguno. El coste asumido —un destino entrecomillado deja de detectarse— es un fallo hacia el
+  lado seguro y está escrito en el propio gate.
+- **Detector:** tools/tests/test_bash_matrix.sh::test_redireccion_entre_comillas_no_bloquea +
+  ::test_el_cuerpo_de_un_heredoc_no_bloquea + ::test_cp_mencionado_en_prosa_no_bloquea +
+  ::test_una_ruta_en_el_mensaje_de_commit_no_bloquea, junto a
+  ::test_la_escritura_real_se_sigue_cazando (un gate que deja de detectar por arreglar sus FP
+  es un gate borrado)
+- **Área:** scripts/agent-hooks/reviewer-gate.sh §0c

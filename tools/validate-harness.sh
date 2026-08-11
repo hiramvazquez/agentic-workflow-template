@@ -147,11 +147,11 @@ fi
 # listos de fábrica. Esto no puede ser un FILL silencioso más.
 echo ""
 echo "── 8. Compilador en los gates ──"
-if grep -q 'FILL: añade build/test' ci/run-gates.sh 2>/dev/null; then
-  warn "ci/run-gates.sh paso 6 sigue en FILL: NINGÚN gate compila ni corre tus tests."
+if ! bash tools/verify-run.sh --cmd-only >/dev/null 2>&1; then
+  warn "tools/verify.conf sigue sin cablear: NINGÚN gate compila ni corre tus tests."
   warn "Los 9 niveles pueden estar en verde con el build ROTO. Cablea build+tests ANTES que nada."
 else
-  ok "ci/run-gates.sh paso 6 cableado (build/tests en el Anillo 3)"
+  ok "tools/verify.conf cableado (build+tests en el gate local Y en el Anillo 3)"
 fi
 
 # ── 8b. ¿EXISTE el Anillo 3? ────────────────────────────────────────

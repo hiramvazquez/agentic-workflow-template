@@ -210,6 +210,15 @@ o `commit -a/-am` evaden esa validación y el gate los rechaza. Override de emer
 `REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...` — **relaja el marker, nunca
 un trinquete** (§9).
 
+**Y el mismo invariante para los TESTS, no solo para el reviewer.** El marker de review se liga a
+`sha256(diff staged)`; durante meses ninguna ejecución de build o de tests se ligaba a ese mismo
+diff, así que se podía commitear un árbol que **nadie llegó a compilar** con todo en verde — el
+reviewer no compila, los trinquetes no compilan y las capas no compilan. `tools/verify-run.sh`
+ejecuta el comando de `tools/verify.conf` (fuente única, compartida con el paso 6 del Anillo 3) y,
+solo si sale 0, firma ese diff; `tools/check-verify-marker.sh` lo exige. Flujo: **stagea →
+`bash tools/verify-run.sh` → commitea**, el mismo que ya pedía el review. Override auditado:
+`VERIFY_OVERRIDE=1 VERIFY_OVERRIDE_REASON="..."`.
+
 **Presets:** con `tools/preset = lite` (uso personal) este gate y el `skill-reminder` AVISAN en vez
 de bloquear; los trinquetes, las capas y `canon-enforce` siguen duros. `full` (equipo) es el default.
 

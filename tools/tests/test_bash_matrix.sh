@@ -104,3 +104,69 @@ _case_docs_exentos() {
   [ "$rc" = "0" ] || { echo "    escribir en docs/ fue bloqueado (exit $rc)"; return 1; }
 }
 test_escribir_documentacion_no_bloquea() { _bm_sandbox _case_docs_exentos; }
+
+# ════════════════════════════════════════════════════════════════════
+# f-gate-bash-lee-texto — el gate leía TEXTO como si fuera sintaxis
+# ════════════════════════════════════════════════════════════════════
+# Tres falsos positivos en un mismo día en un proyecto real: un mensaje de
+# commit, un comentario dentro de un heredoc, y —el que lo retrata— el propio
+# comando que registraba el hallazgo en el ledger. El agente acabó escribiendo
+# la ruta incompleta para poder pasar: la evasión exacta que predice la ley
+# del 10%. Tres FP en un día está muy por encima del umbral.
+
+_case_mensaje_de_commit_no_es_escritura() {
+  # El marker de review en verde: aquí se prueba la MATRIZ sobre el texto del
+  # mensaje, no el gate de commit (que tiene sus propios tests). Sin este stub
+  # el comando se bloquearía por otra razón y el test no probaría nada — pasó
+  # en el primer intento.
+  stub tools/check-review-marker.sh '#!/usr/bin/env bash\nexit 0\n'
+  local rc; rc="$(_bmgate 'git commit -m \"fix(domain): mueve la logica a app/Domain/Movie.swift\"')"
+  [ "$rc" != "2" ] || { echo "    un MENSAJE de commit que nombra una ruta se leyó como escritura"; return 1; }
+}
+test_una_ruta_en_el_mensaje_de_commit_no_bloquea() {
+  _bm_sandbox _case_mensaje_de_commit_no_es_escritura
+}
+
+_case_redireccion_dentro_de_comillas_no_cuenta() {
+  # El caso literal del ledger: el `>` vive dentro de --detail, es prosa.
+  local rc; rc="$(_bmgate 'bash tools/findings/findings.sh add --detail \"el flujo va de A > app/Domain/Movie.swift\"')"
+  [ "$rc" != "2" ] || { echo "    un '>' dentro de una CADENA se leyó como redirección real"; return 1; }
+}
+test_redireccion_entre_comillas_no_bloquea() {
+  _bm_sandbox _case_redireccion_dentro_de_comillas_no_cuenta
+}
+
+_case_heredoc_es_datos_no_comandos() {
+  local rc; rc="$(_bmgate 'cat <<EOF\n# ojo: esto reescribe app/Domain/Movie.swift\nsed -i s/a/b/ app/Domain/Movie.swift\nEOF')"
+  [ "$rc" != "2" ] || { echo "    el CUERPO de un heredoc se leyó como comandos ejecutables"; return 1; }
+}
+test_el_cuerpo_de_un_heredoc_no_bloquea() {
+  _bm_sandbox _case_heredoc_es_datos_no_comandos
+}
+
+_case_cp_en_prosa_no_secuestra_el_ultimo_token() {
+  # `*cp\ *` casaba la subcadena en cualquier sitio: un texto con "cp " convertía
+  # el último token del comando —cualquier cosa— en "destino de copia".
+  local rc; rc="$(_bmgate 'echo \"hay que hacer cp de esto\" >> notas.txt app/Domain/Movie.swift')"
+  [ "$rc" != "2" ] || { echo "    un 'cp ' en prosa secuestró el último token como destino"; return 1; }
+}
+test_cp_mencionado_en_prosa_no_bloquea() {
+  _bm_sandbox _case_cp_en_prosa_no_secuestra_el_ultimo_token
+}
+
+# ── Y la contraparte: lo que SÍ debe seguir bloqueando ──────────────
+# Un gate que deja de detectar por arreglar sus FP es un gate borrado. Estas
+# tres formas reales de escritura tienen que seguir cazándose después del
+# desnudado de comillas y heredocs.
+_case_sigue_cazando_la_escritura_real() {
+  local rc
+  rc="$(_bmgate 'sed -i s/a/b/ app/Domain/Movie.swift')"
+  [ "$rc" = "2" ] || { echo "    tras el arreglo, sed -i dejó de detectarse (exit $rc)"; return 1; }
+  rc="$(_bmgate 'echo x > app/Domain/Movie.swift')"
+  [ "$rc" = "2" ] || { echo "    tras el arreglo, la redirección dejó de detectarse (exit $rc)"; return 1; }
+  rc="$(_bmgate 'cp otro.swift app/Domain/Movie.swift')"
+  [ "$rc" = "2" ] || { echo "    tras el arreglo, cp dejó de detectarse (exit $rc)"; return 1; }
+}
+test_la_escritura_real_se_sigue_cazando() {
+  _bm_sandbox _case_sigue_cazando_la_escritura_real
+}

@@ -94,9 +94,54 @@ done <<< "$(printf '%s' "$CMD" | tr ';&|' '\n')"
 if [ -f "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh" ]; then
   # shellcheck source=lib/skill-matrix.sh
   . "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh"
+  # ⚠️ PRIMERO SE QUITA TODO LO QUE ES *TEXTO*, NO SINTAXIS.
+  # Este gate leía el comando CRUDO, así que cualquier `>` o ruta dentro de una
+  # cadena entrecomillada o de un heredoc contaba como escritura real. Tres
+  # falsos positivos en un mismo día en un proyecto real: un mensaje de commit,
+  # un comentario dentro de un heredoc, y —el que lo retrata— el propio comando
+  # que registraba el hallazgo en el ledger. El agente acabó escribiendo la ruta
+  # incompleta para poder pasar: la evasión exacta que predice la ley del 10%
+  # (§14.2). Tres FP en un día ya está muy por encima del umbral.
+  #
+  # Se quitan, en este orden:
+  #   1. los CUERPOS de heredoc (`<<EOF … EOF`) — son datos, no comandos;
+  #   2. las cadenas entre comillas simples y dobles.
+  # Lo que queda es sintaxis de shell, y ahí un `>` sí es una redirección.
+  #
+  # Coste asumido y declarado: un destino ENTRECOMILLADO (`> "mi archivo.swift"`)
+  # deja de detectarse. Es un fallo hacia el LADO SEGURO —no bloquea de más— y
+  # este gate es conservador en la detección por diseño: un falso positivo lo
+  # apaga entero, un falso negativo lo cubren los otros anillos.
+  _CMD_CLEAN="$(printf '%s\n' "$CMD" | awk '
+    # 1) Cuerpos de heredoc: al ver <<TERM se descarta hasta la línea TERM.
+    !dentro && match($0, /<<-?[[:space:]]*["'"'"']?[A-Za-z_][A-Za-z0-9_]*/) {
+      t = substr($0, RSTART, RLENGTH)
+      gsub(/^<<-?[[:space:]]*["'"'"']?/, "", t)
+      term = t; dentro = 1; print; next
+    }
+    dentro {
+      linea = $0; gsub(/^[[:space:]\t]+|[[:space:]]+$/, "", linea)
+      if (linea == term) dentro = 0
+      next
+    }
+    # 2) Cadenas entrecomilladas: fuera. Son datos que el shell no interpreta
+    #    como redirecciones ni como rutas de escritura.
+    {
+      salida = ""; q = ""
+      n = length($0)
+      for (i = 1; i <= n; i++) {
+        c = substr($0, i, 1)
+        if (q == "") {
+          if (c == "\"" || c == "'"'"'") { q = c; continue }
+          salida = salida c
+        } else if (c == q) { q = ""; salida = salida " " }
+      }
+      print salida
+    }
+  ')"
   # Sin la redirección a /dev/null: es escritura, sí, pero a la papelera.
   # Contarla haría que CUALQUIER comando silenciado disparase el gate.
-  _CMD_CLEAN="$(printf '%s\n' "$CMD" | sed -E 's/2>&1//g; s/[0-9]?>>?[[:space:]]*\/dev\/null//g')"
+  _CMD_CLEAN="$(printf '%s\n' "$_CMD_CLEAN" | sed -E 's/2>&1//g; s/[0-9]?>>?[[:space:]]*\/dev\/null//g')"
   # (a) redirección y tee: el destino es el token siguiente.
   _WRITE_TARGETS="$(printf '%s\n' "$_CMD_CLEAN" \
     | grep -oE '(>>?[[:space:]]*|tee[[:space:]]+(-a[[:space:]]+)?)[^[:space:]|;&<>"'"'"']+' \
@@ -110,11 +155,14 @@ if [ -f "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh" ]; then
       _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s\n' "$_CMD_CLEAN" | tr ' \t' '\n\n' \
         | grep -E '(/|\.[A-Za-z0-9]+$)' | grep -vE '^-|^s/|/$' || true)" ;;
   esac
-  # (c) cp/mv: el destino es el ÚLTIMO argumento.
-  case "$_CMD_CLEAN" in
-    *cp\ *|*mv\ *)
-      _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s' "$_CMD_CLEAN" | awk '{print $NF}')" ;;
-  esac
+  # (c) cp/mv: el destino es el ÚLTIMO argumento. ANCLADO al principio de un
+  #     comando (inicio de línea o tras ; && || |): el patrón antiguo `*cp\ *`
+  #     casaba la subcadena en cualquier sitio, así que un `--detail "...cp ..."`
+  #     o un `grep -c "mv "` convertían el último token del comando —cualquier
+  #     cosa— en un "destino de copia". Segunda cara del mismo FP.
+  if printf '%s' "$_CMD_CLEAN" | grep -qE '(^|[;&|][[:space:]]*)(cp|mv)[[:space:]]'; then
+    _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s' "$_CMD_CLEAN" | awk '{print $NF}')"
+  fi
   # SANEO + DEDUP antes de decidir nada. Sin esto el mensaje del bloqueo salía
   # con la cola del payload pegada al path (`Repo.swift"}}'`) y con la misma
   # ruta repetida tres veces, una por cada extractor que la encontró. En un

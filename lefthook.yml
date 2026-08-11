@@ -72,6 +72,11 @@ pre-commit:
     # no hacía falta `--no-verify` para saltárselo: bastaba commitear desde
     # otra terminal, o desde Codex (que no tiene hooks). Ahora está aquí, que
     # es la única capa que ve TODOS los commits.
+    - name: verify-marker
+      # ¿Alguna ejecución de build+tests está ligada a ESTE diff? El reviewer no
+      # compila, los trinquetes no compilan y las capas no compilan: sin esto se
+      # puede commitear un árbol que nadie llegó a construir.
+      run: bash tools/check-verify-marker.sh
     - name: review-marker
       run: bash tools/check-review-marker.sh --staged
 
