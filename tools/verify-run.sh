@@ -72,6 +72,28 @@ fi
 
 STAGED_SHA="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
 
+# ── "El binario no existe" NO es "tus tests fallan" (§14.3) ─────────
+# Tratar cualquier rc != 0 como fallo del código colapsa las dos cosas que el
+# contrato separa a propósito: 1 = tu código tiene un problema · 3 = el
+# detector no pudo mirar. Un `exit 127` (xcodebuild/gradle/npm fuera del PATH,
+# el caso típico de un runner de CI mal montado o de una máquina nueva) se
+# presentaría como "los tests están rojos", y el dev iría a buscar un bug
+# inexistente. Se comprueba ANTES, con el primer token del comando.
+_BIN="$(printf '%s' "$CMD" | awk '{print $1}')"
+case "$_BIN" in
+  */*) [ -x "$_BIN" ] || _FALTA=1 ;;
+  *)   command -v "$_BIN" >/dev/null 2>&1 || _FALTA=1 ;;
+esac
+if [ "${_FALTA:-0}" = "1" ]; then
+  {
+    echo "⚠️  verify-run: '$_BIN' no está disponible — NO pude verificar nada."
+    echo "   Esto NO es un test rojo: es el contrato §14.3 exit 3 ('no pude mirar')."
+    echo "   En local avisa; en CI bloquea, que es donde un runner sin toolchain"
+    echo "   no puede dar un job por verde."
+  } >&2
+  exit 3
+fi
+
 echo "━━━ verify-run: $CMD"
 set +e
 sh -c "$CMD"

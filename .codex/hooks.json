@@ -4,10 +4,14 @@
   "_comment_limites": "Codex NO tiene equivalente de Stop/SubagentStop/SessionStart: sin canon-enforce al cierre de turno, sin derivación del marker de review, sin reset de sesión. Para Codex el marker se genera con el fallback auditado (scripts/mark-reviewer-run.sh) o preset lite; el backstop sigue siendo Anillo 1 (lefthook) + Anillo 3 (CI). VALIDAR EN VIVO con tools/validate-harness.sh antes de confiar: un wrapper sin validar es un gate presunto.",
   "hooks": {
     "PreToolUse": [
-      { "command": "bash scripts/agent-hooks/adapters/gate-adapter.sh codex scripts/agent-hooks/reviewer-gate.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/adapters/gate-adapter.sh codex scripts/agent-hooks/reviewer-gate.sh"
+      }
     ],
     "PostToolUse": [
-      { "command": "bash scripts/agent-hooks/track-trajectory.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/track-trajectory.sh"
+      }
     ]
   }
 }

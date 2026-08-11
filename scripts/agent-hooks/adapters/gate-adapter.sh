@@ -27,7 +27,16 @@ CLIENT="${1:-}"; GATE="${2:-}"
 
 INPUT="$(cat 2>/dev/null || true)"
 ERR_FILE="$(mktemp 2>/dev/null || echo /tmp/.gate_adapter_$$)"
-OUT="$(printf '%s' "$INPUT" | bash "$ROOT/$GATE" 2>"$ERR_FILE")"
+# Vía run-hook: si el gate (o una lib) no parsea, run-hook avisa y sale 0, y
+# Cursor/Codex reciben "allow" en vez de un deny fantasma. Sin esto, un hook
+# con marcadores de conflicto dejaba al agente sin poder ejecutar NADA —
+# ni siquiera el `git status` con el que diagnosticarlo (§14.3).
+_RUNNER="$ROOT/scripts/agent-hooks/run-hook.sh"
+if [ -f "$_RUNNER" ]; then
+  OUT="$(printf '%s' "$INPUT" | bash "$_RUNNER" "$ROOT/$GATE" 2>"$ERR_FILE")"
+else
+  OUT="$(printf '%s' "$INPUT" | bash "$ROOT/$GATE" 2>"$ERR_FILE")"
+fi
 RC=$?
 REASON="$(cat "$ERR_FILE" 2>/dev/null || true)"; rm -f "$ERR_FILE" 2>/dev/null
 

@@ -5,21 +5,35 @@
   "_comment_contrato": "Los gates hablan exit 2 + stderr (contrato de Claude). Cursor espera {\"permission\":\"deny\"} por stdout → gate-adapter.sh traduce. VALIDAR EN VIVO antes de confiar: tools/validate-harness.sh lista el checklist.",
   "hooks": {
     "beforeSubmitPrompt": [
-      { "command": "bash scripts/agent-hooks/inject-context.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/inject-context.sh"
+      }
     ],
     "beforeShellExecution": [
-      { "command": "bash scripts/agent-hooks/adapters/gate-adapter.sh cursor scripts/agent-hooks/reviewer-gate.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/adapters/gate-adapter.sh cursor scripts/agent-hooks/reviewer-gate.sh"
+      }
     ],
     "beforeReadFile": [
-      { "command": "bash scripts/agent-hooks/track-reads.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/track-reads.sh"
+      }
     ],
     "afterFileEdit": [
-      { "command": "bash scripts/agent-hooks/post-edit-verify.sh" },
-      { "command": "bash scripts/agent-hooks/track-trajectory.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/post-edit-verify.sh"
+      },
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/track-trajectory.sh"
+      }
     ],
     "stop": [
-      { "command": "bash scripts/agent-hooks/canon-enforce.sh" },
-      { "command": "bash scripts/agent-hooks/drift-stop.sh" }
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/canon-enforce.sh"
+      },
+      {
+        "command": "bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/drift-stop.sh"
+      }
     ]
   }
 }

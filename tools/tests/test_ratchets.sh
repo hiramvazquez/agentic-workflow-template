@@ -317,3 +317,34 @@ _case_drift_update_primera_vez() {
     || { echo "    no fijó el techo inicial"; return 1; }
 }
 test_drift_update_primera_vez_fija_el_techo() { _harness_sandbox _case_drift_update_primera_vez; }
+
+# ── Un piso de 0 no es un piso: es una medición que nunca ocurrió ────
+# En un proyecto real el nivel 4 llevaba mudo desde el día uno con
+# `min_score: 0`, mientras AGENTS.md §5 lo declaraba "el veredicto mecánico" y
+# "el gate que distingue un test que verifica de uno escrito para pasar".
+# Un 0 escrito en el ratchet se disfraza de suelo. (f-mutation-score-nunca-medido)
+_case_no_se_escribe_un_piso_de_cero() {
+  printf '{ "min_score": 0, "measured": false }\n' > tools/mutation-ratchet.json
+  MUTATION_SCORE_OVERRIDE=0 bash tools/mutation-score.sh --update >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    --update escribió (o aceptó) un piso de 0"; return 1; }
+  grep -q '"measured"[[:space:]]*:[[:space:]]*false' tools/mutation-ratchet.json \
+    || { echo "    el ratchet dejó de declarar que nunca se ha medido"; return 1; }
+}
+test_update_se_niega_a_escribir_un_piso_de_cero() {
+  _harness_sandbox _case_no_se_escribe_un_piso_de_cero
+}
+
+_case_una_medicion_real_si_sube_el_piso() {
+  # FALSO POSITIVO guard: el caso legítimo tiene que seguir funcionando, o
+  # habríamos cambiado un gate mudo por un gate imposible de inicializar.
+  printf '{ "min_score": 0, "measured": false }\n' > tools/mutation-ratchet.json
+  MUTATION_SCORE_OVERRIDE=63 bash tools/mutation-score.sh --update >/dev/null 2>&1
+  [ "$?" = "0" ] || { echo "    una medición REAL no pudo subir el piso"; return 1; }
+  grep -q '"min_score"[[:space:]]*:[[:space:]]*63' tools/mutation-ratchet.json \
+    || { echo "    el piso no quedó en 63"; return 1; }
+  grep -q '"measured"[[:space:]]*:[[:space:]]*true' tools/mutation-ratchet.json \
+    || { echo "    tras medir, el ratchet no marcó measured:true"; return 1; }
+}
+test_una_medicion_real_sube_el_piso_y_marca_medido() {
+  _harness_sandbox _case_una_medicion_real_si_sube_el_piso
+}

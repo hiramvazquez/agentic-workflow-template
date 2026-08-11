@@ -135,3 +135,42 @@ _case_merge_no_reverifica() {
   [ "$rc" = "0" ] || { echo "    un commit de MERGE exigió re-verificar lo ya verificado en la rama"; return 1; }
 }
 test_commit_de_merge_no_reverifica() { _vm_sandbox _case_merge_no_reverifica; }
+
+# ── `--cmd-only` tiene sus PROPIOS tests ────────────────────────────
+# Es el modo que usan `session-start.sh` y `validate-harness.sh` para reportar
+# si el nivel 3 está cableado. Solo se ejercía de refilón, vía
+# check-verify-marker: si alguien rompe esa rama, ningún test se pone rojo y el
+# health-check empieza a MENTIR sobre si el build está cableado — el modo de
+# fallo exacto que este harness persigue.
+_case_cmd_only_no_ejecuta_nada() {
+  # El stub falla ruidosamente si se le llega a invocar: `--cmd-only` responde
+  # sobre la CONFIGURACIÓN, no corriendo el build (que en un proyecto real son
+  # minutos, y esto se llama en cada arranque de sesión).
+  printf 'sh -c "echo EJECUTADO > ejecutado.txt; exit 1"\n' > tools/verify.conf
+  bash tools/verify-run.sh --cmd-only >/dev/null 2>&1
+  [ "$?" = "0" ] || { echo "    con comando cableado, --cmd-only no devolvió 0"; return 1; }
+  [ -f ejecutado.txt ] && { echo "    --cmd-only EJECUTÓ el build (se llama en cada arranque de sesión)"; return 1; }
+  return 0
+}
+test_cmd_only_responde_sin_ejecutar_el_build() { _vm_sandbox _case_cmd_only_no_ejecuta_nada; }
+
+_case_cmd_only_en_fill_es_3() {
+  printf '# <!-- FILL: tu comando -->\n' > tools/verify.conf
+  bash tools/verify-run.sh --cmd-only >/dev/null 2>&1
+  [ "$?" = "3" ] || { echo "    con la conf en FILL, --cmd-only no devolvió 3"; return 1; }
+  [ -f .agents/state/markers/verify_run.txt ] \
+    && { echo "    --cmd-only creó un marker"; return 1; }
+  return 0
+}
+test_cmd_only_sin_comando_devuelve_3_y_no_firma() { _vm_sandbox _case_cmd_only_en_fill_es_3; }
+
+_case_binario_ausente_es_3_no_1() {
+  # §14.3: "el binario no existe" (3, no pude mirar) ≠ "tus tests fallan" (1).
+  # Un exit 127 presentado como test rojo manda al dev a buscar un bug que no
+  # existe. Caso típico: runner de CI nuevo, o toolchain sin instalar.
+  _stage_producto
+  printf 'xcodebuild-que-no-existe -scheme X test\n' > tools/verify.conf
+  bash tools/verify-run.sh >/dev/null 2>&1
+  [ "$?" = "3" ] || { echo "    un binario AUSENTE se presentó como fallo del código (esperaba 3)"; return 1; }
+}
+test_binario_ausente_devuelve_3_no_1() { _vm_sandbox _case_binario_ausente_es_3_no_1; }

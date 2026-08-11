@@ -72,6 +72,8 @@ echo "── Salud de configuración ──"
 PRESET="$(awk 'NR==1{print $1; exit}' tools/preset 2>/dev/null)"; [ -n "$PRESET" ] || PRESET=full
 echo "• Preset: $PRESET  (full=gates bloquean · lite=gates avisan)"
 _health=1
+grep -q '"measured"[[:space:]]*:[[:space:]]*false' tools/mutation-ratchet.json 2>/dev/null \
+  && { echo "⚠️  NIVEL 4 NUNCA MEDIDO: el mutation score no ha emitido un veredicto en este repo. AGENTS.md §5 lo declara el árbitro de la calidad de los tests; hasta que mida, esa frase es prosa."; _health=0; }
 grep -qE 'Plataformas:\*\* <!-- FILL' AGENTS.md 2>/dev/null && { echo "⚠️  AGENTS.md §2 (Stack) SIN rellenar — build/test/lenguaje desconocidos."; _health=0; }
 _src=0; for d in ios android web src; do [ -d "$d" ] && _src=1; done
 [ "$_src" = "0" ] && { echo "⚠️  Sin carpetas de código (ios/android/web/src) — check-drift inactivo."; _health=0; }

@@ -17,7 +17,12 @@
 - **Skills:** `.claude/skills` es un symlink a `.agents/skills` (la base compartida). Cárgalas según la matriz §11 de `AGENTS.md` (fuente única: `tools/skill-matrix.conf`).
 - **Sub-agentes:** viven en `.claude/agents/*.md`. Invócalos con la tool `Agent` según su `description`. Catálogo en `.claude/agents/README.md`.
 - **Comandos:** `/goal <objetivo>` fija condiciones verificables y delega el cierre en el `reviewer` (nivel 8).
-- **Hooks (Anillo 2):** definidos en `.claude/settings.json`. Llaman a los scripts compartidos en `scripts/agent-hooks/`:
+- **Hooks (Anillo 2):** definidos en `.claude/settings.json`. Todos se invocan a través de
+  `scripts/agent-hooks/run-hook.sh`, que comprueba con `bash -n` que el hook y sus libs parsean
+  **antes** de ejecutarlos: si no parsean, avisa por stderr y deja pasar. Sin ese lanzador, un
+  hook con marcadores de conflicto se leía como DENY y dejaba al agente sin poder ejecutar nada
+  —ni el `git status` con el que diagnosticarlo—. Llaman a los scripts compartidos en
+  `scripts/agent-hooks/`:
   - `SessionStart(startup|clear)` → resetea markers + imprime estado. `(resume)` → solo estado. `(compact)` → reinyecta el digest de reglas + findings (`post-compact.sh`) SIN resetear nada.
   - `PreToolUse Edit|Write` → `skill-reminder` (BLOQUEA si no leíste la skill requerida — matriz en `tools/skill-matrix.conf`).
   - `PreToolUse Bash` → `reviewer-gate` (git-guard de flags prohibidos + BLOQUEA `git commit` sin review reciente + drift-ratchet + capas + semgrep).

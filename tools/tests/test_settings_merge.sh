@@ -95,3 +95,22 @@ _case_template_sin_settings_no_es_error() {
 test_template_sin_settings_no_rompe_el_upgrade() {
   _sm_sandbox _case_template_sin_settings_no_es_error
 }
+
+_case_cambiar_de_lanzador_no_duplica_el_hook() {
+  # El día que el template envolvió todos los hooks en `run-hook.sh`, la unión
+  # por cadena literal habría dejado a cada proyecto con el hook DOS veces: el
+  # suyo directo y el nuevo envuelto. Dos ejecuciones por evento — session-start
+  # reseteando markers dos veces, el gate opinando dos veces. La identidad se
+  # calcula sobre el comando SIN lanzador, y cambiar de lanzador es un upgrade
+  # de la entrada, no una entrada nueva.
+  _sm_commit_template '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"bash scripts/agent-hooks/run-hook.sh scripts/agent-hooks/reviewer-gate.sh"}]}]}}'
+  _sm_local '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"bash scripts/agent-hooks/reviewer-gate.sh"}]}]}}'
+  bash tools/merge-claude-settings.sh tpl >/dev/null 2>&1
+  local n; n="$(grep -c 'reviewer-gate.sh' .claude/settings.json)"
+  [ "$n" = "1" ] || { echo "    el hook quedó DUPLICADO ($n apariciones): correría dos veces por evento"; return 1; }
+  grep -q 'run-hook.sh' .claude/settings.json \
+    || { echo "    no llegó el lanzador nuevo: el proyecto se queda sin el arreglo del brick"; return 1; }
+}
+test_cambiar_de_lanzador_actualiza_en_vez_de_duplicar() {
+  _sm_sandbox _case_cambiar_de_lanzador_no_duplica_el_hook
+}

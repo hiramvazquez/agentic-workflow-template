@@ -907,3 +907,69 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   ::test_la_escritura_real_se_sigue_cazando (un gate que deja de detectar por arreglar sus FP
   es un gate borrado)
 - **Área:** scripts/agent-hooks/reviewer-gate.sh §0c
+
+### [2026-08-11] Un hook roto dejó al agente sin poder ni diagnosticarlo
+- **Qué pasó:** un `upgrade.sh` dejó marcadores de conflicto dentro de `reviewer-gate.sh`, que es
+  el hook `PreToolUse` de Bash. El archivo dejó de parsear, bash salió con error, y el cliente
+  leyó ese error como **DENY**: `PreToolUse:Bash hook error: … syntax error near unexpected token
+  '<<<'`. A partir de ahí toda ejecución de Bash quedó bloqueada — el agente no podía listar los
+  conflictos, ni correr `git status`, ni diagnosticar el problema que el propio upgrade acababa de
+  crear. Se salvó por tener la tool `Edit`, que va por otro hook; un cliente que edite vía Bash, o
+  un run headless, se queda muerto ahí.
+- **Causa raíz:** el modo de **fallo** del hook colisiona con su señal de **deny** — los dos son
+  "exit distinto de 0". §14.3 ya resolvía ese empate ("un bug del hook nunca debe trabar al dev"),
+  pero estaba implementado para los DETECTORES y no para los HOOKS que los invocan. Y es peor que
+  el caso que la regla contempla: no bloquea el commit, bloquea el diagnóstico.
+- **Regla:** cuando el canal de "algo va mal conmigo" es el mismo que el de "te deniego", hace
+  falta alguien FUERA que los distinga. `scripts/agent-hooks/run-hook.sh` valida con `bash -n` el
+  hook **y sus libs** (`bash -n` no sigue los `source`: una lib rota es el mismo brick por otra
+  puerta) antes de cederle el proceso con `exec`. Si no parsean: aviso ruidoso por stderr y
+  **exit 0**. Corolario para cualquier gate: *prefiere dejar pasar sin red a dejar al operador sin
+  instrumentos*. Y `upgrade.sh` lo dice ahora en primer plano cuando un conflicto cae dentro de un
+  hook — con el aviso de resolverlo **con el editor, no con la terminal**.
+- **Detector:** tools/tests/test_run_hook.sh (hook roto y lib rota → avisa y pasa; deny real sigue
+  denegando y hook sano pasa igual — sin esos dos guards habríamos borrado el Anillo 2 entero;
+  stdin y args llegan intactos; y los tres configs de cliente invocan vía run-hook)
+- **Área:** scripts/agent-hooks/run-hook.sh · tools/upgrade.sh · .claude/settings.json
+
+### [2026-08-11] Un piso de 0 no es un suelo: es una medición que nunca ocurrió
+- **Qué pasó:** `mutation-ratchet.json` llevaba en `min_score: 0` desde el montaje, cinco
+  historias completas sin moverlo, mientras `AGENTS.md §5` declara el mutation score "el veredicto
+  mecánico" y "el gate que distingue un test que verifica de uno escrito para pasar". La causa
+  está diagnosticada con un experimento controlado del adoptante: el SwiftSyntax que embebe muter
+  16 no entiende `throws(MoviesError)` (typed throws, SE-0413) y **descarta el archivo entero en
+  silencio** — el mismo archivo sin sintaxis de Swift 6 sí produce mutantes. Y typed throws es lo
+  que recomienda nuestra propia skill: la skill empuja al código que deja mudo a nuestro nivel 4.
+- **Causa raíz:** un 0 en un archivo llamado "piso" se lee como suelo, y lo que dice es "nadie ha
+  medido". El número existía, así que nadie preguntó si significaba algo.
+- **Regla:** un valor que puede significar "sin medir" **no puede compartir representación con una
+  medición legítima**. `--update` se niega a escribir un piso de 0, el ratchet lleva
+  `measured: false` explícito, y `session-start` lo dice en cada arranque: *nivel 4 NUNCA MEDIDO*.
+  Eso no arregla muter — no está en nuestra mano— pero deja de anunciar una defensa que no
+  existe, que es la única parte que sí lo está.
+- **Detector:** tools/tests/test_ratchets.sh::test_update_se_niega_a_escribir_un_piso_de_cero +
+  ::test_una_medicion_real_sube_el_piso_y_marca_medido (el guard de FP: inicializar de verdad
+  tiene que seguir funcionando)
+- **Área:** tools/mutation-score.sh · tools/mutation-ratchet.json · scripts/agent-hooks/session-start.sh
+
+### [2026-08-11] Cambiar de lanzador habría duplicado todos los hooks de todos los proyectos
+- **Qué pasó:** al envolver los hooks en `run-hook.sh` (el arreglo del brick), el merge de
+  `.claude/settings.json` los habría añadido como entradas NUEVAS: el proyecto se quedaba con el
+  hook dos veces —el suyo directo y el envuelto— porque las cadenas difieren aunque el hook sea
+  el mismo. Dos ejecuciones por evento: `session-start` reseteando markers dos veces, el gate
+  opinando dos veces sobre cada comando.
+- **Causa raíz:** la identidad del hook se calculaba sobre el comando LITERAL. Pero un hook no es
+  su línea de invocación: es lo que ejecuta. El lanzador es envoltorio, y comparar envoltorios es
+  comparar la cosa equivocada. La regla "solo añade" —correcta para permisos— aplicada a la
+  identidad equivocada convierte un upgrade en una duplicación.
+- **Regla:** cuando compares "¿es esto lo mismo?", **normaliza antes de comparar**, y normaliza
+  quitando lo que es accidente (aquí: `bash `, el lanzador) y dejando lo que es esencia (el
+  script y sus args). Cambiar de envoltorio es un UPGRADE de la entrada existente, no una entrada
+  nueva — y se reporta como tal (`(lanzador actualizado)`) para que "solo añade" siga siendo
+  cierto en lo que importa: nada del proyecto se pierde. Detalle que costó el primer intento:
+  había que quitar el `bash ` de los DOS lados, o `bash …/run-hook.sh X` y `bash X` normalizaban
+  a `X` y a `bash X` y seguían sin casar.
+- **Detector:** tools/tests/test_settings_merge.sh::test_cambiar_de_lanzador_actualiza_en_vez_de_duplicar
+  (exige UNA aparición del hook y que el lanzador nuevo llegue) junto a
+  ::test_correrlo_dos_veces_no_duplica_nada
+- **Área:** tools/merge-claude-settings.sh

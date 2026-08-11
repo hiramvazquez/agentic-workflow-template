@@ -26,6 +26,11 @@
 #   GATES_SECRET_MODE         history|range|all   (default: history)
 #   GATES_BASE_REF            rama base           (default: origin/main)
 #   GATES_SKIP_TESTS=1        salta build+tests
+#   (GATES_REQUIRE_BUILD ya NO existe: el paso 6 es incondicionalmente
+#    fail-closed. Antes el build era opt-in, lo cual contradecía la doctrina —
+#    "un gate que no corrió nunca debe parecer un gate que pasó" — justo en el
+#    gate más barato y definitivo de todos. Se anota la baja aquí, en la lista
+#    de variables, que es donde alguien iría a buscarla.)
 #   GATES_REQUIRE_SEMGREP     default 1
 #   GATES_REQUIRE_MUTATION    default: 1 si el piso > 0, si no 0 (durante el
 #                             rollout el piso arranca en 0 y el gate no dice nada;

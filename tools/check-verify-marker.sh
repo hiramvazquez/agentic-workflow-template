@@ -47,11 +47,17 @@ fi
 # ── Sin comando cableado no se puede exigir evidencia ───────────────
 # Es el contrato §14.3: "no pude mirar" (3) avisa en local y bloquea en CI.
 # Exigir el marker sin comando sería un deadlock para todo adoptante nuevo.
-_CMD="${VERIFY_CMD:-}"
-if [ -z "$_CMD" ] && [ -f "$CONF" ]; then
-  _CMD="$(grep -vE '^[[:space:]]*(#|$)' "$CONF" 2>/dev/null | head -1)"
+# El parseo del conf vive en UN sitio: `verify-run.sh --cmd-only`, que ya
+# expone ese contrato (0 = hay comando · 3 = no lo hay) y no ejecuta nada.
+# Reimplementarlo aquí era el mismo patrón que este delta acababa de arreglar
+# en `upgrade.sh`: dos copias coincidían hoy y divergirían en el primer edge
+# case que alguien corrigiera en un archivo y no en el otro — y entonces un
+# gate bloquearía y el otro no.
+if bash tools/verify-run.sh --cmd-only >/dev/null 2>&1; then
+  _CMD="ok"
+else
+  _CMD=""
 fi
-case "$_CMD" in ''|'<tu-comando-aqui>'|*'FILL'*) _CMD="" ;; esac
 if [ -z "$_CMD" ]; then
   {
     echo "⚠️  verify-marker: NADIE puede afirmar que esto compila — $CONF sin cablear."

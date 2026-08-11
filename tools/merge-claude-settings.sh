@@ -65,7 +65,7 @@ if [ ! -f "$FILE" ]; then
 fi
 
 MERGE_TPL="$TPL" MERGE_LOCAL="$FILE" python3 - <<'PY'
-import json, os, sys
+import json, os, re, sys
 
 tpl_path, loc_path = os.environ["MERGE_TPL"], os.environ["MERGE_LOCAL"]
 
@@ -97,17 +97,46 @@ for k in ("allow", "deny", "ask"):
 # Un hook se identifica por lo que EJECUTA, no por su posición: así un
 # proyecto que añadió sus propios hooks al mismo evento no los pierde, y un
 # hook del template que ya existe no se duplica.
+#
+# ⚠️ LA IDENTIDAD SE CALCULA SOBRE EL COMANDO *NORMALIZADO*, quitándole el
+# lanzador. Sin eso, el día que el template envolvió todos los hooks en
+# `run-hook.sh` cada proyecto habría acabado con el hook DOS veces —el suyo
+# directo y el nuevo envuelto— porque las cadenas difieren aunque el hook sea
+# el mismo. Dos ejecuciones por evento: session-start reseteando markers dos
+# veces, el gate opinando dos veces. Cambiar de lanzador es UPGRADE de una
+# entrada existente, no una entrada nueva, y se reporta como tal.
+# Ojo al `bash ` de los dos lados: sin quitarlo, `bash …/run-hook.sh X` y
+# `bash X` normalizan a `X` y a `bash X` — distintos, y el hook se duplicaba
+# igual. El primer intento de este arreglo falló justo ahí.
+_LANZADOR = re.compile(r'^\s*(bash\s+)?(\S*run-hook\.sh\s+)?(bash\s+)?')
+
+def _norm(h):
+    h = dict(h)
+    c = h.get("command")
+    if isinstance(c, str):
+        h["command"] = _LANZADOR.sub("", c).strip()
+    return json.dumps(h, sort_keys=True)
+
 def cmds(group):
-    return tuple(sorted(json.dumps(h, sort_keys=True) for h in (group.get("hooks") or [])))
+    return tuple(sorted(_norm(h) for h in (group.get("hooks") or [])))
 
 th, lh = tpl.get("hooks") or {}, loc.setdefault("hooks", {})
 for evento, grupos in th.items():
     locales = lh.setdefault(evento, [])
-    firmas = {(g.get("matcher"), cmds(g)) for g in locales}
+    indice = {(g.get("matcher"), cmds(g)): i for i, g in enumerate(locales)}
     for g in grupos:
-        if (g.get("matcher"), cmds(g)) not in firmas:
+        clave = (g.get("matcher"), cmds(g))
+        if clave not in indice:
             locales.append(g)
+            indice[clave] = len(locales) - 1
             added["hooks"].append(f'{evento}[{g.get("matcher") or "*"}]')
+            continue
+        # Mismo hook, ¿mismo lanzador? Si no, gana el del template: el lanzador
+        # es maquinaria pura y quedarse con el viejo es quedarse sin el arreglo.
+        i = indice[clave]
+        if locales[i] != g:
+            locales[i] = g
+            added["hooks"].append(f'{evento}[{g.get("matcher") or "*"}] (lanzador actualizado)')
 
 # ── claves de primer nivel ausentes ─────────────────────────────────
 # Solo las que NO existen. Una clave con valor distinto es una decisión del

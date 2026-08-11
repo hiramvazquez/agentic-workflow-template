@@ -173,10 +173,29 @@ case "$MODE" in
     echo "MUTATION_SUMMARY score=$SCORE floor=$MIN"; exit 0 ;;
 
   --update)
+    # ⚠️ UN PISO EN 0 NO ES UN PISO: ES UNA MEDICIÓN QUE NUNCA OCURRIÓ.
+    # `min_score: 0` se lee como "el suelo está en el suelo", y lo que dice de
+    # verdad es "nadie ha medido nunca". En un proyecto real llevaba mudo desde
+    # el día uno, con §5 afirmando que el mutation score es "el veredicto
+    # mecánico" y "el gate que distingue un test que verifica de uno escrito
+    # para pasar" — una defensa anunciada que no existía. Por eso escribir un
+    # piso de 0 se rechaza aquí: si el score es 0 sin mutantes, lo que hay que
+    # arreglar es el runner, no el archivo.
+    if [ "$SCORE" = "0" ]; then
+      {
+        echo "❌ mutation-score: NO escribo un piso de 0."
+        echo "   Un 0 no es un suelo, es la ausencia de medición — y escrito en el"
+        echo "   ratchet se disfraza de suelo. Si tu runner descubre 0 mutantes,"
+        echo "   el nivel 4 está MUDO: arregla el runner (o declara el nivel no"
+        echo "   disponible para tu stack), pero no dejes un número que miente."
+      } >&2
+      exit 1
+    fi
     if [ "$SCORE" -gt "$MIN" ]; then
       cat > "$JSON" <<EOF
 {
   "min_score": $SCORE,
+  "measured": true,
   "_note": "Piso del mutation score (% de mutantes muertos). SOLO SUBE. Bajarlo a mano = esconder deuda (AGENTS.md §9)."
 }
 EOF

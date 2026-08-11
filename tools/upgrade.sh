@@ -310,6 +310,28 @@ _report_no_sincronizado() {
   echo "   Incorpora a mano solo lo que te interese. Tu contenido no se pisa nunca."
 }
 
+_avisar_harness_inoperante() {
+  # LO PRIMERO que hay que decir cuando una pasada deja conflictos: si el
+  # conflicto cayó dentro de un hook, el harness no está "a medias", está
+  # INOPERANTE — y en el peor caso el agente se queda sin poder ejecutar Bash
+  # para diagnosticarlo. Pasó en un proyecto real con `reviewer-gate.sh`.
+  local roto=""
+  for _h in scripts/agent-hooks/*.sh scripts/agent-hooks/lib/*.sh scripts/agent-hooks/adapters/*.sh; do
+    [ -f "$_h" ] || continue
+    bash -n "$_h" 2>/dev/null || roto="${roto}   · ${_h}"$'\n'
+  done
+  [ -z "$roto" ] && return 0
+  {
+    echo ""
+    echo "🚨 EL HARNESS ESTÁ INOPERANTE: estos hooks NO parsean (conflictos sin resolver):"
+    printf '%s' "$roto"
+    echo "   Mientras sigan así, sus gates no se aplican. Si tu cliente edita a través"
+    echo "   de Bash, puede que ni siquiera puedas ejecutar comandos para verlos:"
+    echo "   resuélvelos con tu EDITOR, no con la terminal."
+    echo "   Cuando parseen:  bash tools/tests/run-tests.sh && bash tools/validate-harness.sh --selftest"
+  } >&2
+}
+
 _fundir_settings() {
   # `.claude/settings.json` es la ÚNICA parte de `.claude/` que es maquinaria:
   # dentro viven los hooks (Anillo 2) y los permisos (Anillo 0). No se puede
@@ -358,6 +380,7 @@ if [ "$MERGE_BASE_OK" = "1" ]; then
     echo ""
     echo "   Resuélvelos (git checkout --ours/--theirs <archivo>, o a mano), luego:"
     echo "   git add -A && git commit  — y RE-CORRE este script para la verificación."
+    _avisar_harness_inoperante
     exit 2
   fi
   rm -f /tmp/upgrade-merge-err.$$
@@ -389,6 +412,7 @@ else
           # El conflicto NO cancela el informe: es justo cuando más falta hace,
           # porque la pasada termina antes de tiempo y sin él te quedas sin
           # saber qué más te espera.
+          _avisar_harness_inoperante
           _report_no_sincronizado "$BASE_REC"
           exit 2
         fi
