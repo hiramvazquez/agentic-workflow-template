@@ -405,3 +405,26 @@ _case_informe_sale_aunque_haya_conflicto() {
 test_el_informe_sale_tambien_cuando_la_pasada_falla() {
   _upg_sandbox_copia _case_informe_sale_aunque_haya_conflicto
 }
+
+_case_sync_trae_la_maquinaria_nueva() {
+  # Si añades maquinaria en un directorio que NO está en SYNC_PATHS, no viaja —
+  # y lo cruel es que su TEST sí (tools/tests/ está en la lista). El proyecto
+  # se queda con un test que busca un archivo que nunca llegó. Pasó al crear
+  # tools/semgrep/fixtures/. Igual con backlog/_template.md: mandar el gate que
+  # exige la sección de verificación sin mandar la plantilla que la explica.
+  ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures backlog \
+    && printf 'let x = 1\n' > tools/semgrep/fixtures/swift-malo.swift \
+    && printf 'plantilla v2 del template\n' > backlog/_template.md \
+    && printf 'historia del proyecto\n' > backlog/0001-mia.md \
+    && git add -A && git commit -qm "template: corpus + plantilla" ) >/dev/null 2>&1
+  mkdir -p backlog; printf 'historia LOCAL\n' > backlog/0001-mia.md
+  git add -A; git commit -qm "proyecto: su historia" 2>/dev/null
+  bash tools/upgrade.sh >/dev/null 2>&1
+  [ -f tools/semgrep/fixtures/swift-malo.swift ] \
+    || { echo "    el corpus de fixtures NO viajó: su test llegaría sin el archivo que busca"; return 1; }
+  grep -q 'plantilla v2' backlog/_template.md \
+    || { echo "    backlog/_template.md NO viajó: el gate de criterios llega sin sus instrucciones"; return 1; }
+  grep -q 'historia LOCAL' backlog/0001-mia.md \
+    || { echo "    el sync PISÓ una historia del proyecto (backlog/ es suyo, solo la plantilla es harness)"; return 1; }
+}
+test_sync_trae_la_maquinaria_nueva() { _upg_sandbox_copia _case_sync_trae_la_maquinaria_nueva; }

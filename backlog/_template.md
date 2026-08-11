@@ -24,6 +24,18 @@ a PRD/diseño, por qué ahora. 3-6 líneas.>
 1. Dado <estado inicial> cuando <acción> entonces <resultado observable>.
 2. Dado <caso de error> cuando <acción> entonces <manejo esperado>.
 
+## Verificación de criterios
+<!-- Lo rellena el agente ANTES de cerrar; el runner lo comprueba y BLOQUEA.
+     Una línea por criterio, con el test que lo fija:
+       1. Tests/FooTests.swift::testCargaOk
+       2. n/a-manual — <por qué este criterio no es mecanizable>
+     Mismo mecanismo que el `Detector:` de las lecciones: «verificado» no es una
+     frase en el informe del run, es un test que falla si dejas de cumplirlo.
+     Ojo a los criterios NEGATIVOS ("X NO ocurre"): son los que más acaban
+     dados por buenos con un grep que encuentra cero y no impide nada. -->
+1.
+2.
+
 ## Fuera de scope
 - <Lo que NO entra, explícito. Es tu mejor defensa contra el scope creep.>
 

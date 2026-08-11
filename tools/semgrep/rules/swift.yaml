@@ -44,7 +44,23 @@ rules:
     message: >
       `as!` crashea si el tipo no es el esperado. Usa `as?` con manejo del caso
       nil, o rediseña para no necesitar el cast. (swift-estado-del-arte.md)
-    pattern: $X as! $T
+    # MISMA intersección que `swift-force-try`, y por el MISMO motivo — que
+    # tardó semanas en aplicarse aquí. El parser swift de semgrep normaliza
+    # `as!`, `as?` y `as` al mismo nodo, así que `$X as! $T` marcaba también el
+    # `as?` SEGURO. Con el trinquete de drift en 0 eso hacía literalmente
+    # imposible escribir un adapter de URLSession correcto:
+    # `response as? HTTPURLResponse` no tiene alternativa, y el detector
+    # castigaba justo lo que su propio mensaje recomienda.
+    #
+    # El arreglo ya existía doce líneas más arriba, con un comentario
+    # describiendo el mismo defecto del parser. Se arregló un caso y no se
+    # buscó el hermano. Lo que impide que vuelva a pasar no es este comentario,
+    # es `tools/semgrep/fixtures/` + `test_semgrep_rules.sh`: el fixture BUENO
+    # contiene todas las formas seguras y cualquier regla que se pase de listas
+    # falla ahí el mismo día.
+    patterns:
+      - pattern: $X as! $T
+      - pattern-regex: 'as!'
     paths:
       exclude:
         - "*Tests*"

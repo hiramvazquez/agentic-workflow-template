@@ -199,7 +199,16 @@ git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
 # Maquinaria: se sincroniza. Es el harness, y su fuente de verdad es el
 # template (si la personalizaste, tu arreglo necesita SU test — lección del
 # archivo-por-fuera-de-upgrade; la verificación de abajo es la red).
-SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/tests tools/semgrep/rules tools/metrics .github/workflows"
+# Ojo al añadir maquinaria nueva: si vive en un directorio que NO está aquí, no
+# viaja — y el modo de fallo es cruel, porque lo que SÍ viaja es su test. Pasó
+# al crear `tools/semgrep/fixtures/`: `tools/tests/` estaba en la lista y el
+# corpus no, así que el upgrade habría dejado a los proyectos con un test que
+# busca un archivo que nunca llegó. Lo fija test_upgrade.sh::test_sync_trae_la_maquinaria_nueva.
+# `backlog/_template.md` está por su nombre exacto a propósito: `backlog/` es
+# del proyecto (sus historias), pero la PLANTILLA es harness — y desde que
+# `run.sh` exige la sección de verificación de criterios, mandar el gate sin
+# mandar la plantilla sería mandar la exigencia sin las instrucciones.
+SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/tests tools/semgrep/rules tools/semgrep/fixtures tools/metrics .github/workflows backlog/_template.md"
 SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
 
 # ── Qué cuenta como marcador FILL (y qué NO) ────────────────────────

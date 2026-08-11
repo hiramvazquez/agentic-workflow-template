@@ -762,3 +762,80 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   (instala un `jq` de mentira que aprueba todo; el gate debe seguir dando exit 3) junto a
   ::test_semgrep_que_revienta_no_pasa_por_limpio
 - **Área:** tools/semgrep-scan.sh
+
+### [2026-08-10] Un run puede salir con 0 y no haber terminado
+- **Qué pasó:** el agente de una historia lanzó la suite en segundo plano, escribió "me
+  notificará al terminar" y ahí acabó su turno. `claude -p` devolvió 0, así que el runner marcó
+  la historia `in-review` y salió 0 también. Desde fuera parecía terminada — y no lo estaba:
+  691 líneas del adapter sin commitear, el composition root sin cablear, y `git diff
+  base...rama` sin mostrar nada de eso porque vivía en el worktree, sin añadir. Si alguien
+  podaba el worktree por costumbre, se perdía.
+- **Causa raíz:** confundir "el proceso terminó" con "el trabajo está hecho". El exit code de un
+  sub-proceso solo dice lo primero. Lo segundo tiene un hecho observable —el árbol de trabajo—
+  y nadie lo miraba. Es §14.2 otra vez: el veredicto es la salida de un comando, nunca una
+  afirmación de quien lo ejecutó, y aquí el runner estaba tomando por veredicto un `exit 0`.
+- **Regla:** antes de declarar terminado, **comprueba el estado observable, no el código de
+  salida**. En el runner: si el worktree tiene algo sin commitear, la historia vuelve a
+  `in-progress`, el run sale != 0 y lo pendiente se **respalda** en `.agents/state/` — la
+  recuperación no puede depender de que nadie pode el worktree. Y al prompt del agente: no
+  termines el turno con procesos en vuelo; "me avisará al acabar" no es un resultado.
+- **Detector:** tools/tests/test_backlog.sh::test_run_que_deja_trabajo_sin_commitear_no_cierra
+  + ::test_run_limpio_si_cierra_en_in_review (el guard de FP: quien hace las cosas bien sigue
+  cerrando)
+- **Área:** tools/backlog/run.sh
+
+### [2026-08-10] Se arregló un caso del parser y no se buscó el hermano
+- **Qué pasó:** la regla `swift-force-cast` (`$X as! $T`) marcaba también el `as?` **seguro**,
+  porque el parser Swift de semgrep normaliza `as!`, `as?` y `as` al mismo nodo. Con el
+  trinquete de drift en 0, eso hacía literalmente imposible escribir un adapter de URLSession
+  correcto: `response as? HTTPURLResponse` no tiene alternativa. El detector castigaba
+  exactamente lo que su propio mensaje recomienda. Y el arreglo **ya existía doce líneas más
+  arriba**: `swift-force-try` tiene la intersección `pattern` + `pattern-regex` con un
+  comentario describiendo el mismo defecto del parser.
+- **Causa raíz:** se arregló el caso que dolía y no se buscó la familia. Un defecto de una
+  herramienta de terceros casi nunca afecta a una sola regla; afecta a todas las que usan el
+  mismo mecanismo. Y lo que había en su lugar era una promesa: la cabecera decía que las reglas
+  «se ejecutaron contra fixtures reales antes de commitearse». Una comprobación manual hecha
+  una vez no es un detector.
+- **Regla:** al arreglar un defecto del parser/motor, **busca los hermanos en el mismo archivo
+  antes de cerrar**. Y el nivel 2 tiene corpus, no promesas: `tools/semgrep/fixtures/` con un
+  archivo MALO (una forma por regla) y uno BUENO (las formas seguras que se le parecen). El
+  bueno es el que importa: es el guard de falsos positivos de toda la capa. Regla de adopción:
+  si no se te ocurre ninguna forma segura parecida a la que cazas, mira más fuerte — casi
+  siempre existe, y es la que va a bloquear a alguien.
+- **Coletazo, y merece leerse:** crear el directorio de fixtures ROMPIÓ el selftest de
+  `validate-harness`, que cogía `ls tools/semgrep/fixtures/* | head -1` dando por hecho que
+  todo lo de ahí dispara alguna regla. Con un README y un fixture BUENO —que por definición da
+  cero— empezó a declarar el nivel 2 MUDO estando sano. Lo cazó el propio selftest en la
+  primera pasada. Regla que deja: **nunca elijas "el primero del directorio" cuando el
+  directorio puede crecer**; nombra lo que buscas (`*-malo.*`).
+- **Detector:** tools/tests/test_semgrep_rules.sh::test_el_fixture_bueno_no_produce_ni_un_hallazgo
+  + ::test_el_fixture_malo_dispara_todas_las_reglas + ::test_toda_regla_de_swift_tiene_su_caso_en_los_fixtures
+  (el corpus no puede quedarse atrás) + ::test_los_fixtures_estan_fuera_del_scan_normal
+  + ::test_el_selftest_elige_un_fixture_MALO_no_el_primero_del_directorio
+- **Segundo coletazo, y la lección de verdad:** al commitear el corpus, el hook `semgrep-staged`
+  lo BLOQUEÓ con sus seis anti-patrones. Los fixtures estaban en `.semgrepignore` — y ese
+  archivo, igual que `--exclude`, solo se aplica a las rutas que semgrep **descubre**; una ruta
+  pasada como TARGET explícito (que es literalmente lo que hace `--staged`) gana a ambos. El
+  test que lo cubría comprobaba que la línea estuviera en `.semgrepignore`: **verificaba la
+  declaración, no el efecto.** Ahora el corpus se filtra de la lista de targets y el test
+  STAGEA el fixture y corre el gate de verdad. Regla que deja: cuando pruebes una exclusión,
+  ejecuta el gate; que el archivo de configuración diga lo correcto no demuestra que la
+  herramienta lo obedezca por el camino que usas.
+- **Área:** tools/semgrep/rules/swift.yaml · tools/semgrep/fixtures/ · tools/semgrep-scan.sh · tools/validate-harness.sh
+
+### [2026-08-10] Un criterio de aceptación «verificado con un grep» es decoración
+- **Qué pasó:** un criterio ("la lista NO construye su destino") se dio por verificado con un
+  `grep` a mano pegado en el informe del run. Se cumplía ese día — comprobado — y nada impedía
+  la regresión al siguiente. Los criterios **negativos** son los que más acaban así: afirman lo
+  que el código *no* hace, y un grep que devuelve cero parece prueba suficiente.
+- **Causa raíz:** el informe del run se estaba tomando como evidencia. Un grep manual demuestra
+  un instante; un test demuestra un invariante. La diferencia es exactamente la que separa
+  «detectar» de «cerrar» (§1.1).
+- **Regla:** todo criterio de aceptación cita el test que lo fija, con la misma mecánica que el
+  campo `Detector:` de las lecciones —incluida la excepción explícita `n/a-manual — <razón>`—
+  y el runner lo comprueba antes de marcar `in-review`. Y como en las lecciones: el test citado
+  tiene que EXISTIR; validar solo que el campo esté relleno deja pasar tests fantasma.
+- **Detector:** tools/backlog/criteria-link.sh + tools/tests/test_backlog.sh::test_criterio_sin_test_no_pasa
+  + ::test_test_citado_inexistente_no_cuenta + ::test_listas_de_otras_secciones_no_cuentan_como_criterios (FP guard)
+- **Área:** tools/backlog/criteria-link.sh · backlog/_template.md

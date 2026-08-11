@@ -36,6 +36,9 @@ tools/check-exec-bits.sh                     :: test_exec_bits.sh
 tools/check-diff-nature.sh                   :: test_diff_nature.sh
 tools/check-ring3.sh                         :: test_ring3.sh
 tools/check-skill-matrix-doc.sh              :: test_skill_matrix.sh
+tools/backlog/next.sh                        :: test_backlog.sh
+tools/backlog/criteria-link.sh               :: test_backlog.sh
+tools/semgrep/rules/swift.yaml               :: test_semgrep_rules.sh
 tools/check-drift.sh                         :: test_drift_aggregation.sh
 tools/check-review-marker.sh                 :: test_review_marker_preset.sh
 tools/drift-ratchet.sh                       :: test_ratchets.sh
@@ -82,7 +85,7 @@ test_todo_detector_tiene_tests_de_falso_positivo() {
 test_el_manifiesto_no_esta_vacio() {
   local n
   n="$(printf '%s\n' "$MANIFEST" | grep -c '::' || true)"
-  [ "${n:-0}" -ge 20 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥20) — ¿se rompió el formato?"; return 1; }
+  [ "${n:-0}" -ge 24 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥24) — ¿se rompió el formato?"; return 1; }
 }
 
 # ── El manifiesto tampoco puede quedarse ATRÁS (f-meta-fp-manifiesto) ──

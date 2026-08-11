@@ -131,6 +131,16 @@ CONTRATO (no negociable — AGENTS.md es la fuente canónica y sus gates están 
    bloqueo al final de la historia (sección '## Bloqueos') y termina.
 8. Al terminar: resumen de qué hiciste, tests añadidos, y la salida REAL de
    la suite de tests del área.
+9. NO TERMINES EL TURNO CON TRABAJO SIN COMMITEAR NI PROCESOS EN VUELO. Si
+   lanzaste algo en background (una suite, un build), ESPERA su salida real y
+   pégala; "me notificará al terminar" no es un resultado. El runner comprueba
+   el árbol al cerrar: si queda algo sin commitear, la historia vuelve a
+   in-progress y el run cuenta como NO terminado.
+10. Rellena en la historia la sección '## Verificación de criterios': una línea
+   por criterio de aceptación, con la ruta del test que lo fija
+   (\`ruta/al/test::nombre\`). Si alguno de verdad no es mecanizable, escribe
+   \`n/a-manual — <razón>\`. Un criterio "verificado" con un grep pegado en el
+   informe no impide la regresión de mañana; el runner lo comprueba y bloquea.
 EOF
 )"
 
@@ -157,8 +167,66 @@ RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
 echo "═══ fin del run · rc=$RC" >> "$RUN_LOG"
 
-# ── Cierre de estado (en la rama) y limpieza del worktree ───────────
+# ════════════════════════════════════════════════════════════════════
+# UN RUN QUE DEJA TRABAJO SIN COMMITEAR NO HA TERMINADO
+# ════════════════════════════════════════════════════════════════════
+# Cazado en vivo con la 0007: el agente lanzó la suite en background, dijo "me
+# notificará al terminar" y ahí acabó su turno. `claude -p` salió con 0, así
+# que esto marcaba `in-review` y salía 0 también. Desde fuera la historia
+# parecía terminada — pero 691 líneas del adapter estaban sin commitear, el
+# composition root sin cablear, y `git diff base...rama` no mostraba nada de
+# eso. Si alguien podaba el worktree, se perdían.
+#
+# El exit code de un sub-proceso dice "el proceso terminó", no "el trabajo
+# está hecho". Lo segundo tiene un hecho observable —el árbol de trabajo— y es
+# el que hay que mirar. Mismo principio que §14.2: el veredicto es la salida de
+# un comando, nunca una afirmación de quien lo ejecutó.
 if [ $RC -eq 0 ]; then
+  PENDIENTE="$( ( cd "$WT" && git status --porcelain 2>/dev/null ) || true )"
+  if [ -n "$PENDIENTE" ]; then
+    # Respaldo ANTES de nada: que la recuperación no dependa de que nadie
+    # pode el worktree por costumbre. Va a .agents/state (gitignored), así
+    # que sobrevive a `git worktree remove --force`.
+    RESPALDO="$LOG_DIR/${ID}-pendiente-$(date -u +%Y%m%dT%H%M%SZ)"
+    mkdir -p "$RESPALDO"
+    ( cd "$WT" && git status --porcelain 2>/dev/null | sed 's/^...//' ) \
+      | while IFS= read -r f; do
+          [ -z "$f" ] && continue
+          mkdir -p "$RESPALDO/$(dirname "$f")" 2>/dev/null
+          cp "$WT/$f" "$RESPALDO/$f" 2>/dev/null
+        done
+    ( cd "$WT" && _set_status "$STORY" in-progress \
+      && git commit -qm "chore(backlog): ${ID} in-progress — el run acabó con trabajo sin commitear" -- "$STORY" 2>/dev/null )
+    {
+      echo ""
+      echo "❌ backlog: ${ID} NO ha terminado — el run salió con 0 pero dejó trabajo sin commitear:"
+      printf '%s\n' "$PENDIENTE" | sed 's/^/     /'
+      echo ""
+      echo "   La historia queda en 'in-progress' (NO in-review): desde fuera parecería"
+      echo "   terminada y \`git diff ${BASE}...${BRANCH}\` no mostraría nada de esto."
+      echo "   ⚠️  NO podes el worktree: el trabajo vive en ${WT}"
+      echo "   Copia de seguridad: ${RESPALDO}"
+      echo "   Revisa, commitea lo que valga y vuelve a lanzar el runner para retomarla."
+    } >&2
+    exit 4
+  fi
+  # Y el segundo hecho observable: cada criterio de aceptación cita el test
+  # que lo fija. Mismo mecanismo que el `Detector:` de las lecciones, un nivel
+  # más arriba — porque un criterio dado por bueno con un `grep` pegado en el
+  # informe se cumple hoy y no impide la regresión de mañana.
+  if [ -f tools/backlog/criteria-link.sh ]; then
+    CRIT_OUT="$( ( cd "$WT" && bash tools/backlog/criteria-link.sh "$STORY" ) 2>&1 )"; CRIT_RC=$?
+    if [ "$CRIT_RC" = "1" ]; then
+      ( cd "$WT" && _set_status "$STORY" in-progress \
+        && git commit -qm "chore(backlog): ${ID} in-progress — criterios sin test que los fije" -- "$STORY" 2>/dev/null )
+      {
+        echo ""
+        printf '%s\n' "$CRIT_OUT" | grep -v '^CRITERIA_SUMMARY'
+        echo "   La historia queda en 'in-progress'. El worktree sigue en ${WT}."
+      } >&2
+      exit 5
+    fi
+  fi
   ( cd "$WT" && _set_status "$STORY" in-review \
     && git commit -qm "chore(backlog): ${ID} in-review — lista para revisión humana" -- "$STORY" 2>/dev/null )
   if git worktree remove "$WT" >/dev/null 2>&1; then :; else

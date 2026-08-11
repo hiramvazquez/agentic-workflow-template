@@ -274,9 +274,16 @@ selftest() {
 
   # 4. semgrep: un patrón prohibido staged debe dar exit 1 + SEMGREP_SUMMARY;
   #    sin semgrep instalado, el contrato correcto es exit 3 (no pudo mirar).
+  # `*-malo.*` EXPLÍCITO, no "el primero del directorio". La versión anterior
+  # cogía `ls … | head -1` dando por hecho que todo lo de ahí dispara alguna
+  # regla; en cuanto el directorio tuvo un README y un fixture BUENO (el que
+  # debe dar cero por definición), el selftest empezó a coger uno de esos y a
+  # declarar el nivel 2 MUDO estando perfectamente sano. Un selftest con falsos
+  # positivos se ignora entero — y entonces deja de proteger de los gates
+  # mudos, que es justo para lo que existe.
   local FIXT=""
-  if ls tools/semgrep/fixtures/* >/dev/null 2>&1; then
-    FIXT="$(ls tools/semgrep/fixtures/* | head -1)"
+  if ls tools/semgrep/fixtures/*-malo.* >/dev/null 2>&1; then
+    FIXT="$(ls tools/semgrep/fixtures/*-malo.* | head -1)"
     cp "$FIXT" "$SB/r/fixture_selftest.${FIXT##*.}" 2>/dev/null
   elif [ -f tools/semgrep/rules/swift.yaml ]; then
     printf 'import Foundation\nlet d = try! JSONDecoder().decode(Int.self, from: Data())\n' \

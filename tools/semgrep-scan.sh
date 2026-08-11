@@ -61,10 +61,26 @@ fi
 
 [ -d "$RULES_DIR" ] || { echo "SEMGREP_SUMMARY errors=0 warns=0"; exit 0; }
 
+# ⚠️ El corpus de fixtures se filtra AQUÍ, en la lista de targets, y no con
+# `.semgrepignore` ni con `--exclude`. Los dos se aplican a las rutas que
+# semgrep DESCUBRE; una ruta pasada como target explícito —que es exactamente
+# lo que hace este modo— gana a ambos y se escanea igual.
+# Lo cazó el hook al commitear el propio corpus: los seis anti-patrones del
+# fixture MALO, escritos para ser detectados, bloquearon el commit como si
+# fueran código de producto. Y el test que lo cubría comprobaba que la línea
+# estuviera en `.semgrepignore` — la declaración, no el efecto.
+# El test del corpus invoca `semgrep scan` DIRECTO, así que sigue viéndolos:
+# lo que se filtra es el camino por el que el corpus sería deuda del proyecto,
+# nunca el camino por el que se verifica.
+FIXTURES_DIR="${SEMGREP_FIXTURES:-tools/semgrep/fixtures}"
+
 TARGETS=()
 if [ "$MODE" = "--staged" ]; then
-  while IFS= read -r f; do [ -n "$f" ] && [ -f "$f" ] && TARGETS+=("$f"); done \
-    < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+  while IFS= read -r f; do
+    [ -n "$f" ] && [ -f "$f" ] || continue
+    case "$f" in "$FIXTURES_DIR"/*) continue ;; esac
+    TARGETS+=("$f")
+  done < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
   [ ${#TARGETS[@]} -eq 0 ] && { echo "SEMGREP_SUMMARY errors=0 warns=0"; exit 0; }
 fi
 
@@ -76,10 +92,14 @@ OUT="$(mktemp)"; trap 'rm -f "$OUT"' EXIT
 # proyecto que viven dentro del repo (worktrees del backlog, la copia
 # `_mutated` de muter). Sin ese archivo, los avisos de PartialParsing salían
 # mezclados con código ajeno al cambio — y un aviso ruidoso se deja de leer.
+# El `--exclude` cubre el modo de descubrimiento (--all); el filtro de targets
+# de arriba cubre --staged. Hacen falta los dos porque semgrep decide distinto
+# según de dónde venga la ruta.
 semgrep scan \
   --config "$RULES_DIR" \
   --json --quiet --no-git-ignore \
   --metrics=off \
+  --exclude="$FIXTURES_DIR" \
   ${TARGETS[0]+"${TARGETS[@]}"} \
   > "$OUT" 2>/dev/null || true
 

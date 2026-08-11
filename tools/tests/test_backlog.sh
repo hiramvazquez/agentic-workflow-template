@@ -9,6 +9,7 @@ _bl_sandbox() {
   mkdir -p "$d/tools/backlog" "$d/backlog"
   cp "$PROJECT_ROOT/tools/backlog/next.sh" "$d/tools/backlog/" 2>/dev/null
   cp "$PROJECT_ROOT/tools/backlog/run.sh" "$d/tools/backlog/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/backlog/criteria-link.sh" "$d/tools/backlog/" 2>/dev/null
   (
     cd "$d" || exit 1
     git init -q -b develop . 2>/dev/null; git config user.email t@t.t; git config user.name t
@@ -28,6 +29,9 @@ base: develop
 ---
 ## Criterios de aceptación
 1. Dado X cuando Y entonces Z.
+
+## Verificación de criterios
+1. n/a-manual — historia de juguete del harness, sin código que verificar
 EOF
 }
 
@@ -240,3 +244,134 @@ _case_sin_ramas_todo_igual() {
   echo "    sin ramas, el selector cambió de comportamiento: '$out'"; return 1
 }
 test_sin_ramas_el_selector_no_cambia() { _bl_sandbox _case_sin_ramas_todo_igual; }
+
+# ════════════════════════════════════════════════════════════════════
+# f-run-a-medias-exit0 · f-criterio6-sin-test — cerrar no es "salir con 0"
+# ════════════════════════════════════════════════════════════════════
+_hist_con_verificacion() { # <archivo> <id> <n-criterios> <lineas-verificacion>
+  cat > "backlog/$1" <<EOF
+---
+id: $2
+status: ready
+depends_on: []
+base: develop
+---
+## Criterios de aceptación
+1. Dado X cuando Y entonces Z.
+2. Dado A cuando B entonces C.
+
+## Verificación de criterios
+$4
+EOF
+}
+
+_case_criterios_sin_test_bloquean() {
+  _hist_con_verificacion 0009-i.md 0009 2 "1. Tests/FooTests.swift::testUno"
+  mkdir -p Tests; printf 'test\n' > Tests/FooTests.swift
+  bash tools/backlog/criteria-link.sh backlog/0009-i.md >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    un criterio SIN test pasó el gate"; return 1; }
+}
+test_criterio_sin_test_no_pasa() { _bl_sandbox _case_criterios_sin_test_bloquean; }
+
+_case_criterios_con_test_pasan() {
+  _hist_con_verificacion 0009-i.md 0009 2 "1. Tests/FooTests.swift::testUno
+2. n/a-manual — es un criterio visual, verificado en captura"
+  mkdir -p Tests; printf 'test\n' > Tests/FooTests.swift
+  local out; out="$(bash tools/backlog/criteria-link.sh backlog/0009-i.md 2>&1)"
+  case "$out" in *"total=2 sin_test=0"*) return 0 ;; esac
+  echo "    una historia bien verificada fue rechazada: $out"; return 1
+}
+test_criterios_con_test_o_excepcion_pasan() { _bl_sandbox _case_criterios_con_test_pasan; }
+
+_case_test_fantasma_no_cuenta() {
+  # Mismo fallo que los detectores citados que ya no existían, un nivel arriba:
+  # validar solo que el campo esté relleno deja pasar tests que no existen.
+  _hist_con_verificacion 0009-i.md 0009 2 "1. Tests/NoExiste.swift::testUno
+2. n/a-manual — visual"
+  local out; out="$(bash tools/backlog/criteria-link.sh backlog/0009-i.md 2>&1)"
+  case "$out" in *"NO existe"*) return 0 ;; esac
+  echo "    un test FANTASMA se dio por válido: $out"; return 1
+}
+test_test_citado_inexistente_no_cuenta() { _bl_sandbox _case_test_fantasma_no_cuenta; }
+
+_case_historia_sin_criterios_es_noop() {
+  # FALSO POSITIVO guard: sin criterios no hay nada que exigir. (El guard de
+  # "historia sin criterios" es otro y vive en run.sh.)
+  printf -- '---\nid: 0009\nstatus: ready\n---\n# vacía\n' > backlog/0009-i.md
+  local out; out="$(bash tools/backlog/criteria-link.sh backlog/0009-i.md 2>&1)"; local rc=$?
+  [ "$rc" = "0" ] || { echo "    una historia sin criterios fue rechazada (exit $rc)"; return 1; }
+  case "$out" in *"total=0"*) return 0 ;; esac
+  echo "    contó criterios donde no los hay: $out"; return 1
+}
+test_historia_sin_criterios_no_exige_verificacion() {
+  _bl_sandbox _case_historia_sin_criterios_es_noop
+}
+
+_case_lista_posterior_no_infla_el_total() {
+  # FALSO POSITIVO real esperando a pasar: cualquier lista numerada MÁS ABAJO
+  # en la historia (notas técnicas, bloqueos) inflaría el total y el gate
+  # pediría cobertura de criterios que no existen.
+  cat > backlog/0009-i.md <<'EOF'
+---
+id: 0009
+status: ready
+---
+## Criterios de aceptación
+1. Dado X cuando Y entonces Z.
+
+## Verificación de criterios
+1. n/a-manual — visual
+
+## Notas técnicas
+1. Mira el adapter de red.
+2. Ojo con el timeout.
+EOF
+  local out; out="$(bash tools/backlog/criteria-link.sh backlog/0009-i.md 2>&1)"
+  case "$out" in *"total=1 sin_test=0"*) return 0 ;; esac
+  echo "    una lista de otra sección infló el conteo: $out"; return 1
+}
+test_listas_de_otras_secciones_no_cuentan_como_criterios() {
+  _bl_sandbox _case_lista_posterior_no_infla_el_total
+}
+
+_case_run_con_trabajo_sin_commitear_no_es_in_review() {
+  # Cazado en vivo: el agente lanzó la suite en background, dijo "me notificará
+  # al terminar" y acabó su turno. `claude -p` salió con 0 → la historia quedaba
+  # in-review y el runner exit 0, con 691 líneas sin commitear que ni siquiera
+  # salían en `git diff base...rama`. El exit code de un sub-proceso dice que el
+  # proceso terminó, no que el trabajo esté hecho.
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\nprintf "adapter a medias\\n" > Adapter.swift\nexit 0\n' > bin/claude
+  chmod +x bin/claude
+  local rc; PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" != "0" ] || { echo "    un run que dejó trabajo sin commitear salió con 0 (parece terminado)"; return 1; }
+  local st; st="$(git show story/0001-a:backlog/0001-a.md 2>/dev/null | grep '^status:')"
+  case "$st" in *in-review*) echo "    quedó marcada in-review con trabajo sin commitear ($st)"; return 1 ;; esac
+  case "$st" in *in-progress*) : ;; *) echo "    no volvió a in-progress ($st)"; return 1 ;; esac
+  [ -f ".agents/worktrees/story-0001-a/Adapter.swift" ] \
+    || { echo "    el trabajo pendiente desapareció del worktree"; return 1; }
+  ls .agents/state/backlog/0001-pendiente-*/Adapter.swift >/dev/null 2>&1 \
+    || { echo "    no se respaldó el trabajo pendiente (se pierde si alguien poda el worktree)"; return 1; }
+}
+test_run_que_deja_trabajo_sin_commitear_no_cierra() {
+  _bl_sandbox _case_run_con_trabajo_sin_commitear_no_es_in_review
+}
+
+_case_run_limpio_si_cierra() {
+  # FALSO POSITIVO guard: el caso normal —el agente commitea lo suyo— tiene que
+  # seguir cerrando en in-review. Un gate que bloquea también al que hace las
+  # cosas bien se desactiva en una semana.
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\nprintf "hecho\\n" > Adapter.swift\ngit add -A >/dev/null 2>&1\ngit -c user.email=a@a -c user.name=a commit -qm "feat: adapter" >/dev/null 2>&1\nexit 0\n' > bin/claude
+  chmod +x bin/claude
+  local rc; PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || { echo "    un run LIMPIO fue rechazado (rc=$rc)"; return 1; }
+  local st; st="$(git show story/0001-a:backlog/0001-a.md 2>/dev/null | grep '^status:')"
+  case "$st" in *in-review*) return 0 ;; esac
+  echo "    un run limpio no cerró en in-review ($st)"; return 1
+}
+test_run_limpio_si_cierra_en_in_review() { _bl_sandbox _case_run_limpio_si_cierra; }
