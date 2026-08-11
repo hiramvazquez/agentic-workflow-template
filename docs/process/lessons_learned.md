@@ -839,3 +839,26 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Detector:** tools/backlog/criteria-link.sh + tools/tests/test_backlog.sh::test_criterio_sin_test_no_pasa
   + ::test_test_citado_inexistente_no_cuenta + ::test_listas_de_otras_secciones_no_cuentan_como_criterios (FP guard)
 - **Área:** tools/backlog/criteria-link.sh · backlog/_template.md
+
+### [2026-08-11] El informe de "no lo he traído" mentía, y empujaba justo al flujo que prohíbe
+- **Qué pasó:** tras un sync real, el bloque "📋 El template también cambió esto, y NO lo he
+  tocado" listó `tools/backlog/run.sh`, `next.sh`, `criteria-link.sh`, los fixtures y
+  `backlog/_template.md` — todos ellos **sí traídos**. El adoptante hizo lo razonable: se los
+  copió a mano. O sea que el propio script empujó al **flujo inverso** que su última línea
+  prohíbe con todas las letras ("un archivo que entra por fuera de aquí se salta esta red").
+- **Causa raíz:** la regla "¿esto es maquinaria?" estaba implementada **dos veces**. El sync
+  usaba `_es_maquinaria()`; el informe, una lista de regexes escrita a mano que pretendía decir
+  lo mismo. Y decía otra cosa: `^tools/[A-Za-z0-9_-]+\.sh$` no casa `tools/backlog/run.sh` —
+  sobra una barra— y ni `tools/semgrep/fixtures/` ni `backlog/_template.md` aparecían. Cada vez
+  que se añadió maquinaria en un subdirectorio, la copia de la regla se quedó atrás sin que
+  nada lo dijera.
+- **Regla:** una regla, una implementación — y cuando dos sitios necesitan la misma decisión,
+  el segundo **llama al primero**, no lo reescribe. Ya estaba en el README ("Una fuente de
+  verdad") y en `check-review-marker.sh`; esta es la tercera vez. Corolario específico de este
+  script: **el informe de lo NO traído se calcula con la misma función que decide lo traído**,
+  porque si divergen, el que miente es el que la gente obedece.
+- **Detector:** tools/tests/test_upgrade.sh::test_el_informe_de_no_sincronizado_dice_la_verdad
+  (el template cambia maquinaria ANIDADA y una skill; el informe debe listar la skill y NO la
+  maquinaria). Ojo al matiz que el propio test tuvo que aprender: capturar "hasta el final" de
+  la salida incluía el `git diff --cached --stat`, donde lo traído aparece por definición.
+- **Área:** tools/upgrade.sh

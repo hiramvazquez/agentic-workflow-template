@@ -428,3 +428,36 @@ _case_sync_trae_la_maquinaria_nueva() {
     || { echo "    el sync PISÓ una historia del proyecto (backlog/ es suyo, solo la plantilla es harness)"; return 1; }
 }
 test_sync_trae_la_maquinaria_nueva() { _upg_sandbox_copia _case_sync_trae_la_maquinaria_nueva; }
+
+_case_el_informe_no_miente_sobre_lo_traido() {
+  # El informe "no lo he tocado" tenía su PROPIA lista de regexes en vez de usar
+  # `_es_maquinaria`. Divergían: `^tools/[A-Za-z0-9_-]+\.sh$` no casa
+  # `tools/backlog/run.sh`. En un proyecto real el informe listó como NO traídos
+  # archivos que sí llegaron, y el adoptante los copió A MANO — el flujo inverso
+  # que la regla de oro de este script prohíbe, provocado por el script.
+  bash tools/upgrade.sh >/dev/null 2>&1
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  ( cd "$TPL_DIR" && mkdir -p tools/backlog .agents/skills \
+    && stub tools/backlog/run.sh 'runner v2\n' \
+    && printf 'nota nueva\n' > .agents/skills/swift.md \
+    && git add -A && git commit -qm "template: maquinaria anidada + skill" ) >/dev/null 2>&1
+  local out; out="$(bash tools/upgrade.sh 2>&1)"
+  grep -q 'runner v2' tools/backlog/run.sh 2>/dev/null \
+    || { echo "    tools/backlog/run.sh no se sincronizó (y es maquinaria)"; return 1; }
+  # SOLO las viñetas del bloque del informe. Ojo: capturar "hasta el final"
+  # incluía el `git diff --cached --stat` que se imprime después, donde los
+  # archivos SÍ traídos aparecen por definición — el primer intento de este
+  # test falló por eso y habría acusado al script de mentir sin motivo.
+  local reporte; reporte="$(printf '%s\n' "$out" \
+    | sed -n '/NO lo he tocado/,/Incorpora a mano/p' | grep '·' || true)"
+  case "$reporte" in *"tools/backlog/run.sh"*)
+    echo "    el informe declara NO TRAÍDO un archivo que SÍ trajo — así se acaba"
+    echo "    copiando maquinaria a mano, que es justo lo que el script prohíbe"; return 1 ;;
+  esac
+  case "$reporte" in *".agents/skills/swift.md"*) return 0 ;; esac
+  echo "    el informe NO listó la skill, que de verdad no se sincroniza: $reporte"
+  return 1
+}
+test_el_informe_de_no_sincronizado_dice_la_verdad() {
+  _upg_sandbox_copia _case_el_informe_no_miente_sobre_lo_traido
+}

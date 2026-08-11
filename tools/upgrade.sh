@@ -284,11 +284,24 @@ _report_no_sincronizado() {
     echo "   git diff HEAD $REMOTE/$BRANCH -- .agents/skills docs AGENTS.md"
     return 0
   fi
+  # ⚠️ El filtro es `_es_maquinaria`, LA MISMA función que decide qué se
+  # sincroniza. Antes había aquí una lista de regexes escrita a mano que
+  # pretendía decir lo mismo — y decía otra cosa: `^tools/[A-Za-z0-9_-]+\.sh$`
+  # no casa `tools/backlog/run.sh` (hay una barra de más), y `tools/semgrep/
+  # fixtures/` y `backlog/_template.md` ni aparecían. Resultado en un proyecto
+  # real: el informe listó como "NO traído" media docena de archivos que SÍ se
+  # habían traído, y el adoptante los copió A MANO — justo el flujo inverso que
+  # la regla de oro del final de este script prohíbe, provocado por el propio
+  # script. Una regla implementada dos veces diverge; esta vive en un solo
+  # sitio (README §"Una fuente de verdad").
+  # `.claude/settings.json` va aparte porque no es "maquinaria" para el sync
+  # (no se copia) pero SÍ se trae, fundido por claves.
   changed="$(git diff --name-only "$base" "$REMOTE/$BRANCH" 2>/dev/null \
-    | grep -vE '^(scripts/|ci/|tools/tests/|tools/semgrep/rules/|tools/metrics/|\.github/workflows/)' \
-    | grep -vE '^tools/[A-Za-z0-9_-]+\.sh$' \
-    | grep -vE '^tools/findings/[A-Za-z0-9_-]+\.(sh|ts)$' \
-    | grep -vE '^\.claude/settings\.json$' || true)"
+    | while IFS= read -r _f; do
+        [ -z "$_f" ] && continue
+        [ "$_f" = ".claude/settings.json" ] && continue
+        _es_maquinaria "$_f" || printf '%s\n' "$_f"
+      done)"
   [ -z "$changed" ] && return 0
   echo ""
   echo "📋 El template también cambió esto, y NO lo he tocado (es tuyo o es a juicio):"
