@@ -114,3 +114,57 @@ _case_cambiar_de_lanzador_no_duplica_el_hook() {
 test_cambiar_de_lanzador_actualiza_en_vez_de_duplicar() {
   _sm_sandbox _case_cambiar_de_lanzador_no_duplica_el_hook
 }
+
+# ════════════════════════════════════════════════════════════════════
+# EL FIXTURE ES EL ARCHIVO REAL DEL REPO, no una versión inventada
+# ════════════════════════════════════════════════════════════════════
+# Los seis tests de arriba pasaban desde el primer día, y este merge NUNCA
+# había funcionado contra el `.claude/settings.json` de este mismo repo:
+# bajo `hooks` hay claves `_comment_*` cuyo valor es un STRING, `enumerate()`
+# sobre un string da caracteres, y reventaba con
+#   AttributeError: 'str' object has no attribute 'get'
+# Nació roto y sus tests lo aprobaron porque probaban una invención.
+#
+# La ley, que es la misma de los detectores un piso más arriba: **el primer
+# fallo de una pieza que procesa un artefacto del repo aparece contra ESE
+# artefacto.** Igual que el primer falso positivo de un detector aparece en el
+# repo del propio detector (PRD 0001), y por el mismo motivo.
+_case_contra_el_settings_real_del_repo() {
+  [ -f "$PROJECT_ROOT/.claude/settings.json" ] || return 0
+  mkdir -p .claude
+  cp "$PROJECT_ROOT/.claude/settings.json" .claude/settings.json
+  git add -A >/dev/null 2>&1; git commit -qm real >/dev/null 2>&1
+  git branch -f tpl >/dev/null 2>&1
+  local out rc; out="$(bash tools/merge-claude-settings.sh tpl 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    el merge REVIENTA contra el settings.json real del repo (exit $rc):"
+    printf '%s\n' "$out" | tail -4 | sed 's/^/      /'
+    return 1; }
+  case "$out" in *"hooks=+0"*) : ;; *)
+    echo "    fundir el archivo consigo mismo cambió algo: $out"; return 1 ;; esac
+  # Y las claves de documentación no pueden desaparecer: saltar ≠ borrar.
+  local n; n="$(grep -c '_comment_' .claude/settings.json)"
+  [ "${n:-0}" -gt 0 ] || { echo "    el merge BORRÓ las claves _comment_ del archivo"; return 1; }
+  python3 -c "import json,sys; json.load(open('.claude/settings.json'))" 2>/dev/null \
+    || { echo "    el merge dejó el settings.json inválido"; return 1; }
+}
+test_funde_el_settings_REAL_del_repo_sin_reventar() {
+  _sm_sandbox _case_contra_el_settings_real_del_repo
+}
+
+_case_comentario_en_hooks_se_conserva() {
+  # Guard de FALSO POSITIVO del arreglo: "saltar" una clave que no es lista no
+  # puede convertirse en "borrarla". Un proyecto que documenta sus hooks con
+  # `_comment_` tiene que conservarlo intacto tras cada upgrade.
+  _sm_commit_template '{"hooks":{"_comment_Stop":"doc del template","Stop":[{"matcher":"","hooks":[{"type":"command","command":"t.sh"}]}]}}'
+  _sm_local '{"hooks":{"_comment_Stop":"MI documentacion","Stop":[{"matcher":"","hooks":[{"type":"command","command":"m.sh"}]}]}}'
+  bash tools/merge-claude-settings.sh tpl >/dev/null 2>&1 \
+    || { echo "    reventó con un _comment_ bajo hooks"; return 1; }
+  grep -q 'MI documentacion' .claude/settings.json \
+    || { echo "    PISÓ el comentario del proyecto con el del template"; return 1; }
+  grep -q 'm.sh' .claude/settings.json || { echo "    perdió el hook del proyecto"; return 1; }
+  grep -q 't.sh' .claude/settings.json || { echo "    no trajo el hook del template"; return 1; }
+}
+test_un_comentario_bajo_hooks_se_conserva_intacto() {
+  _sm_sandbox _case_comentario_en_hooks_se_conserva
+}

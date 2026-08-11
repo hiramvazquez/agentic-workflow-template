@@ -973,3 +973,46 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   (exige UNA aparición del hook y que el lanzador nuevo llegue) junto a
   ::test_correrlo_dos_veces_no_duplica_nada
 - **Área:** tools/merge-claude-settings.sh
+
+### [2026-08-11] La suite corría DESPUÉS del push, así que `main` se publicó en rojo
+- **Qué pasó:** un adoptante clonó `main` limpio, corrió la suite del propio template y le dio
+  `310 pasaron, 1 FALLÓ`. El test roto era justo el que avisaba de que el arreglo del brick de
+  hooks había quedado cableado en Cursor y Codex pero **inerte en Claude Code**, que es el
+  cliente donde ocurrió el brick que motivó todo el trabajo. Causa próxima concreta: el puente
+  de entrega no puede escribir en `.claude/`, así que ese archivo quedó fuera del lote y el push
+  salió antes de colocarlo a mano.
+- **Causa raíz:** el workflow de CI corre la suite en `push: [main]` — **después** de publicar.
+  Para cuando suena la alarma, el delta ya está en `main` y ya es sincronizable por cualquiera.
+  Eso no es un gate, es un aviso; la misma "defensa anunciada que no existe" que este repo
+  persigue en todo lo demás, cometida sobre su propia publicación. Y los otros dos guardias
+  tampoco tapaban el hueco: la verificación de `upgrade.sh` vive al final del camino limpio (el
+  camino con conflictos sale antes) y `_fundir_settings` solo imprimía un `⚠️`.
+- **Regla:** la suite del harness es un **gate de publicación**, y corre en la máquina de quien
+  publica, antes del push (`pre-push` en `lefthook.yml`). Un `pre-push` versionado gana a la
+  branch protection como primera línea: viaja con el repo, lo hereda cada adoptante, y no
+  depende de configurar nada en una web. Corolario que vale para cualquier proyecto: **si tu CI
+  te avisa después del push, tu gate está una vuelta por detrás de tu problema.**
+- **Detector:** lefthook.yml job `harness-suite` en `pre-push` (corre `tools/tests/run-tests.sh`
+  con lo que se va a publicar) + tools/tests/test_run_hook.sh::test_los_tres_clientes_invocan_los_hooks_via_run_hook
+  (el test que sí avisó, y que ahora bloquea antes de salir)
+- **Área:** lefthook.yml · .github/workflows/ · tools/upgrade.sh
+
+### [2026-08-11] Un test con fixture inventado prueba la invención, no la herramienta
+- **Qué pasó:** `merge-claude-settings.sh` reventaba con `AttributeError: 'str' object has no
+  attribute 'get'` contra el `.claude/settings.json` **de este mismo repo**: bajo `hooks` hay
+  cinco claves `_comment_*` cuyo valor es un string, `enumerate()` sobre un string da caracteres,
+  y `g.get("matcher")` explota. Nació roto en su primer commit y **nunca funcionó** — sus seis
+  tests pasaban desde el día uno porque los fixtures eran JSON sintéticos que no reproducían el
+  archivo real. Como solo se invocaba desde un camino que imprimía `⚠️`, el fallo era invisible.
+- **Causa raíz:** el fixture lo escribió quien escribió la herramienta, con la forma que la
+  herramienta esperaba. Eso no prueba la herramienta: prueba que el autor es coherente consigo
+  mismo. Es la misma ley que ya conocíamos un piso más arriba — *el primer falso positivo de un
+  detector aparece en el repo del propio detector* (PRD 0001) — aplicada a la otra mitad.
+- **Regla:** **toda pieza que procesa un artefacto del repo tiene, como primer test, ese
+  artefacto.** No el que te imaginas: el que está en disco, tal cual, hoy. Y el arreglo tiene su
+  propio matiz: ante una clave inesperada, **saltar ≠ borrar** — la documentación del proyecto se
+  conserva intacta y solo se copia la del template si falta.
+- **Detector:** tools/tests/test_settings_merge.sh::test_funde_el_settings_REAL_del_repo_sin_reventar
+  (funde el archivo del repo consigo mismo: exit 0, hooks=+0, `_comment_` conservados, JSON
+  válido) + ::test_un_comentario_bajo_hooks_se_conserva_intacto
+- **Área:** tools/merge-claude-settings.sh · tools/tests/test_settings_merge.sh

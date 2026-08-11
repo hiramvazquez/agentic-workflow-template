@@ -101,6 +101,20 @@ pre-push:
     #   run: npx tsc --noEmit
     - name: secret-scan-range
       run: bash tools/secret-scan.sh --range
+    # ── LA SUITE DEL HARNESS ES UN GATE DE PUBLICACIÓN, NO UN INFORME ──
+    # El workflow de CI la corre en `push: [main]`, o sea DESPUÉS de publicar:
+    # para cuando suena la alarma, el delta ya está en main y ya es
+    # sincronizable por cualquier adoptante. Eso no es un gate, es un aviso —
+    # la misma "defensa anunciada que no existe" que este harness persigue en
+    # todo lo demás.
+    # Pasó de verdad: se publicó un main con un test en rojo, y el test rojo era
+    # justamente el que avisaba de que el arreglo del brick de hooks había
+    # quedado inerte en Claude Code. El adoptante lo descubrió clonando.
+    # Aquí corre ANTES del push, en la máquina de quien publica, y con lo que
+    # se va a publicar. Si tu suite tarda demasiado para un pre-push, sube el
+    # umbral en CI — no borres esto.
+    - name: harness-suite
+      run: bash tools/tests/run-tests.sh
 
 # NOTA: los builds completos, la matriz de tests y los scans de historial
 # completo van en el Anillo 3 (ci/run-gates.sh), NO aquí. Regla de oro:

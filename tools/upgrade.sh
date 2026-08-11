@@ -342,7 +342,23 @@ _fundir_settings() {
   local out rc
   out="$(bash tools/merge-claude-settings.sh "$REMOTE/$BRANCH" 2>&1)"; rc=$?
   printf '%s\n' "$out" | grep -v '^SETTINGS_MERGE' | sed 's/^/   /'
-  [ "$rc" = "1" ] && echo "   ⚠️  el merge de settings.json falló — arréglalo antes de confiar en el Anillo 2." >&2
+  # ⚠️ ESTO NO PUEDE SER UN AVISO. Dentro de settings.json viven los hooks
+  # (Anillo 2 entero) y los permisos (Anillo 0). Si el merge revienta y solo
+  # imprimimos un ⚠️, el adoptante se queda con el harness anterior y el
+  # upgrade dice que fue bien: un anillo entero sin actualizar, en silencio,
+  # con cara de éxito. Es exactamente el modo de fallo que este repo persigue.
+  # Y no es hipotético: el merge llevaba desde su primer commit reventando
+  # contra el settings.json real, y nadie se enteró porque solo avisaba.
+  if [ "$rc" = "1" ]; then
+    {
+      echo ""
+      echo "❌ upgrade: el merge de .claude/settings.json FALLÓ."
+      echo "   Ahí viven los hooks (Anillo 2) y los permisos (Anillo 0): tu harness"
+      echo "   se quedaría en la versión anterior sin que nada más lo dijera."
+      echo "   Compara a mano:  git diff HEAD $REMOTE/$BRANCH -- .claude/settings.json"
+    } >&2
+    return 1
+  fi
   return 0
 }
 
@@ -488,7 +504,7 @@ else
       exit 1
     fi
   fi
-  _fundir_settings
+  _fundir_settings || _SETTINGS_FAIL=1
   printf '%s  # SHA del template sincronizado por tools/upgrade.sh — no editar a mano\n' \
     "$(git rev-parse "$REMOTE/$BRANCH")" > "$SYNC_RECORD"
   git add -A -- $SYNC_PATHS tools .claude/settings.json "$SYNC_RECORD" 2>/dev/null
@@ -498,7 +514,12 @@ else
   git diff --cached --stat | tail -20
   echo ""
   echo "   Revísalos y commitea tú:  git commit -m \"chore(template): sync de maquinaria\""
-  echo "   Después RE-CORRE este script para la verificación con evidencia."
+  echo ""
+  echo "   ⚠️  LO QUE ACABAS DE TRAER NO ESTÁ VERIFICADO TODAVÍA. La suite y el"
+  echo "   selftest corren al FINAL del camino limpio, y esta salida se produce"
+  echo "   antes. Hasta que RE-CORRAS este script, lo único que sabes es que los"
+  echo "   archivos llegaron — no que funcionen."
+  [ "${_SETTINGS_FAIL:-0}" = "1" ] && exit 1
   exit 2
 fi
 

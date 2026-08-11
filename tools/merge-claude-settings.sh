@@ -122,6 +122,27 @@ def cmds(group):
 
 th, lh = tpl.get("hooks") or {}, loc.setdefault("hooks", {})
 for evento, grupos in th.items():
+    # ⚠️ Bajo `hooks` no todo es una lista de grupos: este mismo repo mete ahí
+    # claves `_comment_*` con un STRING de documentación. `enumerate()` sobre un
+    # string da caracteres y `g.get("matcher")` revienta con
+    # `AttributeError: 'str' object has no attribute 'get'`.
+    # Este merge NACIÓ ROTO contra su propio archivo y nunca funcionó: sus seis
+    # tests pasaban porque los fixtures eran sintéticos y no reproducían el
+    # settings.json real. Lo cazó el adoptante corriéndolo contra el de verdad.
+    # SALTAR ≠ BORRAR: los comentarios del proyecto se conservan intactos, y los
+    # del template se copian si no están (son doc de maquinaria, y añadir es
+    # seguro).
+    if not isinstance(grupos, list):
+        if evento not in lh:
+            lh[evento] = grupos
+            added["claves"].append(f"hooks.{evento}")
+        continue
+    locales = lh.get(evento)
+    if not isinstance(locales, list):
+        # El proyecto tiene un no-lista donde el template trae grupos: no se
+        # pisa nada, se reporta y se sigue. Perder un hook por sobrescribir es
+        # peor que no traerlo.
+        continue
     locales = lh.setdefault(evento, [])
     indice = {(g.get("matcher"), cmds(g)): i for i, g in enumerate(locales)}
     for g in grupos:
