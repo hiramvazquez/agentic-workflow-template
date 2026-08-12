@@ -22,8 +22,8 @@
 <!-- BEGIN GENERATED: capabilities -->
 | Capacidad | Requerida en full | Requerida en lite | Proveedor | Garantía |
 |---|:---:|:---:|---|---|
-| `architecture_complexity` | no | no | externo | Complejidad ciclomática |
-| `architecture_cycles` | no | no | externo | Detección de ciclos |
+| `architecture_complexity` | no | no | `tools/architecture-check.sh architecture_complexity` | Complejidad ciclomática |
+| `architecture_cycles` | no | no | `tools/architecture-check.sh architecture_cycles` | Detección de ciclos |
 | `architecture_import_direction` | sí | sí | `tools/check-layers.sh` | Dirección de imports directos |
 | `review_marker` | sí | no | `tools/check-review-marker.sh` | Evidencia de review ligada al diff |
 | `ring3` | sí | no | `tools/check-ring3.sh` | Backstop de CI |
@@ -130,6 +130,9 @@ Prioridad de relleno (en orden de impacto — es la pirámide de
 4. `.agents/skills/architecture/SKILL.md` + `platforms/<tu-plataforma>.md` + `domain/SKILL.md`.
 5. `tools/layers.conf` — reglas de dirección sobre imports directos de TUS rutas. Este baseline
    no demuestra ciclos ni dependencias transitivas.
+   Para ciclos/complejidad, copia `tools/architecture.conf.example` a
+   `tools/architecture.conf`: declara `unsupported` con razón o configura un adapter cuyo probe
+   emita el marker exacto. Ausencia = `missing`; exit roto/marker ausente = `broken`.
    ⚠️  **Se AMPLÍA, no se reescribe.** Conserva los globs universales que trae
    (`*/Domain/*`, `*/domain/*`…) y añade los tuyos debajo. Sustituirlos rompe cinco tests
    del propio harness, que copian este conf a un sandbox con rutas genéricas (`src/Domain/`)

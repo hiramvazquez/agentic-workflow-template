@@ -134,6 +134,28 @@ if [ -x tools/probe-capability.sh ]; then
 else
   bad "probe de semgrep ausente — presencia no demuestra operación"
 fi
+if [ -x tools/architecture-check.sh ]; then
+  _arch="$(bash tools/architecture-check.sh all 2>/dev/null)"; _arch_rc=$?
+  for _cap in architecture_cycles architecture_complexity; do
+    _state="$(printf '%s\n' "$_arch" | python3 -c '
+import json,sys
+name=sys.argv[1]
+for line in sys.stdin:
+    try: item=json.loads(line)
+    except Exception: continue
+    if item.get("capability") == name:
+        print(item.get("status", "unknown")); break
+' "$_cap" 2>/dev/null || echo unknown)"
+    case "$_state" in
+      operational) ok "$_cap operational" ;;
+      unsupported) warn "$_cap unsupported — declarado explícitamente por el stack" ;;
+      missing) warn "$_cap missing — copia architecture.conf.example y decide adapter/unsupported" ;;
+      *) warn "$_cap broken/unknown (architecture-check exit $_arch_rc)" ;;
+    esac
+  done
+else
+  warn "architecture-check ausente — ciclos/complejidad no tienen estado verificable"
+fi
 if [ -d .git ] && [ -f lefthook.yml ]; then
   grep -q lefthook .git/hooks/pre-commit 2>/dev/null \
     && ok "Anillo 1 instalado (.git/hooks/pre-commit)" \

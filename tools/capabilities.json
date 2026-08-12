@@ -3,13 +3,13 @@
   "capabilities": {
     "architecture_complexity": {
       "title": "Complejidad ciclomática",
-      "provider": "external",
+      "provider": "tools/architecture-check.sh architecture_complexity",
       "required_in_full": false,
       "required_in_lite": false
     },
     "architecture_cycles": {
       "title": "Detección de ciclos",
-      "provider": "external",
+      "provider": "tools/architecture-check.sh architecture_cycles",
       "required_in_full": false,
       "required_in_lite": false
     },

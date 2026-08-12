@@ -84,8 +84,8 @@ El corazón del template. Detalle completo en
 <!-- BEGIN GENERATED: capabilities -->
 | Capacidad | Requerida en full | Requerida en lite | Proveedor | Garantía |
 |---|:---:|:---:|---|---|
-| `architecture_complexity` | no | no | externo | Complejidad ciclomática |
-| `architecture_cycles` | no | no | externo | Detección de ciclos |
+| `architecture_complexity` | no | no | `tools/architecture-check.sh architecture_complexity` | Complejidad ciclomática |
+| `architecture_cycles` | no | no | `tools/architecture-check.sh architecture_cycles` | Detección de ciclos |
 | `architecture_import_direction` | sí | sí | `tools/check-layers.sh` | Dirección de imports directos |
 | `review_marker` | sí | no | `tools/check-review-marker.sh` | Evidencia de review ligada al diff |
 | `ring3` | sí | no | `tools/check-ring3.sh` | Backstop de CI |
@@ -156,6 +156,7 @@ scripts/agent-hooks/       ← UNA implementación de los gates, compartida por 
 
 tools/
   check-layers.sh + layers.conf  ← baseline de dirección de imports directos (nivel 6)
+  architecture-check.sh          ← estado explícito de ciclos/complejidad por adapter
   semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación local de review en git hooks/adapters
