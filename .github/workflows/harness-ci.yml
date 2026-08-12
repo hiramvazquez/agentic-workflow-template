@@ -48,6 +48,11 @@ jobs:
       - name: Toda lección tiene detector (y el detector existe)
         run: bash tools/lesson-detector-link.sh
 
+      - name: El ledger dice cosas comprobables
+        run: |
+          bash tools/check-finding-refs.sh
+          bash tools/check-version-claims.sh
+
       - name: validate-harness (estáticos + selftest de detectores)
         run: bash tools/validate-harness.sh --selftest
 
