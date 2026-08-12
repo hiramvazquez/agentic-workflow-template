@@ -11,6 +11,50 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás
+- **Qué pasó:** `ci/run-gates.sh` —el Anillo 3, el backstop que cubre a Codex, a los commits
+  humanos y a las máquinas sin lefthook— no tenía ni un test. Cada gate del harness tenía el
+  suyo; el script que los ORQUESTA se auditaba leyéndolo. Borrar un paso del script no habría
+  puesto nada en rojo.
+- **Causa raíz:** los tests se escriben por unidad y un orquestador no parece una unidad ("no
+  tiene lógica, solo llama a otros"). La lógica que sí tiene —a quién llama, en qué orden y qué
+  hace cuando uno falta— es exactamente la que sostiene la promesa "el preset full no reduce
+  ningún gate".
+- **Regla:** si un script decide QUÉ se ejecuta, su lista de invocaciones es comportamiento y se
+  fija con un test. Patrón barato: stubs que firman su paso, un caso con un gate en rojo y —el
+  que de verdad importa— un caso con un gate AUSENTE, que nunca puede leerse como aprobado.
+- **Detector:** `tools/tests/test_e2e_matrix.sh` (`test_golden_09_preset_full_no_reduce_ningun_gate`)
+- **Área:** ci/run-gates.sh
+
+### [2026-08-12] Una capacidad declarada no es una capacidad demostrada
+- **Qué pasó:** `claude.sh` declaraba `read_only=true`, `agent-runner` exigía esa capacidad antes
+  de cada review y el backlog la pedía en su preflight. Nada comprobaba que la invocación real
+  fuera de solo lectura: cambiar `--permission-mode plan` por `acceptEdits` habría pasado los
+  tres anillos, y la review habría podido escribir en el árbol que juzgaba.
+- **Causa raíz:** el preflight pregunta al backend y el backend responde lo que dice su propio
+  `case`. Es una declaración sobre sí mismo — el mismo modo de fallo que "instalado ≠ operativo",
+  ya cerrado para las herramientas externas y no para los adapters.
+- **Regla:** toda capacidad que un adapter declare necesita un test que observe el EFECTO, no la
+  declaración. Para un CLI, el efecto observable más barato es su propio argv: un stub del
+  binario que registre con qué lo llamaron.
+- **Detector:** `tools/tests/test_e2e_matrix.sh` (`test_golden_05_autonomia_completa_contra_cli_stub`)
+- **Área:** tools/agent-backends/claude.sh · tools/agent-runner.sh
+
+### [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa
+- **Qué pasó:** la Definition of Done del PRD 0004 decía "los escenarios golden 1–10 pasan" y no
+  existía forma de comprobarlo: ni mapa escenario→test, ni nada que fallara si un escenario se
+  quedaba sin demostración.
+- **Causa raíz:** la lista y su demostración vivían en documentos distintos, y lo único que las
+  ataba era que un humano leyera los dos. Es el mismo patrón que obligó al campo `Detector:` de
+  este archivo, un nivel más arriba.
+- **Regla:** cuando un documento enumera garantías, algo tiene que fallar si la enumeración crece
+  sin su demostración. Aquí la lista es la fuente y el test la persigue: lee los escenarios del
+  PRD y exige un `test_golden_NN_` por cada uno.
+- **Detector:** `tools/tests/test_e2e_matrix.sh` (`test_matriz_e2e_cubre_los_diez_escenarios_golden`)
+- **Área:** docs/process/prds/0004-reconciliar-workflow-agentico.md · tools/tests/
+
+---
+
 ### [2026-08-12] `stat -f` de GNU no falla, y el orden del fallback ERA el bug
 - **Qué pasó:** `main` se publicó en rojo. `test_write_atomico_conserva_el_modo_del_documento`
   fallaba con un mensaje que lo dice todo y no dice nada: **"--write dejó modo 644, esperaba 644"**.

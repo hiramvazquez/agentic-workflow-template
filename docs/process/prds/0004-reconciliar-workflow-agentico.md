@@ -1,6 +1,9 @@
 # PRD — Reconciliar y simplificar el workflow agéntico
 
-> **Tipo:** Forward · **Status:** In progress
+> **Tipo:** Forward · **Status:** Shipped — fases 1a–10 mergeadas, **sujeto a dos cosas que no
+> se pueden cerrar desde dentro de este cambio y siguen abiertas en §15**: (1) el job
+> `ubuntu-latest` de `harness-ci` en verde sobre este commit (Linux no se verificó en local),
+> (2) el `VERDICT` del reviewer de la fase 10. Si alguna falla, esto vuelve a In progress.
 > **Autor:** Codex + owner · **Fecha:** 2026-08-11 · **Tracking:** commits de las fases 1a–10
 > **Design-review:** OK (2026-08-11) — AMBER final atendido antes de aprobación
 
@@ -379,15 +382,36 @@ historia ──► agent-runner ──► diff ──► scope-check ──► g
 
 ## 15. Definition of Done
 
-- [ ] Escenarios golden 1–10 pasan.
-- [ ] Cada fase tuvo regresión roja antes de implementación y guards de falso positivo.
-- [ ] Pruebas herméticas verdes en macOS/Linux; smoke real reporta capacidades sin falsos verdes.
-- [ ] `bash tools/check-drift.sh` sin errores nuevos.
-- [ ] Design-review y reviews de cada fase atendidos.
-- [ ] Tooling transportado y docs/skills/config compartida transportados o reportados exactamente
-  según la matriz de propiedad de upgrade.
-- [ ] Sin secretos; gitleaks limpio.
-- [ ] Findings descubiertos cerrados o aceptados con razón en el ledger.
+- [x] **Escenarios golden 1–10 pasan** — `bash tools/tests/run-tests.sh e2e_matrix` (11/11). La
+  matriz vive en `tools/tests/test_e2e_matrix.sh`, un `test_golden_NN_…` por escenario, y el
+  vínculo lista↔demostración lo fija `test_matriz_e2e_cubre_los_diez_escenarios_golden`: si
+  alguien añade un escenario 11 y no su test, la suite falla. Sin ese último test, esta casilla
+  sería justo la clase de afirmación no comprobable que el PRD combate.
+- [x] **Cada fase tuvo regresión roja antes de implementación y guards de falso positivo.** En
+  fase 10, que no añade comportamiento, el equivalente es la comprobación inversa: 11 mutantes
+  —uno por escenario, más el meta— aplicados a `run-gates.sh`, `claude.sh`, `backlog/run.sh`,
+  `semgrep-scan.sh`, `findings.sh`, `render-capabilities.sh`, `probe-capability.sh`,
+  `architecture-check.sh`, `lessons-rotate.sh`, la matriz de OS del workflow y la propia matriz.
+  Cada uno dejó en rojo exactamente su test y ninguno más.
+- [ ] **Herméticas en macOS/Linux; smoke real sin falsos verdes.** macOS: verde en local
+  (477/477, Darwin arm64). **Linux no está verificado desde esta máquina** y no se da por bueno:
+  lo decide el job `ubuntu-latest` de `harness-ci` en este push. La matriz E2E es hermética por
+  construcción (stubs de `claude`/`semgrep`, PATH fijado), y su único smoke real —escenario 10—
+  no exige un estado concreto sino que estado y exit code sean el mismo hecho.
+- [x] `bash tools/check-drift.sh` sin errores nuevos (`DRIFT_SUMMARY errors=0 warns=0`).
+- [ ] **Design-review y reviews de cada fase atendidos.** Fases 1a–9: sí. La de fase 10 es el
+  propio gate pre-commit de este cambio (`reviewer` → `VERDICT` → marker ligado al diff staged):
+  hasta que ese veredicto exista, esta casilla no se marca desde dentro del cambio que revisa.
+- [x] **Tooling transportado** — `tools/tests` ya está en `SYNC_PATHS` de `tools/upgrade.sh`, así
+  que la matriz viaja al adoptante sin tocar el transportador. Fase 10 no añade familias nuevas
+  a la matriz de propiedad.
+- [x] **Sin secretos** — gitleaks limpio sobre los archivos de este cambio y en los modos que
+  gobiernan un commit (`--staged`, `--range`). `--all` reporta 2 hallazgos, y son falsos
+  positivos de la caché de fase 9 (`"key":"<sha256>"` en archivos gitignored de
+  `.agents/state/`): registrado como `f-gate-cache-falso-positivo-gitleaks`, **no arreglado
+  aquí** porque `.gitleaks.toml` es NO-TOUCH en este PRD (§5) y §8 prohíbe arreglar
+  preexistentes de paso.
+- [x] Findings descubiertos cerrados o aceptados con razón en el ledger (§18).
 
 ## 16. Próximos pasos
 
@@ -403,8 +427,25 @@ y defectos escapados antes de retirar o endurecer cualquier defensa.
 | 2026-08-11 | Elimina contradicciones de claims, review portable, rotación y perfiles | Codex |
 | 2026-08-11 | Exige evidencia pre-commit portable y cierra selección/prompts del runner | Codex |
 | 2026-08-11 | Atiende AMBER final: flujo literal y único de prompts run/review | Codex |
+| 2026-08-12 | Fase 10: matriz E2E ligada al PRD + cutover documental. Status → Shipped | Claude |
 
 ## 18. Gaps detectados
 
-Se llenará durante la implementación. Todo gap accionable irá al ledger y toda lección nueva
-citará su detector o una excepción manual explícita.
+Todo gap accionable va al ledger y toda lección nueva cita su detector o una excepción manual
+explícita. Los que descubrió la integración de fase 10 —tres de ellos, huecos que ninguna fase
+anterior podía ver porque solo aparecen al cruzar scripts—:
+
+| Gap | Qué faltaba | Cerrado por |
+|---|---|---|
+| `ci/run-gates.sh` sin test propio | El Anillo 3 era el único entrypoint que se auditaba **leyéndolo**. "El preset full no reduce ningún gate" era prosa: nada fallaba si un paso desaparecía del script. | `test_golden_09_preset_full_no_reduce_ningun_gate` — cada gate es un stub que firma su paso; además fija que un gate en rojo y uno **ausente** tumban el anillo. |
+| `claude.sh` declaraba `read_only` sin demostrarlo | El backend anunciaba la capacidad y el runner la exigía, pero nada comprobaba que la invocación real fuera de solo lectura. Un cambio a `acceptEdits` habría pasado los tres anillos. | `test_golden_05_autonomia_completa_contra_cli_stub` — inspecciona el argv con el que el adapter llama al CLI. |
+| La promesa de rendimiento de fase 9 no se medía | §10 pedía ≥30% en gates repetidos sobre el mismo diff; los tests de caché fijaban corrección de la clave, nunca el coste. | `test_golden_08_cache_acelera_sin_perder_deteccion` — con un scanner stub que duerme, exige que el hit **no pague el coste del scan** (medido como diferencia acotada por el fixture, no como ratio dependiente del host) y que un `exit 1` jamás se cachee. |
+
+Los tres estaban dentro del alcance declarado del PRD y salieron a la luz al construir la matriz:
+es el argumento de por qué una fase de integración no es ceremonia. Ninguno exigió comportamiento
+nuevo — exigieron mirar.
+
+Un cuarto gap se encontró y **no** se arregló, a propósito: `secret-scan --all` queda rojo
+permanente por los archivos de caché de fase 9 (`f-gate-cache-falso-positivo-gitleaks`). El
+arreglo tocaría `.gitleaks.toml`, que este PRD declara NO-TOUCH (§5), y §8 prohíbe arreglar
+preexistentes "de paso". Queda abierto en el ledger con su medición, que es lo que §10 pide.

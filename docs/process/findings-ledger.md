@@ -3,13 +3,14 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 67 · Total: 68
+Abiertos: **2** · Cerrados: 70 · Total: 72
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
+| `f-gate-cache-falso-positivo-gitleaks` | medium | owner-decision | `tools/gate-cache.sh` | secret-scan --all queda rojo permanente por la cache de la fase 9 |
 
 ## Cerrados
 
@@ -82,3 +83,6 @@ Abiertos: **1** · Cerrados: 67 · Total: 68
 | `f-gate-cache-key-race` | fixed | Las consultas ejecutables ocurren antes del snapshot final HEAD+diff; el boundary recalcula la key y |
 | `f-gate-cache-target-race` | fixed | El scanner compara y vuelve a resolver targets tras consultar cache y antes de publicar; una regresi |
 | `f-stat-f-orden-invertido` | fixed | Orden invertido a GNU primero. Detector nuevo en test_shell_hygiene.sh que barre todo el repo y exig |
+| `f-run-gates-sin-test` | fixed | test_golden_09 stubbea cada gate para que firme su paso y exige los 12 del contrato; ademas fija que |
+| `f-adapter-readonly-declarado` | fixed | test_golden_05 corre el ciclo autonomo completo contra un stub hermetico del CLI y verifica el argv  |
+| `f-golden-sin-vinculo` | fixed | test_matriz_e2e_cubre_los_diez_escenarios_golden lee los escenarios del PRD y exige un test_golden_N |

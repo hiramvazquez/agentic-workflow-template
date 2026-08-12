@@ -224,6 +224,23 @@ Al diseñar un gate, declara explícitamente cuál de las dos das. Decir "infals
 solo tienes la primera es el mismo fallo que anunciar un gate que no está implementado (§G5):
 falsa confianza, que es un modo de fallo, no un estado neutro.
 
+### La lista de garantías se ata a su demostración
+
+Un PRD que enumera escenarios ("golden 1–10 pasan") y una suite que los prueba son dos
+documentos, y lo único que suele atarlos es que alguien lea los dos. Entonces la lista crece y
+la demostración no: la casilla de "Done" sigue verde y ya no significa nada.
+
+La regla es la misma del campo `Detector:` de las lecciones, un nivel más arriba: **la
+enumeración es la fuente y algo mecánico la persigue.** En el harness lo hace
+`tools/tests/test_e2e_matrix.sh` — un `test_golden_NN_…` por escenario del PRD, y un test que
+lee la lista del propio PRD y falla si aparece un escenario sin su test. Cuesta veinte líneas y
+convierte una afirmación de la DoD en un hecho comprobable.
+
+Corolario para las capacidades: un adapter que **declara** `read_only` no demuestra nada — la
+declaración sale de su propio `case`. Lo que se prueba es el efecto observable (para un CLI, el
+argv con el que se le invocó). "Instalado ≠ operativo" y "declarado ≠ demostrado" son el mismo
+error en dos capas distintas.
+
 ## Nivel 9 — Métricas y el bucle de aprendizaje
 
 **Escape rate / phase containment** — qué fracción de defectos se cazó en cada fase.

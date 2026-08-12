@@ -11,42 +11,25 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–9 implementadas:
-  manifiesto estructurado, bloques documentales generados y upgrade que funde esos fragmentos
-  sin pisar la prosa del adoptante; el informe calcula tests/FILLs contra el commit actual en
-  vez de copiar conteos manuales; probe funcional con commit/plataforma/fecha y consumo desde
-  arranque/validate; contratos separados `run`/`review`, watchdog con timeout/cancelación
-  y transporte completo de sus adapters/prompts en upgrades; backlog y AI review ya consumen
-  el boundary portable con preflight de capacidades y review final observable; la telemetría
-  ya emite eventos v2 con identidad/fase/commit/triage desconocido, los lectores normalizan
-  streams mixtos v1/v2 sin reescribirlos y el ledger puede promover detecciones mediante
-  `source_event_ids[]`; `escape-rate` ya cuenta findings únicos en una ventana explícita y
-  `gate-value` separa eventos únicos, actividad, promoción y cobertura de latencia sin llamar
-  “false-positive” a lo que sigue sin triar; la rotación dejó 11 lecciones vivas y movió 52
-  racionales mecanizados al archivo, con un índice único regenerable. El contexto obligatorio
-  termina antes del índice y ocupa 236 líneas; el histórico solo se consulta bajo demanda;
-  Semgrep staged reutiliza exclusivamente resultados 0/0 mediante una key de diff+HEAD+targets+
-  reglas+scanner+binario+versión+plataforma y TTL, revalidada antes de consumir y publicar;
-  targets con cambios no stageados fuerzan scan real. Fase 10 pendiente.
-- **Salud:** las suites herméticas de capabilities, upgrade y clasificación están verdes. La
-  capacidad runtime de Semgrep en esta máquina está **broken**: su binario revienta al inicializar
-  X509. La fase 2 ya separa ambos hechos; un clasificador verde no convierte el entorno en verde.
-  El backlog ya deriva su allowlist solo de `scope: |` y valida rango, índice, worktree,
-  untracked, deletes y ambos lados de renames antes de permitir `in-review`.
-  `check-layers` ya se declara por lo que realmente hace: dirección de imports directos,
-  sin atribuirse grafo, transitividad ni detección de ciclos.
-  Ciclos y complejidad ahora se clasifican como `operational|unsupported|missing|broken`
-  mediante adapters opt-in; ausencia ya no se presenta como arquitectura limpia.
-  Seguridad ya distingue decisiones sensibles fail-closed de fallos de observabilidad
-  fail-loud; se eliminó la autorización genérica y peligrosa de “fail-open OK”.
-  TDD/DbC conserva red-first, mutación e invariantes, pero la matriz nace del riesgo y del
-  comportamiento observable; se eliminaron cuotas universales de casos/aserciones decorativas.
-  Existe un boundary portable `agent-runner` con contratos separados `run`/`review`, backend
-  fake hermético, adapter Claude y limpieza del grupo completo ante timeout/cancelación.
-  Backlog exige `run+review+read_only+subagents+hooks`, conserva scope/worktrees y no llega a
-  `in-review` sin review final parseable; CI exige `review+read_only` sin acoplarse al proveedor.
-  Eventos y findings ya tienen lifecycle separado: detectar no implica true-positive; solo
-  `findings.sh add/import --source-event` crea el vínculo durable y nunca modifica el evento.
+- **En curso:** nada. **PRD 0004 (reconciliación del workflow agéntico) está Shipped**: fases
+  1a–10 mergeadas. Qué dejó, en una frase por bloque — el detalle vive en el PRD, no aquí:
+  manifiesto de capacidades que gobierna los bloques documentales; probes funcionales que
+  distinguen ausente / roto / operativo; scope mecánico del backlog antes de `in-review`;
+  estados explícitos de las capacidades arquitectónicas; boundary portable `agent-runner` con
+  backends intercambiables; eventos v2 y findings con lifecycle separado (detectar ≠ defecto);
+  rotación de lecciones que dejó el contexto obligatorio en 236 líneas; caché de Semgrep staged
+  solo para verde. **Fase 10 cerró el ciclo con la matriz E2E** (`tools/tests/test_e2e_matrix.sh`):
+  un test por escenario golden, atado al PRD por un test que falla si la lista y su demostración
+  divergen. Al construirla salieron tres huecos que ninguna fase anterior podía ver —el Anillo 3
+  no tenía test propio, `claude.sh` declaraba `read_only` sin demostrarlo y la promesa de ≥30% de
+  la caché no se medía— y los tres quedaron cubiertos (PRD 0004 §18).
+- **Salud:** suite del harness verde en macOS (477 tests). El estado por gate NO se apunta aquí
+  a propósito —caduca y se lee como garantía permanente—: lo dice `session-start` en cada
+  arranque y `bash tools/validate-harness.sh --selftest` cuando lo preguntes. El único hecho de
+  entorno que conviene recordar porque confunde: **la capacidad runtime de Semgrep en esta
+  máquina está `broken`** (su binario revienta al inicializar X509), y eso NO es un fallo del
+  clasificador — la fase 2 separa ambos hechos justamente para que un clasificador verde no se
+  lea como entorno verde.
 
 ## Cómo se trabaja aquí (el bucle, no la historia)
 
@@ -61,15 +44,19 @@
 
 ## Próximo paso
 
-- **Siguiente entrega:** fase 10 — matriz E2E y cutover documental final, sin comportamiento nuevo.
-- **Handoff para el siguiente agente:** empezar en PRD 0004 §5b/§9/§10. Construir la matriz E2E
-  que demuestre los criterios 1–10, incluyendo `fake.sh` y `claude.sh` conectado a un stub
-  hermético; el smoke con Claude real queda opcional. No añadir capacidades ni cambiar contratos:
-  fase 10 integra, verifica macOS/Linux y hace el cutover final de documentación.
-- **Base verificada de fase 9:** `bash tools/tests/run-tests.sh gate_cache` da 15/15. Cubre hit,
-  TTL, atomicidad, corrupción/payload manipulado, invalidación por diff/HEAD/targets/reglas/
-  scanner/binario/versión/plataforma, TOCTOU, worktree distinto, exits 1/3, warnings y `--all`.
-- El informe del adoptante sigue siendo una verificación posterior, no bloquea esta iniciativa.
+- **Siguiente entrega:** ninguna iniciativa abierta. El trabajo vuelve al bucle de arriba: el
+  adoptante sincroniza, usa el harness y reporta con medición; el arreglo se hace aquí.
+- **Handoff para el siguiente agente:** no hay fase pendiente que retomar. Antes de abrir una
+  iniciativa nueva, mira `bash tools/metrics/escape-rate.sh` y el ledger: PRD 0004 §16 pide 2–4
+  semanas de datos del adoptante antes de retirar o endurecer cualquier defensa, y endurecer sin
+  ese dato es añadir ceremonia.
+- **Base verificada de fase 10:** `bash tools/tests/run-tests.sh e2e_matrix` da 11/11 y la suite
+  completa 477/477 en macOS. Cada test de la matriz se comprobó contra un mutante del script que
+  dice cubrir (11 mutantes, cada uno rojo en su test y solo en el suyo). **Linux no se verificó
+  en esa corrida**: lo dice el job `ubuntu-latest` de `harness-ci`, y hasta que ese job esté
+  verde la mitad Linux de la promesa es una expectativa, no evidencia.
+- El informe del adoptante sigue siendo la verificación independiente: quien escribe el arreglo
+  no es quien lo aprueba.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
   SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`
   caza la cita si alguien la pega).
