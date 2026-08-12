@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 63 · Total: 64
+Abiertos: **1** · Cerrados: 66 · Total: 67
 
 ## Abiertos
 
@@ -78,3 +78,6 @@ Abiertos: **1** · Cerrados: 63 · Total: 64
 | `f-readme-hardcoded-evidence-counts` | fixed | Se reemplazaron cifras copiadas por los comandos canónicos que calculan deuda y verifican detectores |
 | `f-lessons-heading-collision-data-loss` | fixed | El corpus combinado acepta retries solo si el cuerpo completo coincide y aborta antes de escribir an |
 | `f-lessons-archive-never-restored` | fixed | Cada corrida reclasifica el corpus live+archive y restaura al tramo vivo cualquier entrada que perdi |
+| `f-gate-cache-stdin-payload` | fixed | Put recibe el unico resumen verde canonico como argumento explicito; get rechaza payloads distintos  |
+| `f-gate-cache-key-race` | fixed | Las consultas ejecutables ocurren antes del snapshot final HEAD+diff; el boundary recalcula la key y |
+| `f-gate-cache-target-race` | fixed | El scanner compara y vuelve a resolver targets tras consultar cache y antes de publicar; una regresi |

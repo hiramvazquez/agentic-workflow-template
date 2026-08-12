@@ -11,7 +11,7 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–8 implementadas:
+- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–9 implementadas:
   manifiesto estructurado, bloques documentales generados y upgrade que funde esos fragmentos
   sin pisar la prosa del adoptante; el informe calcula tests/FILLs contra el commit actual en
   vez de copiar conteos manuales; probe funcional con commit/plataforma/fecha y consumo desde
@@ -24,8 +24,10 @@
   `gate-value` separa eventos únicos, actividad, promoción y cobertura de latencia sin llamar
   “false-positive” a lo que sigue sin triar; la rotación dejó 11 lecciones vivas y movió 52
   racionales mecanizados al archivo, con un índice único regenerable. El contexto obligatorio
-  termina antes del índice y ocupa 236 líneas; el histórico solo se consulta bajo demanda.
-  Fases 9–10 pendientes.
+  termina antes del índice y ocupa 236 líneas; el histórico solo se consulta bajo demanda;
+  Semgrep staged reutiliza exclusivamente resultados 0/0 mediante una key de diff+HEAD+targets+
+  reglas+scanner+binario+versión+plataforma y TTL, revalidada antes de consumir y publicar;
+  targets con cambios no stageados fuerzan scan real. Fase 10 pendiente.
 - **Salud:** las suites herméticas de capabilities, upgrade y clasificación están verdes. La
   capacidad runtime de Semgrep en esta máquina está **broken**: su binario revienta al inicializar
   X509. La fase 2 ya separa ambos hechos; un clasificador verde no convierte el entorno en verde.
@@ -59,8 +61,14 @@
 
 ## Próximo paso
 
-- **Siguiente entrega:** fase 9 — caché verde únicamente para Semgrep staged, ligada a diff,
-  HEAD, reglas, binario, plataforma y TTL; exits 1/3 nunca se cachean.
+- **Siguiente entrega:** fase 10 — matriz E2E y cutover documental final, sin comportamiento nuevo.
+- **Handoff para el siguiente agente:** empezar en PRD 0004 §5b/§9/§10. Construir la matriz E2E
+  que demuestre los criterios 1–10, incluyendo `fake.sh` y `claude.sh` conectado a un stub
+  hermético; el smoke con Claude real queda opcional. No añadir capacidades ni cambiar contratos:
+  fase 10 integra, verifica macOS/Linux y hace el cutover final de documentación.
+- **Base verificada de fase 9:** `bash tools/tests/run-tests.sh gate_cache` da 15/15. Cubre hit,
+  TTL, atomicidad, corrupción/payload manipulado, invalidación por diff/HEAD/targets/reglas/
+  scanner/binario/versión/plataforma, TOCTOU, worktree distinto, exits 1/3, warnings y `--all`.
 - El informe del adoptante sigue siendo una verificación posterior, no bloquea esta iniciativa.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
   SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`

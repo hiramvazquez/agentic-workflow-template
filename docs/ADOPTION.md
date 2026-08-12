@@ -143,6 +143,11 @@ Prioridad de relleno (en orden de impacto — es la pirámide de
 6. `tools/semgrep/rules/` — tus anti-patrones como reglas AST. **Ejecuta el scan una vez**
    (`bash tools/semgrep-scan.sh`): `--validate` solo valida el YAML, no el parseo por
    lenguaje — nos pasó (PRD 0001 §18 G15).
+   El modo `--staged` reutiliza únicamente resultados totalmente limpios (`0 errors/0 warns`)
+   durante 300 s. La identidad incluye diff, HEAD, targets, reglas, scanner, binario+versión y
+   plataforma; `GATE_CACHE_TTL_SECONDS` ajusta el TTL. Corrupción/miss ejecuta Semgrep, un target
+   con cambios no stageados desactiva el caché y exits 1/3 jamás se guardan. El modo `--all` y
+   CI no sustituyen evidencia con esta optimización local.
 7. `docs/process/current_execution_map.md` — estado del proyecto.
 8. `CODEOWNERS` — sustituye los `@owner`.
 

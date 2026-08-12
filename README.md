@@ -158,6 +158,7 @@ tools/
   check-layers.sh + layers.conf  ← baseline de dirección de imports directos (nivel 6)
   architecture-check.sh          ← estado explícito de ciclos/complejidad por adapter
   semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
+  gate-cache.sh                 ← reutiliza solo Semgrep staged 0/0 con identidad completa + TTL
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación local de review en git hooks/adapters
   lesson-detector-link.sh    ← toda lección tiene detector, y el detector (archivo Y test) existe

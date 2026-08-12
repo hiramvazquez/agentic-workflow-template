@@ -11,6 +11,19 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-12] El programa embebido consumía el mismo stdin reservado para el payload
+- **Qué pasó:** `gate-cache.sh put` invocaba `python3 -` con el programa en un heredoc y a la vez
+  esperaba leer el resumen verde con `sys.stdin.read()`. El programa ocupaba stdin, así que el
+  payload siempre llegaba vacío y el caché nunca publicaba una entrada utilizable.
+- **Causa raíz:** se diseñó el transporte mirando cada redirección por separado; en un proceso
+  solo existe un stdin efectivo y el heredoc reemplaza al pipe del caller.
+- **Regla:** si `python3 -` recibe código por stdin, los datos del caller viajan por argumentos,
+  descriptor separado o archivo; nunca por ese mismo stdin. El consumidor valida además el
+  payload canónico, no solo que sea texto.
+- **Detector:** tools/tests/test_gate_cache.sh (`test_mismo_diff_verde_reutiliza_cache`,
+  `test_cache_solo_acepta_payload_verde_canonico`)
+- **Área:** tools/gate-cache.sh · tools/semgrep-scan.sh
+
 ### [2026-08-12] Reconciliar un archivo exige identidad no ambigua y clasificación bidireccional
 - **Qué pasó:** el rotador prefería una entrada archivada si otra nueva reutilizaba su encabezado,
   aunque el cuerpo fuera distinto; además, jamás reconsideraba las archivadas cuando desaparecía

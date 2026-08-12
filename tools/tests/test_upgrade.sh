@@ -425,6 +425,8 @@ _case_sync_trae_la_maquinaria_nueva() {
     && printf 'cycles.command=<!-- FILL -->\n' > tools/architecture.conf.example \
     && cp "$PROJECT_ROOT/tools/metrics/read-events.py" tools/metrics/read-events.py \
     && cp "$PROJECT_ROOT/tools/metrics/metrics-report.py" tools/metrics/metrics-report.py \
+    && cp "$PROJECT_ROOT/tools/gate-cache.sh" tools/gate-cache.sh \
+    && chmod +x tools/gate-cache.sh \
     && printf 'plantilla v2 del template\n' > backlog/_template.md \
     && printf 'historia del proyecto\n' > backlog/0001-mia.md \
     && git add -A && git commit -qm "template: corpus + plantilla" ) >/dev/null 2>&1
@@ -445,6 +447,8 @@ _case_sync_trae_la_maquinaria_nueva() {
     || { echo "    architecture.conf.example NO viajó: el clasificador llega sin configuración documentada"; return 1; }
   [ -f tools/metrics/read-events.py ] && [ -f tools/metrics/metrics-report.py ] \
     || { echo "    tools/metrics llegó incompleto: wrappers/tests sin lectores y reporte compartido"; return 1; }
+  [ -x tools/gate-cache.sh ] \
+    || { echo "    gate-cache.sh no viajó: semgrep-scan llega sin su optimización portable"; return 1; }
   grep -q 'plantilla v2' backlog/_template.md \
     || { echo "    backlog/_template.md NO viajó: el gate de criterios llega sin sus instrucciones"; return 1; }
   grep -q 'historia LOCAL' backlog/0001-mia.md \

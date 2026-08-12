@@ -74,14 +74,57 @@ fi
 # nunca el camino por el que se verifica.
 FIXTURES_DIR="${SEMGREP_FIXTURES:-tools/semgrep/fixtures}"
 
-TARGETS=()
-if [ "$MODE" = "--staged" ]; then
+_staged_targets() {
+  local f
   while IFS= read -r f; do
     [ -n "$f" ] && [ -f "$f" ] || continue
     case "$f" in "$FIXTURES_DIR"/*) continue ;; esac
-    TARGETS+=("$f")
+    printf '%s\n' "$f"
   done < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+}
+
+TARGETS=()
+if [ "$MODE" = "--staged" ]; then
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    TARGETS+=("$f")
+  done < <(_staged_targets)
   [ ${#TARGETS[@]} -eq 0 ] && { echo "SEMGREP_SUMMARY errors=0 warns=0"; exit 0; }
+fi
+TARGET_SNAPSHOT="$(printf '%s\n' "${TARGETS[@]}")"
+
+# Fase 9: optimización transparente y conservadora. Si la caché falta, está
+# corrupta o no puede calcular su identidad, el detector REAL corre igual.
+# Solo un 0/0 staged se guarda; exits 1/3 y warnings de parseo jamás entran.
+CACHE_KEY=""
+CACHE_ALLOWED=0
+if [ "$MODE" = "--staged" ] && [ -x tools/gate-cache.sh ] \
+   && git diff --quiet -- "${TARGETS[@]}"; then
+  CACHE_ALLOWED=1
+  SEMGREP_BIN="$(command -v semgrep 2>/dev/null || true)"
+  CACHE_KEY="$(bash tools/gate-cache.sh key semgrep-staged "$RULES_DIR" "$SEMGREP_BIN" "${TARGETS[@]}" 2>/dev/null)" || CACHE_KEY=""
+  if [ -n "$CACHE_KEY" ]; then
+    CACHED="$(bash tools/gate-cache.sh get "$CACHE_KEY" 2>/dev/null)"; CACHE_RC=$?
+    if [ "$CACHE_RC" = "0" ]; then
+      CURRENT_KEY="$(bash tools/gate-cache.sh key semgrep-staged "$RULES_DIR" "$SEMGREP_BIN" "${TARGETS[@]}" 2>/dev/null)" || CURRENT_KEY=""
+      if [ "$CURRENT_KEY" = "$CACHE_KEY" ] && git diff --quiet -- "${TARGETS[@]}" \
+         && [ "$(_staged_targets)" = "$TARGET_SNAPSHOT" ]; then
+        printf '%s\n' "$CACHED"
+        exit 0
+      fi
+    fi
+  fi
+fi
+
+# Un proveedor consultado durante la identidad puede mutar el índice. El scan
+# real debe recibir la lista posterior, y esa mutación invalida la publicación.
+CURRENT_TARGET_SNAPSHOT="$(_staged_targets)"
+if [ "$MODE" = "--staged" ] && [ "$CURRENT_TARGET_SNAPSHOT" != "$TARGET_SNAPSHOT" ]; then
+  TARGETS=()
+  while IFS= read -r f; do [ -n "$f" ] && TARGETS+=("$f"); done <<< "$CURRENT_TARGET_SNAPSHOT"
+  TARGET_SNAPSHOT="$CURRENT_TARGET_SNAPSHOT"
+  CACHE_ALLOWED=0
+  CACHE_KEY=""
 fi
 
 OUT="$(mktemp)"; trap 'rm -f "$OUT"' EXIT
@@ -198,6 +241,15 @@ jq -r '.results[] |
    + " [" + .check_id + "] " + (.extra.message | gsub("\n"; " ") | .[0:160]))' \
   "$OUT" 2>/dev/null || true
 
-echo "SEMGREP_SUMMARY errors=${ERRORS:-0} warns=${WARNS:-0}"
+SUMMARY="SEMGREP_SUMMARY errors=${ERRORS:-0} warns=${WARNS:-0}"
+echo "$SUMMARY"
 [ "${ERRORS:-0}" -gt 0 ] && exit 1
+if [ "$CACHE_ALLOWED" = "1" ] && [ -n "$CACHE_KEY" ] \
+   && [ "${WARNS:-0}" = "0" ] && [ "${PARSE_WARNS:-0}" = "0" ]; then
+  FINAL_KEY="$(bash tools/gate-cache.sh key semgrep-staged "$RULES_DIR" "$SEMGREP_BIN" "${TARGETS[@]}" 2>/dev/null)" || FINAL_KEY=""
+  if [ "$FINAL_KEY" = "$CACHE_KEY" ] && git diff --quiet -- "${TARGETS[@]}" \
+     && [ "$(_staged_targets)" = "$TARGET_SNAPSHOT" ]; then
+    bash tools/gate-cache.sh put "$CACHE_KEY" "$SUMMARY" >/dev/null 2>&1 || true
+  fi
+fi
 exit 0
