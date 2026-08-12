@@ -137,8 +137,19 @@ _ntests="$(find tools/tests -name 'test_*.sh' 2>/dev/null | wc -l | tr -d ' ')"
 # ── Niveles de la pirámide que están MUDOS (verification-loop.md) ────
 # Un gate no configurado es peor que ausente si el harness lo anuncia como
 # activo: da falsa confianza. Aquí se declara explícitamente qué NO cubre.
-command -v semgrep >/dev/null 2>&1 \
-  || { echo "⚠️  Nivel 2 MUDO: semgrep no instalado (\`brew install semgrep\`) — sin detectores AST."; _health=0; }
+if [ -x tools/probe-capability.sh ]; then
+  _semgrep_probe="$(PROBE_TIMEOUT_SECS="${PROBE_TIMEOUT_SECS:-10}" bash tools/probe-capability.sh semgrep 2>/dev/null)"; _semgrep_rc=$?
+  _semgrep_status="$(printf '%s' "$_semgrep_probe" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null || echo unknown)"
+  _semgrep_detail="$(printf '%s' "$_semgrep_probe" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("detail","sin diagnóstico"))' 2>/dev/null || echo 'salida no parseable')"
+  case "$_semgrep_status:$_semgrep_rc" in
+    operational:0) : ;;
+    missing:1) echo "⚠️  Nivel 2 MUDO: semgrep ausente — sin detectores AST."; _health=0 ;;
+    broken:1) echo "⚠️  Nivel 2 ROTO: semgrep existe pero su probe funcional falla — $_semgrep_detail"; _health=0 ;;
+    *) echo "⚠️  Nivel 2 DESCONOCIDO: el probe no pudo clasificar semgrep (exit $_semgrep_rc) — $_semgrep_detail"; _health=0 ;;
+  esac
+else
+  echo "⚠️  Nivel 2 DESCONOCIDO: falta tools/probe-capability.sh; presencia no demuestra operación."; _health=0
+fi
 grep -q '<!-- FILL' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && grep -qE '^\s*\*\)\s*:\s*;;' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && { echo "⚠️  Nivel 1 PARCIAL: post-edit-verify sin lint/typecheck de tu stack (§FILL) — el agente no recibe señal in-loop."; _health=0; }

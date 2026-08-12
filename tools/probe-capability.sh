@@ -40,12 +40,57 @@ case "$CAPABILITY" in
       exit 3
     fi
     out="$(mktemp)"; err="$(mktemp)"; trap 'rm -f "$out" "$err"' EXIT
-    SEMGREP_ENABLE_VERSION_CHECK=0 semgrep scan \
-      --config tools/semgrep/rules --json --quiet --metrics=off "$fixture" \
-      >"$out" 2>"$err" || true
+    timeout_secs="${PROBE_TIMEOUT_SECS:-15}"
+    case "$timeout_secs" in ''|*[!0-9]*|0) emit unknown "PROBE_TIMEOUT_SECS inválido"; exit 3 ;; esac
+    runner_status="$(python3 - "$fixture" "$out" "$err" "$timeout_secs" <<'PY'
+import os, signal, subprocess, sys
+
+fixture, stdout_path, stderr_path, timeout_raw = sys.argv[1:]
+command = ["semgrep", "scan", "--config", "tools/semgrep/rules", "--json",
+           "--quiet", "--metrics=off", fixture]
+env = os.environ.copy()
+env["SEMGREP_ENABLE_VERSION_CHECK"] = "0"
+try:
+    with open(stdout_path, "wb") as stdout, open(stderr_path, "wb") as stderr:
+        process = subprocess.Popen(command, stdout=stdout, stderr=stderr, env=env,
+                                   start_new_session=True)
+        try:
+            print(process.wait(timeout=int(timeout_raw)))
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            # El líder puede salir con TERM mientras un hijo lo ignora. Mata
+            # el GRUPO tras la gracia siempre; ProcessLookupError significa
+            # que ya no queda nadie, no un fallo del clasificador.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+            print("timeout")
+except OSError as exc:
+    with open(stderr_path, "w", encoding="utf-8") as stderr:
+        stderr.write(str(exc))
+    print("spawn-error")
+PY
+)"
+    case "$runner_status" in
+      timeout) emit broken "timeout tras ${timeout_secs}s"; exit 1 ;;
+      spawn-error) emit broken "no pude ejecutar semgrep"; exit 1 ;;
+      ''|-) emit unknown "runner del probe devolvió estado inválido"; exit 3 ;;
+      -*|*[!0-9-]*)
+        case "$runner_status" in -[0-9]*) : ;; *) emit unknown "runner del probe devolvió estado inválido"; exit 3 ;; esac
+        ;;
+    esac
     if [ ! -s "$out" ]; then
       detail="$(head -3 "$err" 2>/dev/null | tr '\n' ' ' | cut -c1-500)"
       [ -n "$detail" ] || detail="semgrep no produjo salida JSON"
+      case "$detail" in
+        *X509*trust\ anchors*) detail="X509 trust anchors: almacén CA vacío o no disponible" ;;
+      esac
       emit broken "$detail"
       exit 1
     fi
@@ -67,6 +112,12 @@ except Exception:
     print("invalid")
 PY
 )"
+    if [ "$runner_status" != "0" ]; then
+      detail="$(head -3 "$err" 2>/dev/null | tr '\n' ' ' | cut -c1-500)"
+      [ -n "$detail" ] || detail="semgrep terminó con exit $runner_status pese a producir JSON"
+      emit broken "$detail"
+      exit 1
+    fi
     case "$parsed" in
       operational) emit operational "fixture detectado"; exit 0 ;;
       errors) emit broken "semgrep cargó con errores de reglas/parsing"; exit 1 ;;

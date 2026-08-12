@@ -6,6 +6,7 @@ _probe_sandbox() {
   mkdir -p "$d/tools/semgrep/rules" "$d/tools/semgrep/fixtures" "$d/bin"
   [ -f "$PROJECT_ROOT/tools/probe-capability.sh" ] && cp "$PROJECT_ROOT/tools/probe-capability.sh" "$d/tools/"
   cp "$PROJECT_ROOT/tools/semgrep-scan.sh" "$d/tools/"
+  [ -f "$PROJECT_ROOT/tools/validate-harness.sh" ] && cp "$PROJECT_ROOT/tools/validate-harness.sh" "$d/tools/"
   printf 'rules: []\n' > "$d/tools/semgrep/rules/dummy.yaml"
   printf 'print("fixture")\n' > "$d/tools/semgrep/fixtures/python-malo.py"
   (
@@ -54,6 +55,26 @@ assert d["checked_at"].endswith("Z")
 }
 test_probe_que_ve_fixture_es_operational() { _probe_sandbox _case_operational; }
 
+_case_json_sano_con_exit_roto_no_es_operational() {
+  stub bin/semgrep '#!/usr/bin/env bash\nprintf '\''{"results":[{"path":"x","start":{"line":1},"check_id":"probe","extra":{"severity":"ERROR","message":"ok"}}],"errors":[]}\n'\''\nexit 2\n'
+  local out rc
+  out="$(bash tools/probe-capability.sh semgrep 2>/dev/null)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    JSON sano+exit2 salió $rc: $out"; return 1; }
+  assert_eq "broken" "$(_json_status "$out")"
+}
+test_json_valido_no_oculta_exit_no_cero_del_scanner() { _probe_sandbox _case_json_sano_con_exit_roto_no_es_operational; }
+
+_case_scanner_muerto_por_signal_es_broken() {
+  stub bin/semgrep '#!/usr/bin/env bash\nprintf '\''{"results":[],"errors":[]}\n'\''\nkill -TERM $$\n'
+  local out rc
+  out="$(bash tools/probe-capability.sh semgrep 2>/dev/null)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    rc por señal salió $rc: $out"; return 1; }
+  assert_eq "broken" "$(_json_status "$out")"
+}
+test_scanner_muerto_por_signal_no_se_confunde_con_clasificador_roto() {
+  _probe_sandbox _case_scanner_muerto_por_signal_es_broken
+}
+
 _case_unknown() {
   local out rc
   out="$(bash tools/probe-capability.sh desconocida 2>/dev/null)"; rc=$?
@@ -69,3 +90,39 @@ _case_json_seguro() {
   printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null
 }
 test_diagnostico_multilinea_sigue_siendo_json_valido() { _probe_sandbox _case_json_seguro; }
+
+_case_timeout_es_broken() {
+  stub bin/semgrep '#!/usr/bin/env bash\nsleep 10\n'
+  local out rc start end
+  start="$(date +%s)"
+  out="$(PROBE_TIMEOUT_SECS=1 bash tools/probe-capability.sh semgrep 2>/dev/null)"; rc=$?
+  end="$(date +%s)"
+  [ "$rc" = "1" ] || { echo "    timeout salió $rc: $out"; return 1; }
+  [ $((end-start)) -lt 5 ] || { echo "    el probe tardó $((end-start))s pese al timeout de 1s"; return 1; }
+  assert_eq "broken" "$(_json_status "$out")" || return 1
+  assert_contains "$out" 'timeout'
+}
+test_probe_cuelgue_termina_como_broken() { _probe_sandbox _case_timeout_es_broken; }
+
+_case_timeout_mata_descendientes() {
+  stub bin/semgrep "#!/usr/bin/env bash\n(trap '' TERM; sleep 30) &\necho \$! > probe-child.pid\nwait\n"
+  PROBE_TIMEOUT_SECS=1 bash tools/probe-capability.sh semgrep >/dev/null 2>&1 || true
+  local child
+  child="$(cat probe-child.pid 2>/dev/null || echo '')"
+  [ -n "$child" ] || { echo "    el stub no registró su descendiente"; return 1; }
+  if kill -0 "$child" 2>/dev/null; then
+    kill -KILL "$child" 2>/dev/null || true
+    echo "    el descendiente $child sobrevivió al timeout"
+    return 1
+  fi
+}
+test_timeout_limpia_el_grupo_de_procesos_completo() { _probe_sandbox _case_timeout_mata_descendientes; }
+
+_case_validate_no_confunde_presencia_con_salud() {
+  stub bin/semgrep '#!/usr/bin/env bash\necho "X509: empty trust anchors" >&2\nexit 1\n'
+  local out
+  out="$(bash tools/validate-harness.sh 2>&1)" || true
+  assert_contains "$out" 'semgrep broken' || return 1
+  case "$out" in *'✅ semgrep'*) echo "    validate mostró verde por mera presencia"; return 1 ;; esac
+}
+test_validate_harness_consume_el_probe_funcional() { _probe_sandbox _case_validate_no_confunde_presencia_con_salud; }

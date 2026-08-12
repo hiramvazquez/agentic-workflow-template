@@ -118,9 +118,22 @@ echo "── 6. Dependencias ──"
 for dep in jq python3 git; do
   command -v "$dep" >/dev/null 2>&1 && ok "$dep" || bad "$dep AUSENTE — varios hooks degradan o fallan"
 done
-for dep in semgrep gitleaks lefthook; do
+for dep in gitleaks lefthook; do
   command -v "$dep" >/dev/null 2>&1 && ok "$dep" || warn "$dep ausente — el nivel que lo usa está MUDO (session-start ya lo reporta)"
 done
+if [ -x tools/probe-capability.sh ]; then
+  _probe="$(PROBE_TIMEOUT_SECS="${PROBE_TIMEOUT_SECS:-15}" bash tools/probe-capability.sh semgrep 2>/dev/null)"; _probe_rc=$?
+  _probe_status="$(printf '%s' "$_probe" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null || echo unknown)"
+  _probe_detail="$(printf '%s' "$_probe" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("detail","sin diagnóstico"))' 2>/dev/null || echo 'salida no parseable')"
+  case "$_probe_status:$_probe_rc" in
+    operational:0) ok "semgrep operational — $_probe_detail" ;;
+    missing:1) bad "semgrep missing — $_probe_detail" ;;
+    broken:1) bad "semgrep broken — $_probe_detail" ;;
+    *) bad "semgrep unknown (exit $_probe_rc) — $_probe_detail" ;;
+  esac
+else
+  bad "probe de semgrep ausente — presencia no demuestra operación"
+fi
 if [ -d .git ] && [ -f lefthook.yml ]; then
   grep -q lefthook .git/hooks/pre-commit 2>/dev/null \
     && ok "Anillo 1 instalado (.git/hooks/pre-commit)" \

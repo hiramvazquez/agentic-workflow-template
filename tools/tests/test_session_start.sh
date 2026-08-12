@@ -87,6 +87,46 @@ _case_detecta_anillo_dormido() {
 }
 test_detecta_anillo1_dormido() { _sst_sandbox _case_detecta_anillo_dormido; }
 
+_case_semgrep_broken_no_parece_instalado() {
+  cat > tools/probe-capability.sh <<'EOF'
+#!/usr/bin/env bash
+echo '{"capability":"semgrep","status":"broken","detail":"X509 trust anchors"}'
+exit 1
+EOF
+  chmod +x tools/probe-capability.sh
+  local out
+  out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  assert_contains "$out" 'Nivel 2 ROTO' || return 1
+  assert_contains "$out" 'X509 trust anchors'
+}
+test_arranque_distingue_semgrep_roto_de_ausente() { _sst_sandbox _case_semgrep_broken_no_parece_instalado; }
+
+_case_semgrep_operational_no_avisa_nivel2() {
+  cat > tools/probe-capability.sh <<'EOF'
+#!/usr/bin/env bash
+echo '{"capability":"semgrep","status":"operational","detail":"fixture detectado"}'
+exit 0
+EOF
+  chmod +x tools/probe-capability.sh
+  local out
+  out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  case "$out" in *'Nivel 2 MUDO'*|*'Nivel 2 ROTO'*) echo "    operational siguió avisando: $out"; return 1 ;; esac
+}
+test_arranque_acepta_solo_probe_operational() { _sst_sandbox _case_semgrep_operational_no_avisa_nivel2; }
+
+_case_operational_con_exit_roto_es_unknown() {
+  cat > tools/probe-capability.sh <<'EOF'
+#!/usr/bin/env bash
+echo '{"capability":"semgrep","status":"operational","detail":"inconsistente"}'
+exit 1
+EOF
+  chmod +x tools/probe-capability.sh
+  local out
+  out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  assert_contains "$out" 'Nivel 2 DESCONOCIDO'
+}
+test_arranque_valida_status_y_exit_como_un_par() { _sst_sandbox _case_operational_con_exit_roto_es_unknown; }
+
 # ════════════════════════════════════════════════════════════════════
 # NIVEL 4 — cuatro estados, cuatro mensajes (f-nivel4-dos-estados-un-cajon)
 # ════════════════════════════════════════════════════════════════════

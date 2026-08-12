@@ -27,6 +27,7 @@
 | `architecture_import_direction` | sí | sí | `tools/check-layers.sh` | Dirección de imports directos |
 | `review_marker` | sí | no | `tools/check-review-marker.sh` | Evidencia de review ligada al diff |
 | `ring3` | sí | no | `tools/check-ring3.sh` | Backstop de CI |
+| `semgrep` | sí | sí | `tools/probe-capability.sh semgrep` | Análisis AST funcional |
 | `skill_reminder` | sí | no | `scripts/agent-hooks/skill-reminder.sh` | Lectura obligatoria por path |
 <!-- END GENERATED: capabilities -->
 

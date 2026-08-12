@@ -31,6 +31,12 @@
       "required_in_full": true,
       "required_in_lite": false
     },
+    "semgrep": {
+      "title": "Análisis AST funcional",
+      "provider": "tools/probe-capability.sh semgrep",
+      "required_in_full": true,
+      "required_in_lite": true
+    },
     "skill_reminder": {
       "title": "Lectura obligatoria por path",
       "provider": "scripts/agent-hooks/skill-reminder.sh",
