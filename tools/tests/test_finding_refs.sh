@@ -254,3 +254,24 @@ test_el_corpus_ajeno_lleva_los_textos_que_produjeron_el_fallo() {
   grep -q 'no tiene alternativa' "$f" 2>/dev/null \
     || { echo "    desapareció del corpus el FP 'Los 3 casts ... no tiene alternativa'"; return 1; }
 }
+
+# ── El caso que PARECE del corpus bueno y va en el malo ─────────────
+# Un hallazgo que CITA una afirmación de versión como ejemplo. Se propuso
+# exentarlo —citar ≠ afirmar— invocando dos precedentes reales: el git-guard no
+# salta con `grep "git commit --no-verify" doc.md`, y la matriz de Bash desnuda
+# las cadenas entrecomilladas. Pero esos dos se apoyan en una gramática EXTERNA
+# (el shell no ejecuta lo entrecomillado, y quien lo dictamina es su parser, no
+# nuestro criterio). En prosa no hay tal gramática: las comillas son estilo, y
+# exentarlas regalaría una primitiva de evasión — envuelve la afirmación en
+# comillas y pasa. Este test fija la decisión para que nadie la "arregle" luego.
+test_una_afirmacion_de_version_citada_como_ejemplo_sigue_disparando() {
+  local f="$PROJECT_ROOT/$_FIX/ledger-malo.jsonl"
+  grep -q 'f-malo-citada-como-ejemplo' "$f" 2>/dev/null \
+    || { echo "    el caso 'citada como ejemplo' desapareció del corpus MALO"; return 1; }
+  grep -q 'f-malo-citada-como-ejemplo' "$PROJECT_ROOT/$_FIX/ledger-bueno.jsonl" 2>/dev/null \
+    && { echo "    el caso 'citada como ejemplo' se movió al corpus BUENO."
+         echo "    Eso exenta lo entrecomillado, y en prosa las comillas las controla"
+         echo "    el evaluado: sería una primitiva de evasión, no una lectura mejor."
+         return 1; }
+  return 0
+}

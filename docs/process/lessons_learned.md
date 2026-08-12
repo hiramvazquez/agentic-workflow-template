@@ -1251,4 +1251,21 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   reescribe para que "quede mejor" deja de reproducir nada), y
   tools/tests/test_upgrade.sh::test_sync_trae_la_maquinaria_nueva, porque un corpus que no viaja
   deja al adoptante con el test y sin el archivo que busca.
+- **Coletazo, y es una regla nueva:** al cerrar esto, el adoptante propuso un caso más para el
+  corpus BUENO — un hallazgo que **cita** una afirmación de versión como ejemplo (*"el informe
+  afirmaba «muter 16 no parsea typed throws»"*), invocando dos precedentes reales de este mismo
+  harness: el git-guard no salta con `grep "git commit --no-verify" doc.md`, y la matriz de Bash
+  desnuda las cadenas entrecomilladas antes de analizar. **Se rechazó, y va al corpus MALO.**
+  Aquellos dos se apoyan en una gramática EXTERNA y autoritativa —el shell no ejecuta lo
+  entrecomillado, y quien lo dictamina es su parser, no nuestro criterio—. En prosa no existe esa
+  gramática: las comillas son estilo. Exentarlas no sería leer mejor, sería regalar una primitiva
+  de evasión (envuelve la afirmación en comillas y pasa), y un detector evadible con un truco de
+  formato enseña el truco. La confirmación empírica llegó sola: quien encontró el caso lo resolvió
+  **citando la fuente**, no pidiendo la excepción, y le costó una URL.
+  > **"Texto ≠ sintaxis" solo se puede mecanizar cuando existe un parser que lo dictamine.**
+  > Sin gramática externa, esa distinción la controla el evaluado — y un gate cuyo criterio
+  > controla el evaluado no es un gate.
+- **Detector (del coletazo):** tools/tests/test_finding_refs.sh::test_una_afirmacion_de_version_citada_como_ejemplo_sigue_disparando
+  — fija la decisión en las DOS direcciones (la fila está en el corpus malo y NO puede aparecer
+  en el bueno), porque una decisión razonada que no se fija la "arregla" el siguiente que pase.
 - **Área:** tools/check-version-claims.sh · tools/findings/fixtures/
