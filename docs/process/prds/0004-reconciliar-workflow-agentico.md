@@ -235,9 +235,15 @@ scope-check.sh --story <path> --base <ref> --head <ref> --worktree <path>
 
 - inspecciona `base...head`, índice, modificaciones y untracked del worktree;
 - en renames valida origen y destino; incluye deletes;
-- allowlist cerrada: el propio archivo de historia y, solo cuando cambian por el CLI, ledger JSONL
-  + vista generada. Tests/implementación deben estar enumerados en `scope`;
+- allowlist cerrada: solo el propio archivo de historia es automático. Tests, implementación,
+  ledger JSONL y su vista generada deben estar enumerados en `scope`; no se afirma procedencia
+  del CLI cuando Git solo permite demostrar qué bytes cambiaron;
 - globs se evalúan sobre paths relativos normalizados, sin escapar del repo;
+- antes del run, checker e historia deben estar limpios y commiteados; el orquestador fija sus
+  blobs en memoria y reduce la base a OID, por lo que la rama evaluada no puede reescribir al juez,
+  ampliar su propia allowlist ni mover la referencia base para ocultar el rango. También fija las
+  rutas absolutas de Bash, Python y Git para que un ejecutable añadido luego a `PATH` no suplante
+  al gate;
 - `0` limpio, `1` path fuera de scope, `3` no pudo resolver story/base/head/worktree.
 
 ### Upgrade: propiedad y estrategia

@@ -10,6 +10,7 @@ _bl_sandbox() {
   cp "$PROJECT_ROOT/tools/backlog/next.sh" "$d/tools/backlog/" 2>/dev/null
   cp "$PROJECT_ROOT/tools/backlog/run.sh" "$d/tools/backlog/" 2>/dev/null
   cp "$PROJECT_ROOT/tools/backlog/criteria-link.sh" "$d/tools/backlog/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/backlog/scope-check.sh" "$d/tools/backlog/" 2>/dev/null
   (
     cd "$d" || exit 1
     git init -q -b develop . 2>/dev/null; git config user.email t@t.t; git config user.name t
@@ -26,6 +27,8 @@ titulo: Historia $2
 status: $3
 depends_on: [$4]
 base: develop
+scope: |
+  **
 ---
 ## Criterios de aceptación
 1. Dado X cuando Y entonces Z.
@@ -126,6 +129,149 @@ _case_checkout_humano_intacto() {
   case "$st" in *in-review*) : ;; *) echo "    en la rama la historia no quedó in-review ($st)"; return 1 ;; esac
 }
 test_checkout_del_humano_queda_intacto() { _bl_sandbox _case_checkout_humano_intacto; }
+
+_case_scope_bloquea_antes_de_in_review() {
+  _story 0001-a.md 0001 ready ""
+  python3 - <<'PY'
+p='backlog/0001-a.md'
+s=open(p).read().replace('scope: |\n  **', 'scope: |\n  src/allowed.txt')
+open(p,'w').write(s)
+PY
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  cat > bin/claude <<'EOF'
+#!/usr/bin/env bash
+printf 'scope creep\n' >> seed.txt
+git add seed.txt
+git -c user.email=t@t.t -c user.name=t commit -qm 'feat: fuera de scope'
+EOF
+  chmod +x bin/claude
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "6" ] || { echo "    scope creep terminó con rc=$rc, esperaba 6: $out"; return 1; }
+  local st
+  st="$(git show story/0001-a:backlog/0001-a.md | grep '^status:')"
+  case "$st" in *in-progress*) return 0 ;; esac
+  echo "    historia fuera de scope quedó $st en vez de in-progress"
+  return 1
+}
+test_run_no_llega_a_in_review_con_diff_fuera_de_scope() {
+  _bl_sandbox _case_scope_bloquea_antes_de_in_review
+}
+
+_case_checker_de_la_rama_no_es_confiable() {
+  _story 0001-a.md 0001 ready ""
+  python3 - <<'PY'
+p='backlog/0001-a.md'
+s=open(p).read().replace('scope: |\n  **', 'scope: |\n  src/allowed.txt')
+open(p,'w').write(s)
+PY
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  cat > bin/claude <<'EOF'
+#!/usr/bin/env bash
+printf '#!/usr/bin/env bash\nexit 0\n' > tools/backlog/scope-check.sh
+chmod +x tools/backlog/scope-check.sh
+printf 'scope creep\n' >> seed.txt
+git add tools/backlog/scope-check.sh seed.txt
+git -c user.email=t@t.t -c user.name=t commit -qm 'feat: reemplaza el juez'
+EOF
+  chmod +x bin/claude
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "6" ] || { echo "    checker sustituido terminó rc=$rc: $out"; return 1; }
+}
+test_runner_usa_checker_fijado_antes_del_agente() { _bl_sandbox _case_checker_de_la_rama_no_es_confiable; }
+
+_case_path_no_sustituye_interpretes_del_gate() {
+  _story 0001-a.md 0001 ready ""
+  python3 - <<'PY'
+p='backlog/0001-a.md'
+s=open(p).read().replace('scope: |\n  **', 'scope: |\n  src/allowed.txt')
+open(p,'w').write(s)
+PY
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  cat > bin/claude <<'EOF'
+#!/usr/bin/env bash
+real_git="$(command -v git)"
+printf 'scope creep\n' >> seed.txt
+"$real_git" add seed.txt
+"$real_git" -c user.email=t@t.t -c user.name=t commit -qm 'feat: fuera de scope'
+attack_dir="$(cd "$(dirname "$0")" && pwd)"
+for name in bash python3 git; do
+  printf '#!/bin/sh\nexit 0\n' > "$attack_dir/$name"
+  chmod +x "$attack_dir/$name"
+done
+EOF
+  chmod +x bin/claude
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "6" ] || { echo "    PATH shadowing terminó rc=$rc: $out"; return 1; }
+  assert_contains "$out" 'seed.txt'
+}
+test_runner_fija_bash_python_y_git_antes_del_agente() { _bl_sandbox _case_path_no_sustituye_interpretes_del_gate; }
+
+_case_anchor_sucio_no_es_autoridad() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  printf '\n# cambio local no auditado\n' >> tools/backlog/scope-check.sh
+  _fake_claude
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    checker sucio terminó rc=$rc: $out"; return 1; }
+  assert_contains "$out" 'deben estar commiteados y limpios'
+  git rev-parse --verify story/0001-a >/dev/null 2>&1 \
+    && { echo "    creó rama con anchors sucios"; return 1; }
+  return 0
+}
+test_checker_o_historia_sucios_no_se_vuelven_autoridad() { _bl_sandbox _case_anchor_sucio_no_es_autoridad; }
+
+_case_scope_no_se_puede_ampliar_durante_run() {
+  _story 0001-a.md 0001 ready ""
+  python3 - <<'PY'
+p='backlog/0001-a.md'
+s=open(p).read().replace('scope: |\n  **', 'scope: |\n  src/allowed.txt')
+open(p,'w').write(s)
+PY
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  cat > bin/claude <<'EOF'
+#!/usr/bin/env bash
+python3 - <<'PY'
+p='backlog/0001-a.md'
+s=open(p).read().replace('  src/allowed.txt', '  **')
+open(p,'w').write(s)
+PY
+printf 'scope creep\n' >> seed.txt
+git add backlog/0001-a.md seed.txt
+git -c user.email=t@t.t -c user.name=t commit -qm 'feat: amplía scope'
+EOF
+  chmod +x bin/claude
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "6" ] || { echo "    scope ampliado terminó rc=$rc: $out"; return 1; }
+}
+test_runner_fija_scope_antes_del_agente() { _bl_sandbox _case_scope_no_se_puede_ampliar_durante_run; }
+
+_case_base_mutada_no_oculta_diff() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  mkdir -p bin
+  cat > bin/claude <<'EOF'
+#!/usr/bin/env bash
+printf 'cambio\n' >> seed.txt
+git add seed.txt
+git -c user.email=t@t.t -c user.name=t commit -qm 'feat: cambio'
+git update-ref refs/heads/develop HEAD
+EOF
+  chmod +x bin/claude
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "3" ] || { echo "    base mutada terminó rc=$rc: $out"; return 1; }
+  assert_contains "$out" 'ref base develop cambió'
+}
+test_runner_detecta_mutacion_de_la_ref_base() { _bl_sandbox _case_base_mutada_no_oculta_diff; }
 
 _case_in_review_no_se_retrabaja() {
   _story 0001-a.md 0001 ready ""

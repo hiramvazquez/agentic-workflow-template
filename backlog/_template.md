@@ -4,7 +4,7 @@ titulo: <verbo + resultado, como el summary de un ticket>
 status: ready        # ready | in-progress | in-review | done | blocked | ejemplo
 depends_on: []       # ids que deben estar DONE (= mergeados a la base) antes: [0001, 0002]
 base: develop        # rama desde la que se crea story/NNNN-<slug>
-scope: |             # los archivos/módulos que la historia PUEDE tocar (§8: scope exclusivo)
+scope: |             # ÚNICA allowlist mecánica de lo que PUEDE tocar (§8)
   <rutas o globs>
 ---
 
@@ -37,7 +37,7 @@ a PRD/diseño, por qué ahora. 3-6 líneas.>
 2.
 
 ## Fuera de scope
-- <Lo que NO entra, explícito. Es tu mejor defensa contra el scope creep.>
+- <Lo que NO entra, explícito. Esta prosa orienta, pero NO amplía `scope: |`.>
 
 ## Notas técnicas (opcional)
 <Pistas, no órdenes: patrón a seguir, archivo de referencia, gotchas.>

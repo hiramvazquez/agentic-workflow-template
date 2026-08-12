@@ -48,6 +48,9 @@ _set_status() { # _set_status <archivo> <estado>
 }
 ID="$(_field "$STORY" id)"; : "${ID:=$(basename "$STORY" | cut -d- -f1)}"
 BASE="$(_field "$STORY" base)"; : "${BASE:=develop}"
+case "$BASE" in
+  -*) echo "❌ backlog: base insegura en ${STORY}: ${BASE}" >&2; exit 1 ;;
+esac
 SLUG="$(basename "$STORY" .md | sed "s/^${ID}-\{0,1\}//")"
 BRANCH="story/${ID}${SLUG:+-$SLUG}"
 WT=".agents/worktrees/${BRANCH//\//-}"
@@ -72,6 +75,32 @@ if ! command -v claude >/dev/null 2>&1; then
   exit 3
 fi
 
+# Resuelve intérpretes/herramientas antes de ceder ejecución. Después, un
+# agente puede escribir un `bash`, `python3` o `git` antes en PATH; el gate no
+# vuelve a consultar ese namespace mutable.
+TRUSTED_BASH="$(command -v bash 2>/dev/null || true)"
+TRUSTED_PYTHON="$(command -v python3 2>/dev/null || true)"
+TRUSTED_GIT="$(command -v git 2>/dev/null || true)"
+for TRUSTED_BIN in "$TRUSTED_BASH" "$TRUSTED_PYTHON" "$TRUSTED_GIT"; do
+  case "$TRUSTED_BIN" in
+    /*) [ -x "$TRUSTED_BIN" ] || { echo "❌ backlog: ejecutable confiable no disponible: $TRUSTED_BIN" >&2; exit 3; } ;;
+    *) echo "❌ backlog: no pude fijar ejecutables absolutos para el gate." >&2; exit 3 ;;
+  esac
+done
+
+# Checker y contrato deben ser blobs commiteados. El árbol puede estar sucio
+# en otras rutas porque el worktree aísla, pero no en los archivos que
+# decidirán qué se permite: un cambio local sin OID no es autoridad auditable.
+if ! git diff --quiet -- tools/backlog/scope-check.sh "$STORY" \
+  || ! git diff --cached --quiet -- tools/backlog/scope-check.sh "$STORY"; then
+  echo "❌ backlog: checker e historia deben estar commiteados y limpios antes del run." >&2
+  exit 1
+fi
+TRUSTED_SCOPE_SOURCE="$(git show "HEAD:tools/backlog/scope-check.sh" 2>/dev/null)" \
+  || { echo "❌ backlog: scope-check no existe en HEAD; commitéalo antes del run." >&2; exit 1; }
+TRUSTED_STORY_CONTENT="$(git show "HEAD:${STORY}" 2>/dev/null)" \
+  || { echo "❌ backlog: la historia no existe en HEAD; commitéala antes del run." >&2; exit 1; }
+
 # ── Rama nueva o retomar — SIEMPRE vía worktree, jamás checkout aquí ─
 if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
   BR_STATUS="$(_branch_field "$BRANCH" "$STORY" status)"
@@ -92,6 +121,13 @@ else
   git worktree add "$WT" -b "$BRANCH" "$BASE" >/dev/null 2>&1 \
     || { echo "❌ backlog: git worktree add falló (¿worktree huérfano? git worktree prune)." >&2; exit 1; }
 fi
+
+# Los tres anchors de confianza se fijan ANTES de ejecutar código del agente:
+# source del checker + historia viven en memoria privada del proceso padre y
+# vienen de HEAD; la base se reduce a OID. No hay archivo temporal que otro
+# proceso con el mismo UID pueda reescribir.
+BASE_OID="$(git rev-parse --verify "${BASE}^{commit}" 2>/dev/null)" \
+  || { echo "❌ backlog: no pude fijar el commit base ${BASE}." >&2; exit 1; }
 
 # Estado: in-progress, commiteado EN LA RAMA vía el worktree.
 ( cd "$WT" && _set_status "$STORY" in-progress \
@@ -119,8 +155,8 @@ CONTRATO (no negociable — AGENTS.md es la fuente canónica y sus gates están 
    owner (§1.4) — no lo resuelvas tú.
 2. TDD estricto: cada criterio de aceptación se convierte PRIMERO en un test
    que falla, luego la implementación mínima, luego refactor (§5).
-3. Scope EXCLUSIVO: los archivos que la historia lista (frontmatter \`scope\`
-   y cuerpo). Hallazgos fuera de scope → al ledger
+3. Scope EXCLUSIVO: los paths listados en el frontmatter \`scope: |\`.
+   El cuerpo no amplía esa allowlist. Hallazgos fuera de scope → al ledger
    (bash tools/findings/findings.sh add), jamás "de paso" (§8, §10).
 4. Antes de cada commit: invoca el sub-agente \`reviewer\` y atiende su
    veredicto. Sin VERDICT GREEN/AMBER real, el commit está bloqueado — no
@@ -182,6 +218,14 @@ echo "═══ fin del run · rc=$RC" >> "$RUN_LOG"
 # el que hay que mirar. Mismo principio que §14.2: el veredicto es la salida de
 # un comando, nunca una afirmación de quien lo ejecutó.
 if [ $RC -eq 0 ]; then
+  CURRENT_BASE_OID="$("$TRUSTED_GIT" rev-parse --verify "${BASE}^{commit}" 2>/dev/null || true)"
+  if [ "$CURRENT_BASE_OID" != "$BASE_OID" ]; then
+    ( cd "$WT" && _set_status "$STORY" in-progress \
+      && git commit -qm "chore(backlog): ${ID} in-progress — la base cambió durante el run" -- "$STORY" 2>/dev/null ) || true
+    echo "❌ backlog: la ref base ${BASE} cambió durante el run; no puedo evaluar un rango estable." >&2
+    echo "   Esperado: ${BASE_OID} · actual: ${CURRENT_BASE_OID:-ausente}" >&2
+    exit 3
+  fi
   PENDIENTE="$( ( cd "$WT" && git status --porcelain 2>/dev/null ) || true )"
   if [ -n "$PENDIENTE" ]; then
     # Respaldo ANTES de nada: que la recuperación no dependa de que nadie
@@ -226,6 +270,30 @@ if [ $RC -eq 0 ]; then
       } >&2
       exit 5
     fi
+  fi
+  # El prompt es instrucción; este gate es evidencia. Mira rango, índice,
+  # modificaciones, untracked, deletes y ambos lados de renames.
+  if [ -n "$TRUSTED_SCOPE_SOURCE" ]; then
+    if SCOPE_OUT="$( ( cd "$WT" && BACKLOG_TRUSTED_STORY="$TRUSTED_STORY_CONTENT" \
+      SCOPE_PYTHON_BIN="$TRUSTED_PYTHON" SCOPE_GIT_BIN="$TRUSTED_GIT" \
+      "$TRUSTED_BASH" -c "$TRUSTED_SCOPE_SOURCE" -- \
+      --story "$STORY" --scope-env BACKLOG_TRUSTED_STORY \
+      --base "$BASE_OID" --head HEAD --worktree "$PWD" ) 2>&1 )"; then
+      SCOPE_RC=0
+    else
+      SCOPE_RC=$?
+    fi
+    if [ "$SCOPE_RC" != "0" ]; then
+      ( cd "$WT" && _set_status "$STORY" in-progress \
+        && git commit -qm "chore(backlog): ${ID} in-progress — scope mecánico falló" -- "$STORY" 2>/dev/null ) || true
+      printf '\n%s\n' "$SCOPE_OUT" >&2
+      echo "   La historia queda en 'in-progress': corrige/revierte el scope creep." >&2
+      [ "$SCOPE_RC" = "1" ] && exit 6
+      exit 3
+    fi
+  else
+    echo "❌ backlog: falta el checker confiable en memoria — no puedo demostrar el scope." >&2
+    exit 3
   fi
   ( cd "$WT" && _set_status "$STORY" in-review \
     && git commit -qm "chore(backlog): ${ID} in-review — lista para revisión humana" -- "$STORY" 2>/dev/null )

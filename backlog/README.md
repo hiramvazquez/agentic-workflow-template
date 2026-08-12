@@ -15,6 +15,8 @@ run.sh  ├─ next.sh elige la primera ready SIN deps pendientes
         ├─ claude -p trabaja DENTRO del worktree + el contrato del harness
         │    └─ dentro rigen los MISMOS gates: TDD, capas, semgrep,
         │       reviewer con VERDICT real, trinquetes (.agents/state limpio)
+        ├─ scope-check compara TODO el cambio con `scope: |` del frontmatter
+        │    (rango, índice, modificaciones, untracked, deletes y renames)
         ├─ commits quedan EN LA RAMA (jamás push, jamás merge)
         └─ historia → in-review (worktree se limpia) · blocked (worktree
         │    queda para inspección) · in-review NO se re-trabaja: se espera tu merge
@@ -29,6 +31,11 @@ tú revisas la rama → merge a develop → status: done → desbloquea dependie
   (`multi-agent-orchestration.md` §Default).
 - **Historia sin criterios de aceptación → `blocked`**, no improvisación (§1.4). Los
   criterios SON el contrato: cada uno se convierte primero en un test que falla.
+- **`scope: |` es la única allowlist mecánica.** La sección “Fuera de scope” explica la
+  intención a humanos, pero no concede permisos. Un path no permitido deja la historia en
+  `in-progress` y bloquea el paso a `in-review`. Solo la propia historia se permite
+  automáticamente; tests, implementación y ledger deben enumerarse. Antes del run, historia
+  y checker deben estar commiteados: sus blobs se fijan en memoria junto con el OID de la base.
 
 ## Cómo lanzarlo
 
@@ -54,8 +61,8 @@ Config útil: `BACKLOG_MAX_TURNS=40` acota el coste por historia ·
 
 ## Qué es esto y qué NO es (honestidad de nivel)
 
-**Sí estamos a este nivel** en lo mecánico: selección, ramas, estados, dependencias y guards
-están implementados y testeados (`test_backlog.sh`, 9 casos). Y la pieza que hace viable lo
+**Sí estamos a este nivel** en lo mecánico: selección, ramas, estados, dependencias, scope y guards
+están implementados y testeados (`test_backlog.sh` + `test_backlog_scope.sh`). Y la pieza que hace viable lo
 no-atendido no es el runner: son los gates de dentro — el run headless hereda `settings.json`
 completo (permisos deny, hooks, el reviewer con VERDICT), así que "terminó" significa "pasó
 todo", no "el modelo dice que terminó".
