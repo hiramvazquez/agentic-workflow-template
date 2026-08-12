@@ -100,7 +100,7 @@ fi
 # Nivel 3-6 — arquitectura, deuda y CALIDAD DE LOS TESTS
 # ════════════════════════════════════════════════════════════════════
 
-# 4) Capas: fitness function sobre el grafo de imports (AGENTS.md §3).
+# 4) Capas: dirección de imports directos (sin grafo/ciclos; AGENTS.md §3).
 step "4/8 check-layers (arquitectura)"
 if [ -f tools/check-layers.sh ]; then
   bash tools/check-layers.sh || FAIL=1

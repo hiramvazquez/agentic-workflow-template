@@ -45,7 +45,7 @@ el script, no en el YAML → cambiar de proveedor no cambia los gates.
 1. **tests del harness** (`tools/tests/`) — si los gates están rotos, el resto no significa nada.
 2. **secret-scan** (gitleaks, historial) — obligatorio en CI.
 3. **semgrep** (patrones AST) — fail-closed: aquí "no pude mirar" también falla.
-4. **check-layers** — fitness function de arquitectura sobre el grafo de imports.
+4. **check-layers** — baseline de dirección sobre imports directos; no detecta ciclos.
 5. **drift-ratchet** — el conteo de deuda no puede haber subido.
 6. **build & tests** — `<!-- FILL: tu stack -->`.
 7. **mutation-score** — informativo con piso 0; **obligatorio automáticamente** en cuanto el

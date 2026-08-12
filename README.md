@@ -67,7 +67,7 @@ El corazón del template. Detalle completo en
 | 9 | Métricas + lección→detector | `tools/metrics/escape-rate.sh` · `tools/lesson-detector-link.sh` |
 | 8 | Gate por evidencia | `capture-review-verdict.sh` (SubagentStop) · marker ↔ `sha256(diff)` · `/goal` |
 | 7 | Review adversarial de IA | sub-agentes `reviewer`/`security-reviewer` · plugin `security-guidance` · `ci/ai-review.sh` |
-| 6 | Arquitectura | `tools/check-layers.sh` + `tools/layers.conf` (grafo de imports) |
+| 6 | Arquitectura | `tools/check-layers.sh` + `tools/layers.conf` (dirección de imports directos) |
 | 5 | Contratos | suite de conformidad fake ≡ real (`domain/SKILL.md`) |
 | 4 | **Calidad del test** | `tools/mutation-score.sh` + trinquete que **solo sube** |
 | 3 | Spec ejecutable | TDD red-first + aserciones/DbC (`tdd-workflow.md`) |
@@ -155,7 +155,7 @@ scripts/agent-hooks/       ← UNA implementación de los gates, compartida por 
   lib/io.sh                  ← normalización Claude/Cursor + hook_log_detection (telemetría)
 
 tools/
-  check-layers.sh + layers.conf  ← fitness function por grafo de imports (nivel 6)
+  check-layers.sh + layers.conf  ← baseline de dirección de imports directos (nivel 6)
   semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación local de review en git hooks/adapters

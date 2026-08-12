@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════
-# check-layers.sh — fitness function de arquitectura (grafo de imports)
+# check-layers.sh — baseline de dirección sobre imports directos
 # ════════════════════════════════════════════════════════════════════
 # Enforza AGENTS.md §3 ("el dominio no depende de UI ni de infraestructura")
-# de forma MECÁNICA, sobre los imports reales del archivo — no con grep sobre
-# su cuerpo. Es la diferencia entre un detector que el equipo respeta y uno
+# de forma MECÁNICA, sobre directivas de import del archivo — no construye un
+# grafo, no resuelve dependencias transitivas y no detecta ciclos. Es la
+# diferencia entre un detector que el equipo respeta y uno
 # que aprende a ignorar (Google midió que por encima de ~10% de falsos
 # positivos los analizadores se descartan sistemáticamente).
 #

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fitness function de CAPAS (AGENTS.md §3: el dominio no depende de UI ni infra).
-# Se comprueba sobre el GRAFO DE IMPORTS, no con grep sobre el cuerpo del archivo:
+# Se comprueba sobre IMPORTS DIRECTOS, no con grep sobre el cuerpo del archivo:
 # un grep matchea comentarios y strings → falsos positivos → el detector se ignora
 # (ley de Tricorder: FP > ~10% y el analizador muere).
 

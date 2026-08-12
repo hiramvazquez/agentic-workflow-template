@@ -128,7 +128,8 @@ Prioridad de relleno (en orden de impacto — es la pirámide de
    medición (`--update` fija el piso, que a partir de ahí SOLO sube). Es lo único que
    distingue un test que verifica de uno escrito para pasar.
 4. `.agents/skills/architecture/SKILL.md` + `platforms/<tu-plataforma>.md` + `domain/SKILL.md`.
-5. `tools/layers.conf` — las reglas de capas de TUS rutas (grafo de imports).
+5. `tools/layers.conf` — reglas de dirección sobre imports directos de TUS rutas. Este baseline
+   no demuestra ciclos ni dependencias transitivas.
    ⚠️  **Se AMPLÍA, no se reescribe.** Conserva los globs universales que trae
    (`*/Domain/*`, `*/domain/*`…) y añade los tuyos debajo. Sustituirlos rompe cinco tests
    del propio harness, que copian este conf a un sandbox con rutas genéricas (`src/Domain/`)

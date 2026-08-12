@@ -236,7 +236,7 @@ Dos principios que gobiernan todo lo demás:
 
 ```
 9 Métricas + lección→detector     8 Gate por evidencia      7 Review adversarial de IA
-6 Arquitectura (grafo imports)    5 Contratos (fake ≡ real) 4 CALIDAD del test (mutación)
+6 Arquitectura (imports directos; ciclos si hay adapter) 5 Contratos (fake ≡ real) 4 CALIDAD del test (mutación)
 3 Spec ejecutable (TDD + DbC)     2 Patrón AST (Semgrep)    1 Lint/typecheck in-loop
 0 Imposibilitar (tipos)
 ```
