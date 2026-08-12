@@ -11,7 +11,7 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–5b implementadas:
+- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–6a implementadas:
   manifiesto estructurado, bloques documentales generados y upgrade que funde esos fragmentos
   sin pisar la prosa del adoptante; el informe calcula tests/FILLs contra el commit actual en
   vez de copiar conteos manuales; probe funcional con commit/plataforma/fecha y consumo desde
@@ -29,6 +29,8 @@
   fail-loud; se eliminó la autorización genérica y peligrosa de “fail-open OK”.
   TDD/DbC conserva red-first, mutación e invariantes, pero la matriz nace del riesgo y del
   comportamiento observable; se eliminaron cuotas universales de casos/aserciones decorativas.
+  Existe un boundary portable `agent-runner` con contratos separados `run`/`review`, backend
+  fake hermético y adapter Claude; aún falta migrar backlog/CI a ese boundary.
 
 ## Cómo se trabaja aquí (el bucle, no la historia)
 
@@ -43,7 +45,7 @@
 
 ## Próximo paso
 
-- **Siguiente entrega:** fase 6a — contrato portable separado para `run` y `review`.
+- **Siguiente entrega:** fase 6b — migrar backlog y AI review al runner portable.
 - El informe del adoptante sigue siendo una verificación posterior, no bloquea esta iniciativa.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
   SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`

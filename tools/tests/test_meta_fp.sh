@@ -42,6 +42,7 @@ tools/backlog/next.sh                        :: test_backlog.sh
 tools/backlog/criteria-link.sh               :: test_backlog.sh
 tools/backlog/scope-check.sh                 :: test_backlog_scope.sh
 tools/architecture-check.sh                  :: test_architecture_capabilities.sh
+tools/agent-runner.sh                        :: test_agent_runner.sh
 tools/semgrep/rules/swift.yaml               :: test_semgrep_rules.sh
 tools/check-drift.sh                         :: test_drift_aggregation.sh
 tools/check-review-marker.sh                 :: test_review_marker_preset.sh
