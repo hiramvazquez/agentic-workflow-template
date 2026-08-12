@@ -28,8 +28,10 @@
 3. **Autorización por recurso, no solo por ruta.** Un endpoint autenticado que no
    comprueba que el recurso pertenece al solicitante es un IDOR. Toda query
    multi-tenant filtra por el identificador de tenant/usuario.
-4. **Errores fail-open OK, fail-silent NO** en paths sensibles: loguea la señal
-   (que algo falló, dónde y por qué), nunca el dato.
+4. **Authn/authz, cripto y validación sensible fallan cerradas:** ante error o
+   duda, deniega; nunca sustituyas una decisión fallida por permisos/defaults
+   permisivos. Un fallo de observabilidad se hace visible (sin el dato) y solo
+   preserva la operación principal si hacerlo sigue siendo seguro. Fail-silent nunca.
 5. **Toda entrada externa se valida en el servidor**, aunque ya se valide en el
    cliente. La validación de cliente es UX, no seguridad.
 6. **Comparación de tokens/secretos en tiempo constante** (`timingSafeEqual` y

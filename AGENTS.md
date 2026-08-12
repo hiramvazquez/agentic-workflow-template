@@ -100,7 +100,10 @@ sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/
 - **Datos sensibles (PII/PHI) al almacenamiento seguro** de la plataforma (Keychain/Keystore/cifrado), nunca a almacenamiento en claro (UserDefaults/SharedPreferences/localStorage planos).
 - **DB:** RLS/authz por fila donde aplique; cifrado at-rest (default del proveedor) verificado; sin tablas sensibles sin política de acceso.
 - **Dependencias:** sin paquetes no auditados para manejar secretos/cripto; revisa el lockfile.
-- **Errores fail-open OK, fail-silent NO** en paths sensibles: loguea la señal (sin el dato).
+- **Authn/authz, cripto y validación sensible fallan cerradas:** ante error o duda, deniega;
+  nunca continúes con permisos/defaults permisivos. Los fallos de observabilidad se hacen
+  visibles (sin datos sensibles) y solo pueden preservar la operación principal si hacerlo
+  sigue siendo seguro. Fail-silent nunca.
 
 ## 7. Convenciones Git (duras)
 

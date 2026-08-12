@@ -11,7 +11,7 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–4b implementadas:
+- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–5a implementadas:
   manifiesto estructurado, bloques documentales generados y upgrade que funde esos fragmentos
   sin pisar la prosa del adoptante; el informe calcula tests/FILLs contra el commit actual en
   vez de copiar conteos manuales; probe funcional con commit/plataforma/fecha y consumo desde
@@ -25,6 +25,8 @@
   sin atribuirse grafo, transitividad ni detección de ciclos.
   Ciclos y complejidad ahora se clasifican como `operational|unsupported|missing|broken`
   mediante adapters opt-in; ausencia ya no se presenta como arquitectura limpia.
+  Seguridad ya distingue decisiones sensibles fail-closed de fallos de observabilidad
+  fail-loud; se eliminó la autorización genérica y peligrosa de “fail-open OK”.
 
 ## Cómo se trabaja aquí (el bucle, no la historia)
 
@@ -39,7 +41,7 @@
 
 ## Próximo paso
 
-- **Siguiente entrega:** fase 5a — corregir la semántica fail-closed/fail-loud de seguridad.
+- **Siguiente entrega:** fase 5b — DbC y tests guiados por riesgo e invariantes.
 - El informe del adoptante sigue siendo una verificación posterior, no bloquea esta iniciativa.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
   SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`

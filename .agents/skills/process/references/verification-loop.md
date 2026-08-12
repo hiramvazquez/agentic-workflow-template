@@ -110,8 +110,9 @@ que **falla ruidosamente en vez de silenciosamente**, y deja una especificación
 verificable por máquina para el siguiente agente. Es la forma más barata que existe de
 convertir intención en algo comprobable.
 
-`AGENTS.md §6` ya dice *"fail-open OK, fail-silent NO"*. Las aserciones son cómo se
-cumple esa regla.
+`AGENTS.md §6` exige fail-closed en authn/authz/cripto y fallos visibles en
+observabilidad. Las aserciones ayudan a hacer visibles invariantes rotos; no sustituyen una
+decisión de autorización segura ni una recuperación explícita.
 
 ## Nivel 4 — La calidad del test (no su existencia)
 

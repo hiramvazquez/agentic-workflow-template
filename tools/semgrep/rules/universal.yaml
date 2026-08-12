@@ -27,7 +27,7 @@ rules:
 
   # ── Excepciones tragadas: el anti-patrón que más caro sale ────────
   # Un catch vacío convierte un fallo en un comportamiento incorrecto
-  # silencioso. AGENTS.md §6: "fail-open OK, fail-silent NO".
+  # silencioso. AGENTS.md §6: paths sensibles fail-closed; fail-silent nunca.
   - id: excepcion-tragada
     languages: [python]
     severity: WARNING
