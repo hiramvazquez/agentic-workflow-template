@@ -38,6 +38,27 @@ esac
 
 state_dir=".agents/state"
 mkdir -p "$state_dir/skills-read" "$state_dir/markers" "$state_dir/trajectory"
+
+# ── HEAD de arranque: el insumo del juez es un RANGO, no una sesión ──
+# `session-end` decidía si encolar mirando si el árbol quedó SUCIO. O sea que
+# la sesión que cierra bien —commitea y deja limpio— era exactamente la que
+# nunca se encolaba, y el juez auditaba sistemáticamente a quien no trabajó
+# (medido: la cola apuntaba a una sesión con 7 tool-calls y CERO ediciones,
+# mientras las dos que escribieron el adapter no entraron).
+# Con el HEAD de arranque guardado, el cierre puede preguntar lo que importa:
+# ¿esta sesión produjo commits? Y deja además el rango exacto que el juez debe
+# mirar, mejor insumo que un id de sesión cuya trayectoria tiene huecos.
+_SH_REC="$state_dir/session-head.txt"
+_SH_SID="$(printf '%s' "${_input:-}" | jq -r '.session_id // empty' 2>/dev/null || true)"
+: "${_SH_SID:=manual}"
+if ! grep -qxF "sid: ${_SH_SID}" "$_SH_REC" 2>/dev/null; then
+  {
+    printf 'sid: %s\n' "$_SH_SID"
+    printf 'head: %s\n' "$(git rev-parse HEAD 2>/dev/null || echo '')"
+    printf 'branch: %s\n' "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+    printf 'at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$_SH_REC" 2>/dev/null || true
+fi
 if [ "$MODE" != "--report" ]; then
   # Reset: obliga a re-leer las skills requeridas en cada sesión nueva.
   find "$state_dir/skills-read" -mindepth 1 -delete 2>/dev/null || true
@@ -72,8 +93,22 @@ echo "── Salud de configuración ──"
 PRESET="$(awk 'NR==1{print $1; exit}' tools/preset 2>/dev/null)"; [ -n "$PRESET" ] || PRESET=full
 echo "• Preset: $PRESET  (full=gates bloquean · lite=gates avisan)"
 _health=1
-grep -q '"measured"[[:space:]]*:[[:space:]]*false' tools/mutation-ratchet.json 2>/dev/null \
-  && { echo "⚠️  NIVEL 4 NUNCA MEDIDO: el mutation score no ha emitido un veredicto en este repo. AGENTS.md §5 lo declara el árbitro de la calidad de los tests; hasta que mida, esa frase es prosa."; _health=0; }
+# El nivel 4 tiene CUATRO estados y hasta hace poco tres se veían igual
+# ("piso 0"). Los dos que importan piden cosas opuestas: "sin cablear" es
+# trabajo del adoptante; "el runner no completa" es un bug de la herramienta y
+# no se arregla escribiendo conf — mandarte a cablear ahí es mandarte a perder
+# la tarde. Lo aprendimos por el camino largo: se declaró muter incompatible
+# con Swift 6 basándose en `brew info` (release de 2023) cuando su `main` ya
+# lo tenía resuelto desde hacía años.
+case "$(bash tools/mutation-score.sh --state 2>/dev/null || echo sin-cablear)" in
+  medido) : ;;
+  runner-incompleto)
+    echo "⚠️  NIVEL 4 CABLEADO PERO SIN VEREDICTO: el runner de mutación está y NO completa su corrida. Esto NO se arregla cablear-más: es un fallo de la herramienta. Aísla el síntoma y abre issue upstream (y comprueba su repositorio, no solo el release de tu gestor de paquetes)."; _health=0 ;;
+  sin-cablear)
+    echo "⚠️  NIVEL 4 SIN CABLEAR: no hay runner de mutación. AGENTS.md §5 declara el mutation score el árbitro de la calidad de los tests; hasta que exista, esa frase es prosa. Cablea el runner de tu stack (tools/mutation-score.sh §FILL)."; _health=0 ;;
+  *)
+    echo "⚠️  NIVEL 4 NUNCA MEDIDO: el runner corre, pero nadie ha fijado el piso. Mide una vez (\`bash tools/mutation-score.sh --update\`) y a partir de ahí solo sube."; _health=0 ;;
+esac
 grep -qE 'Plataformas:\*\* <!-- FILL' AGENTS.md 2>/dev/null && { echo "⚠️  AGENTS.md §2 (Stack) SIN rellenar — build/test/lenguaje desconocidos."; _health=0; }
 _src=0; for d in ios android web src; do [ -d "$d" ] && _src=1; done
 [ "$_src" = "0" ] && { echo "⚠️  Sin carpetas de código (ios/android/web/src) — check-drift inactivo."; _health=0; }

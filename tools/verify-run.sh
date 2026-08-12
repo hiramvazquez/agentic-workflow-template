@@ -46,6 +46,45 @@ if [ -z "$CMD" ]; then
   } >&2
   exit 3          # "no pude mirar" (§14.3): local avisa, CI bloquea
 fi
+# ── Un comando que no toca tu producto no verifica tu producto ──────
+# El template SÍ tiene comando cableado, y es honesto para él: su producto es
+# el propio harness, así que su build+tests es la suite de gates. El problema
+# es lo que hereda quien adopta: un `verify.conf` que sale 0 sin compilar una
+# línea de su app. Eso no es un FILL sin rellenar —que se anuncia solo en cada
+# arranque— sino algo peor: un gate que ANUNCIA ÉXITO. La asimetría es exacta:
+# el hueco se delata, la respuesta equivocada no.
+#
+# El test no es "¿eres el template?" sino la pregunta que de verdad importa:
+# **¿hay código de producto que este comando no está tocando?** Un repo sin una
+# sola fuente de producto no tiene nada más que verificar y la suite es su
+# verificación completa; en cuanto aparece la primera, deja de serlo.
+# Solo dispara con el comando EXACTO del template: quien encadene la suite a su
+# propio build (`xcodebuild ... && bash tools/tests/run-tests.sh`) está haciendo
+# lo correcto y no debe oír una palabra.
+if [ "$CMD" = "bash tools/tests/run-tests.sh" ]; then
+  _PROD="$(find ios android web src app lib Sources -type f \
+             \( -name '*.swift' -o -name '*.kt' -o -name '*.java' -o -name '*.ts' \
+                -o -name '*.tsx' -o -name '*.js' -o -name '*.py' -o -name '*.go' \
+                -o -name '*.rb' -o -name '*.cs' -o -name '*.rs' \) 2>/dev/null | head -1)"
+  if [ -n "$_PROD" ]; then
+    {
+      echo "❌ verify-run: tu $CONF sigue siendo el del TEMPLATE."
+      echo "   El comando cableado es \`$CMD\`: corre la suite del HARNESS y NO"
+      echo "   compila tu producto. Y hay producto — p. ej. $_PROD."
+      echo ""
+      echo "   Esto es peor que un FILL sin rellenar: un hueco se anuncia solo en"
+      echo "   cada arranque, pero esto SALE VERDE sin haber construido tu app."
+      echo "   Sustituye la línea de $CONF por el build+tests de tu stack:"
+      echo "     xcodebuild -scheme MiApp -destination '...' -quiet test"
+      echo "     ./gradlew --quiet testDebugUnitTest"
+      echo "     npm ci --silent && npm test --silent"
+      echo "   (Si quieres correr además la suite del harness, encadénala con &&:"
+      echo "    encadenada no salta este aviso, porque entonces sí compilas.)"
+    } >&2
+    exit 3        # "no pude verificar TU proyecto": avisa en local, bloquea en CI
+  fi
+fi
+
 [ "$MODE" = "--cmd-only" ] && { echo "VERIFY_CMD_OK $CMD"; exit 0; }
 
 # ── ¿Sobre QUÉ va a correr? El árbol de trabajo, no el índice ───────

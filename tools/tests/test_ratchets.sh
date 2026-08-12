@@ -348,3 +348,75 @@ _case_una_medicion_real_si_sube_el_piso() {
 test_una_medicion_real_sube_el_piso_y_marca_medido() {
   _harness_sandbox _case_una_medicion_real_si_sube_el_piso
 }
+
+# ════════════════════════════════════════════════════════════════════
+# f-nivel4-dos-estados-un-cajon — CUATRO estados, no dos
+# ════════════════════════════════════════════════════════════════════
+# `--state` responde SIN medir (lo consulta session-start en cada arranque:
+# si disparara muter, abrir una sesión costaría minutos). Los dos estados que
+# importan piden cosas OPUESTAS —"sin cablear" es trabajo del adoptante;
+# "el runner no completa" es un fallo de la herramienta que no se arregla
+# escribiendo conf— y hasta hoy se veían igual.
+_case_state_sin_cablear() {
+  printf '{"min_score": 0, "measured": false}\n' > tools/mutation-ratchet.json
+  local s; s="$(bash tools/mutation-score.sh --state 2>/dev/null)"
+  [ "$s" = "sin-cablear" ] || { echo "    sin runner instalado dijo '$s' (esperaba sin-cablear)"; return 1; }
+  # FALSO POSITIVO: una huella VIEJA no puede acusar a una herramienta ausente.
+  # Se desinstala el runner (o se clona el repo en otra máquina) y el registro
+  # de la última corrida sigue ahí: sin este orden, el arranque mandaría a abrir
+  # un issue upstream contra algo que ni siquiera está instalado.
+  mkdir -p .agents/state; printf 'incompleto 2026-01-01T00:00:00Z\n' > .agents/state/mutation-last-run.txt
+  s="$(bash tools/mutation-score.sh --state 2>/dev/null)"
+  [ "$s" = "sin-cablear" ] || {
+    echo "    con una huella vieja y SIN runner dijo '$s' (esperaba sin-cablear)"; return 1; }
+}
+test_state_sin_runner_dice_sin_cablear() { _harness_sandbox _case_state_sin_cablear; }
+
+_case_state_medido() {
+  printf '{"min_score": 61, "measured": true}\n' > tools/mutation-ratchet.json
+  local s; s="$(bash tools/mutation-score.sh --state 2>/dev/null)"
+  [ "$s" = "medido" ] || { echo "    con piso real dijo '$s' (esperaba medido)"; return 1; }
+}
+test_state_con_piso_real_dice_medido() { _harness_sandbox _case_state_medido; }
+
+_case_state_runner_incompleto() {
+  # El runner EXISTE y arranca, pero no llega al final (el caso real: muter no
+  # localizaba el xctestrun del proyecto y completaba con cero mutantes).
+  # El estado NO se afirma: se deriva de una corrida real (invariante nº1). Así
+  # que primero se corre de verdad —ahí se escribe la huella— y luego se
+  # pregunta. Preguntar antes de haber corrido nunca da `runner-incompleto`, y
+  # eso es correcto: nadie ha visto todavía a esa herramienta fallar.
+  printf '{"min_score": 0, "measured": false}\n' > tools/mutation-ratchet.json
+  mkdir -p bin; printf '#!/usr/bin/env bash\nexit 1\n' > bin/muter; chmod +x bin/muter
+  printf 'x\n' > muter.conf.yml
+  local s
+  s="$(PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --state 2>/dev/null)"
+  [ "$s" = "sin-medir" ] || { echo "    sin haber corrido nunca dijo '$s' (esperaba sin-medir)"; return 1; }
+  PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --report >/dev/null 2>&1
+  s="$(PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --state 2>/dev/null)"
+  [ "$s" = "runner-incompleto" ] || {
+    echo "    tras una corrida que no completa dijo '$s' (esperaba runner-incompleto)"
+    echo "    Es el estado cuyo remedio es OPUESTO al de sin-cablear: confundirlos"
+    echo "    manda al adoptante a cablear conf que ya está cableada."; return 1; }
+}
+test_state_runner_que_no_completa_no_se_confunde_con_sin_cablear() {
+  _harness_sandbox _case_state_runner_incompleto
+}
+
+# ── FALSO POSITIVO: --state no puede DISPARAR una medición ──────────
+# Si `--state` cayera en el camino normal, cada arranque de sesión lanzaría el
+# runner (minutos) y el health-check mentiría por ruido. Además va ANTES del
+# cálculo a propósito: el primer intento lo metió dentro del `case` demasiado
+# tarde e imprimía los avisos del camino normal junto al estado.
+_case_state_no_mide() {
+  printf '{"min_score": 0, "measured": false}\n' > tools/mutation-ratchet.json
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\ntouch "$PWD/MIDIO"\nexit 0\n' > bin/muter; chmod +x bin/muter
+  printf 'x\n' > muter.conf.yml
+  local out; out="$(PATH="$PWD/bin:$PATH" bash tools/mutation-score.sh --state 2>&1)"
+  [ -f MIDIO ] && { echo "    --state EJECUTÓ el runner: cada arranque de sesión costaría minutos"; return 1; }
+  [ "$(printf '%s' "$out" | wc -l)" -le 1 ] || {
+    echo "    --state imprimió más que el estado (los avisos del camino normal):"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_state_no_dispara_una_corrida_del_runner() { _harness_sandbox _case_state_no_mide; }

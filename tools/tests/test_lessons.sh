@@ -290,3 +290,50 @@ _case_archivo_sigue_verificado() {
   [ "$?" = "1" ] || { echo "    una lección ARCHIVADA con detector inexistente pasó el gate"; return 1; }
 }
 test_lecciones_archivadas_siguen_verificadas() { _rot_sandbox _case_archivo_sigue_verificado; }
+
+# ════════════════════════════════════════════════════════════════════
+# El ARCHIVO existiendo no basta: el TEST citado también tiene que existir
+# ════════════════════════════════════════════════════════════════════
+# Cazado escribiendo las lecciones de este mismo día: una citaba
+# `test_session_start.sh (los cuatro estados)` y el archivo no tenía ni un test
+# de los cuatro estados. El archivo existía → verde. La lección quedaba
+# respaldada por una promesa, que es justo lo que este gate existe para impedir.
+# Mismo agujero que un id de finding fantasma (tools/check-finding-refs.sh): la
+# cita LEE COMO CUBIERTO y nadie vuelve a comprobarla.
+_case_test_citado_inexistente() {
+  mkdir -p tools/tests
+  printf '#!/usr/bin/env bash\ntest_que_si_existe() { :; }\n' > tools/tests/test_x.sh
+  _doc '### [2026-01-01] una
+- **Detector:** tools/tests/test_x.sh::test_que_si_existe + ::test_que_nunca_se_escribio'
+  local out; out="$(bash tools/lesson-detector-link.sh 2>&1)"
+  case "$out" in *test_que_nunca_se_escribio*) : ;; *)
+    echo "    un ::test citado que no existe pasó el gate:"; printf '%s\n' "$out" | head -4 | sed 's/^/      /'
+    return 1 ;; esac
+}
+test_un_test_citado_que_no_existe_falla() { _lessons_sandbox _case_test_citado_inexistente; }
+
+# ── FALSO POSITIVO nº1: los tests que SÍ existen no pueden acusarse ──
+_case_todos_los_tests_citados_existen() {
+  mkdir -p tools/tests
+  printf '#!/usr/bin/env bash\ntest_uno() { :; }\nfunction test_dos() { :; }\n' > tools/tests/test_x.sh
+  _doc '### [2026-01-01] una
+- **Detector:** tools/tests/test_x.sh::test_uno + ::test_dos (el guard de FP)'
+  bash tools/lesson-detector-link.sh >/dev/null 2>&1 \
+    || { echo "    FALSO POSITIVO: acusó a tests que sí existen (incluido el declarado con 'function')"; return 1; }
+}
+test_los_tests_que_existen_no_se_acusan() { _lessons_sandbox _case_todos_los_tests_citados_existen; }
+
+# ── FALSO POSITIVO nº2: un detector en prosa, sin `::`, sigue valiendo ──
+# No toda lección se fija con un test. Exigir un `::` convertiría este gate en
+# una máquina de rechazar detectores legítimos (semgrep, layers.conf, un hook),
+# y un gate ruidoso se desactiva entero.
+_case_detector_sin_tests_citados() {
+  mkdir -p tools/semgrep/rules; echo 'rules: []' > tools/semgrep/rules/universal.yaml
+  _doc '### [2026-01-01] una
+- **Detector:** tools/semgrep/rules/universal.yaml#regla-x'
+  bash tools/lesson-detector-link.sh >/dev/null 2>&1 \
+    || { echo "    FALSO POSITIVO: un detector que no es un test fue rechazado"; return 1; }
+}
+test_un_detector_que_no_es_un_test_sigue_valiendo() {
+  _lessons_sandbox _case_detector_sin_tests_citados
+}

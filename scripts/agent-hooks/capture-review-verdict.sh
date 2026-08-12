@@ -125,19 +125,81 @@ Cola de juicio vaciada. Si el juez reportó hallazgos, van al ledger
 (\`bash tools/findings/findings.sh add ...\`), no solo a la prosa (AGENTS.md §10)."
 fi
 
-# ── RED → sin marker, y el agente principal se entera ──────────────
+# El sha del diff que se está juzgando AHORA. Se calcula antes de bifurcar
+# porque lo necesitan los dos caminos: el RED para dejar huella, y el
+# GREEN/AMBER para comprobar contra ella.
+_DIR="$(hook_state_dir)/markers"; mkdir -p "$_DIR"
+_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo no-repo)"
+_STAGED_SHA="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
+_HIST="$(hook_state_dir)/review-history.jsonl"
+_LAST_RED="$_DIR/last_red.txt"
+
+_apuntar_historia() { # _apuntar_historia <veredicto> <nota>
+  printf '{"ts":"%s","agent":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","nota":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$1" "$FINDINGS" \
+    "$(printf '%s' "$SCOPE" | tr '"' "'" | tr -d '\n')" "$_HEAD" "$_STAGED_SHA" "$2" \
+    >> "$_HIST" 2>/dev/null || true
+}
+
+# ── RED → sin marker, PERO CON HUELLA ──────────────────────────────
+# Un RED no dejaba rastro: ni el diff ni sus hallazgos. Consecuencia medida en
+# un proyecto real — 36 RED, 9 AMBER y CERO GREEN en todo el historial, con
+# secuencias RED→RED→GREEN sobre archivos cuyo mtime era anterior al primer
+# RED: ni un byte cambió entre veredictos. La lectura benigna era la correcta
+# ahí (los RED pedían registrar gaps en el ledger, §10), y ese es justo el
+# problema: **el harness no podía distinguirla de un verdict-shopping.**
+# Guardando el sha del diff también en RED, la diferencia pasa a ser mecánica.
 if ! verdict_is_markable "$VERDICT"; then
+  _apuntar_historia "$VERDICT" "sin marker; commit sigue bloqueado"
+  {
+    printf 'ts: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'agent: %s\nverdict: %s\nfindings: %s\nscope: %s\nhead: %s\nstaged_sha: %s\nsource: hook\n' \
+      "$AGENT" "$VERDICT" "$FINDINGS" "$SCOPE" "$_HEAD" "$_STAGED_SHA"
+  } > "$_LAST_RED"
   hook_context "$EV" "🔴 \`$AGENT\` emitió VERDICT: $VERDICT ($FINDINGS hallazgos) sobre «${SCOPE}».
 
 NO se escribió marker de review — el commit sigue BLOQUEADO por el reviewer-gate.
-Atiende los hallazgos y vuelve a invocar \`$AGENT\`. No intentes commitear
-ni marcar manualmente: el override queda auditado en override_log.txt."
+Queda huella del diff juzgado (${_STAGED_SHA:0:12}…): si el próximo veredicto es
+GREEN sobre ESE MISMO diff, el sistema lo rechazará — un verde sobre un código
+que no cambió no es una remediación, es un reintento.
+Atiende los hallazgos, STAGEA el arreglo, y vuelve a invocar \`$AGENT\`."
+fi
+
+# ── Un GREEN sobre el MISMO diff que acaba de ser RED no es remediación ──
+# Es el invariante nº1 llevado a su conclusión: si el veredicto lo deriva el
+# sistema de una ejecución real, dos ejecuciones sobre la MISMA entrada no
+# pueden dar salidas opuestas sin que algo haya cambiado. O el primero estaba
+# mal o el segundo lo está, y en ninguno de los dos casos toca desbloquear.
+# Escape auditado —mismo patrón que REVIEWER_OVERRIDE— para el caso legítimo:
+# un RED resuelto por argumentación y no por código.
+if [ -f "$_LAST_RED" ] && [ -n "$_STAGED_SHA" ]; then
+  _RED_SHA="$(grep -E '^staged_sha:' "$_LAST_RED" 2>/dev/null | head -1 | sed -E 's/^staged_sha:[[:space:]]*//')"
+  _RED_HEAD="$(grep -E '^head:' "$_LAST_RED" 2>/dev/null | head -1 | sed -E 's/^head:[[:space:]]*//')"
+  if [ "$_RED_SHA" = "$_STAGED_SHA" ] && [ "$_RED_HEAD" = "$_HEAD" ]; then
+    if [ "${REVIEW_SAME_DIFF_OVERRIDE:-0}" = "1" ]; then
+      printf '[%s] same-diff-override en %s · agent=%s · reason=%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_HEAD" "$AGENT" \
+        "${REVIEW_SAME_DIFF_REASON:-(SIN RAZÓN — esto es un smell)}" \
+        >> "$_DIR/override_log.txt" 2>/dev/null || true
+      _apuntar_historia "$VERDICT" "override same-diff"
+    else
+      _apuntar_historia "$VERDICT" "RECHAZADO: mismo diff que el RED anterior"
+      hook_context "$EV" "🛑 \`$AGENT\` emitió $VERDICT sobre EXACTAMENTE el mismo diff que acaba de
+recibir un RED (${_STAGED_SHA:0:12}…, head=$_HEAD). NO se ha escrito marker.
+
+Entre los dos veredictos no cambió ni un byte de lo staged, así que esto no es
+una remediación: o el RED estaba mal o lo está este. Si arreglaste algo, STAGÉALO
+y vuelve a revisar — el arreglo tiene que estar en el diff que se juzga (incluido
+el ledger, si el hallazgo pedía registrarlo).
+Si de verdad el RED se resolvió con un argumento y no con código:
+  REVIEW_SAME_DIFF_OVERRIDE=1 REVIEW_SAME_DIFF_REASON=\"...\"   (queda auditado)"
+    fi
+  fi
 fi
 
 # ── GREEN / AMBER → el sistema escribe el marker ───────────────────
-DIR="$(hook_state_dir)/markers"; mkdir -p "$DIR"
-HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo no-repo)"
-STAGED_SHA="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
+DIR="$_DIR"; HEAD="$_HEAD"; STAGED_SHA="$_STAGED_SHA"
+_apuntar_historia "$VERDICT" "marker escrito"
 
 # El marker canónico que consulta el gate + uno por agente para trazabilidad.
 for target in "$DIR/reviewer_run.txt" "$DIR/${AGENT}_run.txt"; do

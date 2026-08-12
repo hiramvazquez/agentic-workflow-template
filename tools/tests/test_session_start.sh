@@ -86,3 +86,42 @@ _case_detecta_anillo_dormido() {
   echo "    no detectó lefthook.yml sin hooks instalados"; return 1
 }
 test_detecta_anillo1_dormido() { _sst_sandbox _case_detecta_anillo_dormido; }
+
+# ════════════════════════════════════════════════════════════════════
+# NIVEL 4 — cuatro estados, cuatro mensajes (f-nivel4-dos-estados-un-cajon)
+# ════════════════════════════════════════════════════════════════════
+# El health-check del arranque ramifica sobre `mutation-score.sh --state`. Lo
+# que se fija aquí no es el texto: es que "sin cablear" y "cableado pero el
+# runner no completa" NO puedan salir con el mismo mensaje, porque sus remedios
+# son opuestos. El adoptante real cableó el conf, volvió a leer lo mismo, y
+# siguió sin score: el mensaje le pedía justo lo que ya había hecho.
+_estado_dice() { # _estado_dice <estado> → imprime la salud que ve el arranque
+  printf '#!/usr/bin/env bash\necho %s\n' "$1" > tools/mutation-score.sh
+  bash scripts/agent-hooks/session-start.sh --report 2>&1
+}
+
+_case_cuatro_estados_cuatro_mensajes() {
+  local sin cab run med
+  sin="$(_estado_dice sin-cablear   | grep -i 'NIVEL 4' || true)"
+  run="$(_estado_dice runner-incompleto | grep -i 'NIVEL 4' || true)"
+  med="$(_estado_dice medido        | grep -i 'NIVEL 4' || true)"
+  cab="$(_estado_dice sin-medir     | grep -i 'NIVEL 4' || true)"
+
+  [ -n "$sin" ] || { echo "    'sin-cablear' no dijo nada del nivel 4"; return 1; }
+  [ -n "$run" ] || { echo "    'runner-incompleto' no dijo nada del nivel 4"; return 1; }
+  [ -n "$cab" ] || { echo "    'sin-medir' no dijo nada del nivel 4"; return 1; }
+  [ -z "$med" ] || { echo "    'medido' avisó igualmente: $med"; return 1; }
+
+  [ "$sin" != "$run" ] || {
+    echo "    'sin cablear' y 'el runner no completa' salen con el MISMO mensaje."
+    echo "    Sus remedios son opuestos: uno se arregla con conf, el otro NO."; return 1; }
+  [ "$cab" != "$run" ] || { echo "    'sin-medir' y 'runner-incompleto' salen igual"; return 1; }
+
+  # Y el mensaje del caso caro tiene que decir explícitamente que cablear más
+  # no arregla nada: sin esa frase, el lector hace lo de siempre.
+  case "$run" in *[Nn][Oo]*) : ;; *)
+    echo "    el mensaje de runner-incompleto no niega la vía de 'cablea más': $run"; return 1 ;; esac
+}
+test_los_cuatro_estados_del_nivel4_no_comparten_mensaje() {
+  _sst_sandbox _case_cuatro_estados_cuatro_mensajes
+}

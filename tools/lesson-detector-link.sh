@@ -116,6 +116,36 @@ while IFS= read -r line; do
             CURRENT="${CURRENT} — detector citado NO existe: ${DET_FILE}"
           else
             HAS_DETECTOR=1
+          fi
+          # ── …y el TEST citado tiene que existir dentro del archivo ──
+          # El archivo existiendo no basta. Cazado escribiendo estas mismas
+          # lecciones: una citaba `test_session_start.sh (los cuatro estados)`
+          # y el archivo no tenía ni un test de los cuatro estados — el archivo
+          # existía, el gate daba verde, y la lección quedaba respaldada por
+          # una promesa. Es el mismo agujero que un id de finding fantasma
+          # (`check-finding-refs.sh`): la cita LEE COMO CUBIERTO, y nadie
+          # vuelve a comprobarlo. Toda la línea se escanea, no solo el primer
+          # token: una lección cita varios tests y basta uno inventado.
+          if [ "$HAS_DETECTOR" = "1" ]; then
+            FALTAN=""
+            for _t in $(printf '%s' "$VAL" | grep -oE '::[A-Za-z0-9_]+' | tr -d ':' || true); do
+              # El archivo al que pertenece cada test es el ÚLTIMO citado antes
+              # que él; en la práctica las lecciones citan un archivo y sus
+              # tests, así que se busca en todos los archivos citados en la
+              # línea. Un test que exista en cualquiera de ellos cuenta.
+              _hallado=0
+              for _f in $(printf '%s' "$VAL" | grep -oE '[A-Za-z0-9_./-]+\.(sh|bash)' || true); do
+                _f="${_f%%::*}"
+                [ -f "$_f" ] || continue
+                grep -qE "^[[:space:]]*(function[[:space:]]+)?${_t}[[:space:]]*\(\)" "$_f" 2>/dev/null \
+                  && { _hallado=1; break; }
+              done
+              [ "$_hallado" = "0" ] && FALTAN="${FALTAN} ${_t}"
+            done
+            if [ -n "$FALTAN" ]; then
+              HAS_DETECTOR=0
+              CURRENT="${CURRENT} — test(s) citados que NO existen:${FALTAN}"
+            fi
           fi ;;
       esac
       ;;

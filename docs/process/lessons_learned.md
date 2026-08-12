@@ -935,11 +935,14 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 ### [2026-08-11] Un piso de 0 no es un suelo: es una medición que nunca ocurrió
 - **Qué pasó:** `mutation-ratchet.json` llevaba en `min_score: 0` desde el montaje, cinco
   historias completas sin moverlo, mientras `AGENTS.md §5` declara el mutation score "el veredicto
-  mecánico" y "el gate que distingue un test que verifica de uno escrito para pasar". La causa
-  está diagnosticada con un experimento controlado del adoptante: el SwiftSyntax que embebe muter
-  16 no entiende `throws(MoviesError)` (typed throws, SE-0413) y **descarta el archivo entero en
-  silencio** — el mismo archivo sin sintaxis de Swift 6 sí produce mutantes. Y typed throws es lo
-  que recomienda nuestra propia skill: la skill empuja al código que deja mudo a nuestro nivel 4.
+  mecánico" y "el gate que distingue un test que verifica de uno escrito para pasar".
+  > **Rectificación (2026-08-12).** Esta entrada afirmaba, con un experimento controlado detrás,
+  > que la causa era que el SwiftSyntax de muter 16 no entiende `throws(...)` (typed throws,
+  > SE-0413). **Era falso**, y la lección que deja el error está una entrada más abajo: el 16 es
+  > lo que sirve Homebrew, y el repositorio arregla typed throws en `main` desde 2026-07 sin
+  > release publicado. Se deja escrito en vez de borrarlo — una causa retirada enseña más que
+  > una causa que nunca estuvo. Lo que sí sigue en pie es todo lo de abajo, que no dependía de
+  > por qué el nivel 4 estaba mudo, sino de que lo estuviera.
 - **Causa raíz:** un 0 en un archivo llamado "piso" se lee como suelo, y lo que dice es "nadie ha
   medido". El número existía, así que nadie preguntó si significaba algo.
 - **Regla:** un valor que puede significar "sin medir" **no puede compartir representación con una
@@ -951,6 +954,130 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   ::test_una_medicion_real_sube_el_piso_y_marca_medido (el guard de FP: inicializar de verdad
   tiene que seguir funcionando)
 - **Área:** tools/mutation-score.sh · tools/mutation-ratchet.json · scripts/agent-hooks/session-start.sh
+
+### [2026-08-12] "Sin cablear" y "cableado, pero el runner no termina" no son el mismo estado
+- **Qué pasó:** el arreglo de arriba dejaba el nivel 4 con dos estados: *medido* y *NUNCA MEDIDO*.
+  Con eso, el adoptante que ya había cableado el runner y se quedaba sin score leía en cada
+  arranque el mismo mensaje que quien no lo había cableado nunca — y el mensaje le decía que
+  cableara el conf. Cableó el conf. Volvió a leer lo mismo. El estado real era un tercero: muter
+  arrancaba y no localizaba el `xctestrun` del proyecto, así que **completaba con cero mutantes**.
+- **Causa raíz:** un estado agregado que mete en el mismo cajón "no lo has intentado" y "lo
+  intentaste y la herramienta no llegó al final". Lo primero se arregla con configuración; lo
+  segundo NO, y el mensaje empujaba justo a la acción que no podía funcionar. Es el mismo defecto
+  que el piso de 0, un nivel más arriba: **dos situaciones distintas compartiendo representación**.
+- **Regla:** cuando un estado agregado pueda venir de causas con remedios OPUESTOS, sepáralos y
+  di cuál es. `tools/mutation-score.sh --state` responde con uno de cuatro:
+  `medido` · `sin-cablear` · `runner-incompleto` · `sin-medir`, y `session-start` ramifica sobre
+  eso — el mensaje de `runner-incompleto` dice explícitamente que **no se arregla cableando más
+  conf** y manda a mirar el repositorio de la herramienta, no su release.
+- **Coletazo, y es la parte que más enseña:** la primera versión de `--state` resolvía
+  `runner-incompleto` **llamando al runner**. O sea que la función cuya cabecera prometía "responde
+  sin medir" lanzaba una corrida de decenas de minutos en cada arranque de sesión. Lo cazó su
+  propio test de FP, escrito precisamente porque la cabecera prometía esa propiedad. La salida es
+  el invariante nº1 otra vez: el estado no se AFIRMA, se DERIVA de una ejecución real — cada
+  corrida de verdad deja su resultado en `.agents/state/mutation-last-run.txt` y `--state` lo lee.
+  Regla que deja: **cuando una función promete "esto es barato", el test que lo fija es
+  obligatorio**; sin él la promesa es documentación de algo que no ocurre.
+- **Detector:** tools/tests/test_ratchets.sh::test_state_sin_runner_dice_sin_cablear +
+  ::test_state_con_piso_real_dice_medido +
+  ::test_state_runner_que_no_completa_no_se_confunde_con_sin_cablear +
+  ::test_state_no_dispara_una_corrida_del_runner (el FP guard de la promesa "no mide"), y
+  tools/tests/test_session_start.sh::test_los_cuatro_estados_del_nivel4_no_comparten_mensaje.
+  El otro guard de FP vive dentro del primero: un repo SIN runner y con una huella vieja sigue
+  diciendo `sin-cablear` — acusar a una herramienta ausente de fallar sería el error simétrico.
+- **Área:** tools/mutation-score.sh · scripts/agent-hooks/session-start.sh
+
+### [2026-08-12] El archivo de tests existía; el test citado no
+- **Qué pasó:** `lesson-detector-link.sh` comprobaba que el archivo citado en `Detector:`
+  existiera, y ahí paraba. Escribiendo las lecciones de este mismo día cité
+  "`test_session_start.sh` (los cuatro estados, cada uno con su mensaje)" cuando ese archivo no
+  tenía **ningún** test de los cuatro estados. El archivo existía → gate en verde → lección
+  respaldada por una promesa.
+- **Causa raíz:** la comprobación se detuvo en el eslabón barato. Verificar la existencia del
+  archivo es fácil; verificar la del test hace falta leer dentro. Es el mismo agujero que un id de
+  finding fantasma: **la cita LEE COMO CUBIERTO, y precisamente por eso nadie vuelve a mirarla.**
+- **Regla:** toda referencia `archivo::test_x` de una línea `Detector:` se resuelve contra las
+  funciones del archivo — la línea entera, no solo el primer token, porque una lección cita varios
+  tests y basta uno inventado para que el respaldo sea ficticio.
+- **Detector:** tools/lesson-detector-link.sh, fijado por
+  tools/tests/test_lessons.sh::test_un_test_citado_que_no_existe_falla +
+  ::test_los_tests_que_existen_no_se_acusan +
+  ::test_un_detector_que_no_es_un_test_sigue_valiendo (sin este último, exigir un `::` rechazaría
+  detectores legítimos —semgrep, layers.conf, un hook— y el gate acabaría desactivado)
+- **Área:** tools/lesson-detector-link.sh
+
+### [2026-08-12] El gestor de paquetes contesta a otra pregunta
+- **Qué pasó:** el nivel 4 llevaba semanas declarado imposible para Swift 6 sobre esta cadena:
+  `brew` sirve muter 16 → muter 16 no parsea typed throws → *no hay upgrade* → el nivel 4 no está
+  disponible. Todo el razonamiento era correcto salvo el primer eslabón. El repositorio
+  (`https://github.com/muter-mutation-testing/muter`) tiene el arreglo en `main` desde 2026-07:
+  el proyecto llevaba meses desarrollando **sin publicar un release**. Y de propina, el único
+  score que se llegó a ver (`globalMutationScore = 25`) salió de un artefacto de build viejo:
+  una medición inválida que además *tranquilizaba*.
+- **Causa raíz:** `brew`/`apt`/`npm` responden "¿cuál es el último RELEASE?". La pregunta era
+  "¿qué soporta el proyecto?". Son preguntas distintas y sus respuestas divergen durante meses;
+  tomar una por la otra es una inferencia, no una comprobación — y quedó escrita en el ledger
+  con la forma de un hecho verificado.
+- **Regla:** antes de declarar un gate no disponible por la versión de una herramienta, **mira la
+  fuente**: `git ls-remote --tags <repo>`, el issue, el commit. Y el hallazgo cita esa fuente, no
+  la salida del gestor. La asimetría es lo que lo hace obligatorio: una capa entera de la
+  pirámide se declara imposible, se documenta como tal, y la conclusión negativa **se
+  auto-preserva** porque desalienta exactamente la comprobación que la refutaría. No es un error
+  que se caiga solo; hay que ir a buscarlo.
+- **Detector:** tools/check-version-claims.sh
+  (Anillo 3, paso 8e): un hallazgo del ledger que declare una herramienta incapaz por versión
+  debe citar un repositorio, un `git ls-remote`, o declarar `n/a-repo — <razón>`. Sus guards de
+  falso positivo están en tools/tests/test_finding_refs.sh — el que importa es
+  ::test_una_observacion_sobre_versiones_no_exige_repositorio: "jq 1.6 se comporta así" se
+  verifica **corriendo jq**, y solo la afirmación de que NO EXISTE una versión capaz necesita
+  mirar la fuente, porque es justo lo que tu copia no puede decirte.
+- **Área:** tools/findings/ledger.jsonl · tools/check-version-claims.sh
+
+### [2026-08-12] Un id de finding que no existe LEE COMO CERRADO
+- **Qué pasó:** nada, todavía — y esa es la mitad interesante. El ledger es el inventario único de
+  hallazgos y la doc lo cita por id ("decidido en `f-marker-spoof`"), pero nadie comprobaba que el
+  id existiera. Bastaba un typo, un id reconstruido de memoria tras una compactación, o renombrar
+  una entrada sin repasar quién la citaba.
+- **Causa raíz:** una cita rota, en cualquier otro contexto, se nota. Aquí no: quien encuentra
+  "cerrado en `f-xxxxxxx`" **no va a comprobarlo**, da por hecho que hay una entrada con su tier,
+  su razón y su fecha, y no vuelve a abrir el tema. El hallazgo se evapora **con el aspecto de
+  haberse cerrado**, que es exactamente el modo de fallo contra el que existe el ledger (§10).
+- **Regla:** un id citado tiene que resolver contra `ledger.jsonl`. Si el hallazgo es real, se
+  crea con el CLI en el mismo cambio; si la cita está mal, se corrige.
+- **Detector:** tools/check-finding-refs.sh
+  (Anillo 3, paso 8e). Y su primer falso positivo apareció, como manda la ley de este repo,
+  **contra este mismo repo**: un `grep 'f-[a-z-]*'` casaba la subcadena **f-nature** dentro de
+  `check-diff-nature`. Por eso una cita es solo un span entre acentos graves y fuera de bloques
+  de código: los acentos son la marca que el autor pone para decir "esto es un identificador",
+  y exigirlos convierte una heurística en una lectura. Coletazo, en la primera pasada: **este
+  párrafo disparó el check**, porque el ejemplo iba entre acentos graves. No se le puso excepción
+  al doc —eso habría cegado justo al archivo que más cita findings—: se le quitaron los acentos,
+  que es literalmente lo que el mensaje del check recomienda hacer. Guards en
+  tools/tests/test_finding_refs.sh::test_una_subcadena_dentro_de_otro_nombre_no_es_una_cita +
+  ::test_los_ejemplos_de_uso_no_se_confunden_con_citas (el `close f-xxxx` del manual del CLI).
+- **Área:** tools/check-finding-refs.sh · docs/**
+
+### [2026-08-12] La cuarta vez del mismo falso positivo no pide otra lección
+- **Qué pasó:** el write-gate de Bash volvió a bloquear una lectura. Cuarta vez del mismo patrón,
+  con el caso más limpio posible: `sed -n '54,58p' <archivo>` y
+  `grep -rc "assert(" Pelis --include="*.swift"`. El gate casaba `*sed*-i*` y `*perl*-i*` como
+  subcadenas, así que `--include=` contiene una `i` precedida de guion y `-n '54,58p'` va detrás
+  de un `sed`. Dos comandos de LECTURA pura leídos como edición in-place.
+- **Causa raíz:** la vez anterior se anclaron `cp` y `mv` al inicio de comando, con un comentario
+  explicando por qué. Los patrones hermanos —`sed` y `perl`, cuatro líneas más abajo, con el mismo
+  defecto y en la misma función— se quedaron sin tocar. Es literalmente la lección
+  *[2026-08-10] Se arregló un caso del parser y no se buscó el hermano*, cometida **en el arreglo
+  de otro caso de la misma regla**.
+- **Regla:** no hace falta otra lección; hace falta que el arreglo cubra a la familia **en el
+  mismo cambio**. Operativamente: al anclar/normalizar un patrón, se releen todos los patrones de
+  esa función antes de cerrar, y cada uno estrena su test. Ahora `sed`/`perl` exigen ser el primer
+  token de un comando y que `-i` sea un argumento propio (`-i`, `-pi`, `-i.bak`), no una letra
+  dentro de un flag largo.
+- **Detector:** tools/tests/test_bash_matrix.sh::test_sed_de_lectura_con_flag_que_contiene_i_no_bloquea
+  + ::test_un_flag_largo_que_contiene_i_no_es_edicion_in_place +
+  ::test_la_edicion_in_place_real_se_sigue_cazando (sin este último, arreglar los FP habría
+  borrado el gate)
+- **Área:** scripts/agent-hooks/reviewer-gate.sh §0c
 
 ### [2026-08-11] Cambiar de lanzador habría duplicado todos los hooks de todos los proyectos
 - **Qué pasó:** al envolver los hooks en `run-hook.sh` (el arreglo del brick), el merge de
@@ -1016,3 +1143,80 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   (funde el archivo del repo consigo mismo: exit 0, hooks=+0, `_comment_` conservados, JSON
   válido) + ::test_un_comentario_bajo_hooks_se_conserva_intacto
 - **Área:** tools/merge-claude-settings.sh · tools/tests/test_settings_merge.sh
+
+### [2026-08-11] Un RED sin huella hace indistinguible la remediación del reintento
+- **Qué pasó:** `capture-review-verdict.sh` guardaba `staged_sha` y hallazgos solo en el camino
+  GREEN/AMBER. En RED solo llamaba a `hook_log_detection`. Medido en un proyecto real: **36 RED,
+  9 AMBER y CERO GREEN** en todo el historial, con una secuencia RED→RED→GREEN sobre nueve
+  archivos cuyo mtime era diez minutos ANTERIOR al primer RED — ni un byte cambió entre los tres
+  veredictos. La lectura benigna era la correcta en ese caso (los RED pedían registrar gaps en
+  el ledger, §10, y se hizo), y eso es exactamente lo grave: **el harness no podía distinguirla
+  de un verdict-shopping.**
+- **Causa raíz:** solo se guardaba la evidencia del veredicto que desbloqueaba. El sistema
+  contaba veredictos sin verificar que algo cambiara entre ellos, así que "insistir" y "arreglar"
+  tenían el mismo aspecto desde fuera.
+- **Regla:** el invariante nº1 llevado a su conclusión — si el veredicto lo deriva el sistema de
+  una ejecución real, **dos ejecuciones sobre la misma entrada no pueden dar salidas opuestas**
+  sin que algo haya cambiado. Un RED deja huella (`last_red.txt` + `review-history.jsonl` con el
+  sha), y un GREEN sobre ese mismo sha y ese mismo HEAD no escribe marker: o el RED estaba mal o
+  lo está el GREEN, y en ninguno de los dos casos toca desbloquear. Escape auditado
+  (`REVIEW_SAME_DIFF_OVERRIDE`) para el RED que se resuelve con un argumento y no con código —
+  mismo patrón que `REVIEWER_OVERRIDE`, porque el caso legítimo existe y negarlo produciría el
+  deadlock contrario. Corolario práctico: si el hallazgo pedía registrar algo en el ledger, ese
+  registro **es parte del diff** y se estagea antes de re-revisar.
+- **Detector:** tools/tests/test_verdict.sh::test_un_red_deja_huella_del_diff_juzgado +
+  ::test_green_sobre_el_mismo_diff_que_el_red_no_marca +
+  ::test_green_tras_cambiar_el_codigo_si_marca (el guard que impide convertir el agujero en un
+  deadlock) + ::test_el_override_de_mismo_diff_queda_auditado
+- **Área:** scripts/agent-hooks/capture-review-verdict.sh
+
+### [2026-08-11] La cola del juez premiaba dejar basura
+- **Qué pasó:** `session-end.sh` encolaba para el `process-judge` si el árbol quedaba SUCIO. O
+  sea que la sesión que cierra bien —commitea su trabajo y deja el árbol limpio— era exactamente
+  la que **nunca** se encolaba. Reproducido: la cola apuntaba a una sesión con 7 tool-calls y
+  cero ediciones (leer el backlog y dos builds), mientras las dos sesiones que escribieron el
+  adapter y el composition root no entraron. El juez auditaba sistemáticamente a quien no había
+  trabajado.
+- **Causa raíz:** se eligió como señal un residuo (el árbol sin limpiar) en vez del resultado
+  (los commits producidos). Un residuo mide lo que quedó sin hacer, no lo que se hizo — y aquí
+  correlacionaba **al revés** con lo que se quería auditar. Una métrica de calidad sobre la
+  muestra equivocada es peor que ninguna: da confianza sin cubrir nada.
+- **Regla:** elige como señal el **resultado**, no lo que quedó por el camino. `session-start`
+  guarda el HEAD de arranque y `session-end` encola por commits producidos (el árbol sucio sigue
+  contando, pero ya no es la condición). Y la línea de la cola lleva el **rango de commits**, no
+  solo el id de sesión: es lo que el juez tiene que mirar (`git diff <rango>`), y no tiene los
+  huecos de la trayectoria — en el caso real, 13 minutos sin cubrir, justo la ventana de los
+  sub-agentes `reviewer` y los dos commits.
+- **Detector:** tools/tests/test_judge_queue.sh::test_la_sesion_que_commitea_y_deja_limpio_SI_se_encola
+  + ::test_una_sesion_sin_commits_ni_cambios_no_se_encola (el FP guard). Ojo al detalle que costó
+  el primer intento: el sandbox necesita el `.gitignore` REAL, porque sin él git reporta
+  `?? .agents/` colapsando el directorio y el filtro —que casa `?? .agents/state/`— no lo ve.
+- **Área:** scripts/agent-hooks/session-end.sh · scripts/agent-hooks/session-start.sh
+
+### [2026-08-12] El repo que escribe el gate era el único sin cablearlo
+- **Qué pasó:** al ir a commitear la tanda que añade dos detectores al ledger, el propio gate de
+  evidencia paró el commit: *"no hay comando de build+tests cableado (`tools/verify.conf`)"*.
+  El template lleva meses exigiendo a sus adoptantes que aten una ejecución verde al diff que
+  commitean — `verify-run.sh`, el paso 6 del Anillo 3, el job `verify-marker` de lefthook — y en
+  su propio repo esa línea seguía siendo un FILL. Ninguno de sus commits estuvo nunca ligado a
+  una ejecución registrada.
+- **Causa raíz:** `verify.conf` nació como plantilla *para otros*, y a nadie le chirrió que el
+  template no lo rellenara: "es un template, no tiene build". Sí lo tiene — su producto es el
+  harness y su build+tests es `bash tools/tests/run-tests.sh`. Es `f-harness-no-autogate` otra
+  vez: la herramienta se exime de la regla que reparte, y el hueco vive justo donde nadie mira
+  porque parece que no aplica.
+- **Regla:** el template se aplica sus propios gates. `tools/verify.conf` va cableado con la
+  suite. Y como eso crea un riesgo NUEVO —quien adopta hereda esa línea y su `verify-run` sale
+  verde sin compilar su app—, el riesgo se cierra en el mismo cambio: `verify-run.sh` mira si hay
+  código de producto que el comando no toca y sale 3 ("no pude verificar"), que avisa en local y
+  bloquea en CI. La pregunta que hace el guard no es "¿eres el template?" sino la que de verdad
+  importa: **¿hay producto que este comando no está tocando?**
+  Lo que hace obligatorio ese guard es la asimetría: un FILL sin rellenar se anuncia solo en cada
+  arranque de sesión; un comando heredado **SALE VERDE**. Un hueco se delata; una respuesta
+  equivocada, no.
+- **Detector:** tools/tests/test_verify_marker.sh::test_heredar_el_verify_del_template_no_cuenta_como_cableado
+  + ::test_un_repo_sin_producto_verifica_con_la_suite (el FP que importa: es el caso del propio
+  template, y sin él el harness volvería a no poder atar sus commits a nada)
+  + ::test_encadenar_la_suite_al_build_propio_no_avisa (regañar a quien encadena la suite a su
+  build le enseñaría a QUITARLA: el gate produciría lo contrario de lo que persigue)
+- **Área:** tools/verify.conf · tools/verify-run.sh

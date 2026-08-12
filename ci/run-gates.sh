@@ -175,6 +175,26 @@ if [ -f tools/lesson-detector-link.sh ]; then
   bash tools/lesson-detector-link.sh || FAIL=1
 fi
 
+# 8e) El ledger solo vale si lo que dice se puede COMPROBAR. Dos formas de que
+#     deje de valer sin que nadie lo note, cada una con su check:
+#       · una cita a un id que no existe → lee como cerrado, y nadie reabre el
+#         tema: el hallazgo se evaporó con el aspecto de haberse cerrado.
+#       · un hallazgo que declara una herramienta incapaz citando al gestor de
+#         paquetes → `brew` sirve el último RELEASE, no lo que soporta el
+#         proyecto. Pasó aquí: el nivel 4 se dio por imposible durante semanas
+#         con el arreglo ya en `main` del repositorio.
+#     Van en el Anillo 3 y en la suite (que corre en pre-push), NO en
+#     pre-commit: leen el árbol entero, no el diff staged, así que en cada
+#     commit bloquearían por algo que ni siquiera has stageado — el falso
+#     positivo que acaba con un `--no-verify` de costumbre (ley del 10%).
+for _chk in tools/check-finding-refs.sh tools/check-version-claims.sh; do
+  [ -f "$_chk" ] || continue
+  bash "$_chk"; _rc=$?
+  # exit 3 = no pude mirar (sin ledger, sin python3). En CI bloquea, como el
+  # resto de los gates de este anillo (§14.3).
+  [ "$_rc" -ne 0 ] && FAIL=1
+done
+
 # 8d) Contención por fase — INFORMATIVO, nunca bloquea.
 #     No es un gate: es el termómetro que dice si los gates sirven. Va aquí
 #     porque una métrica que hay que acordarse de correr no se corre nunca

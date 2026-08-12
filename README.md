@@ -146,7 +146,11 @@ tools/
   semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación de review compartida por los 3 anillos
-  lesson-detector-link.sh    ← toda lección tiene detector (nivel 9)
+  lesson-detector-link.sh    ← toda lección tiene detector, y el detector (archivo Y test) existe
+  check-finding-refs.sh      ← un id de finding citado en la doc resuelve contra el ledger
+  check-version-claims.sh    ← declarar una herramienta incapaz por versión exige citar el
+                               repositorio: `brew` sirve el último RELEASE, no lo que soporta
+                               el proyecto (nos costó dar el nivel 4 por imposible durante semanas)
   skill-matrix.conf          ← FUENTE ÚNICA de la matriz path→skill (la lee skill-reminder)
   upgrade.sh                 ← trae mejoras del template a tu proyecto (merge 3-vías + verificación)
   validate-harness.sh        ← ¿los gates EXISTEN de verdad? estático + checklist en vivo

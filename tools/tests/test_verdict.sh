@@ -115,3 +115,101 @@ test_contrato_mencionado_en_prosa_no_cuenta() {
   local out; out="$(contract_parse 'te dejo el contract: ready cuando quieras')"
   [ -z "$out" ] || { echo "    una mención en prosa se leyó como contrato ('$out')"; return 1; }
 }
+
+# ════════════════════════════════════════════════════════════════════
+# f-review-red-sin-huella — un RED tiene que dejar rastro
+# ════════════════════════════════════════════════════════════════════
+# Medido en un proyecto real: 36 RED, 9 AMBER y CERO GREEN en todo el
+# historial, con secuencias RED→RED→GREEN sobre archivos cuyo mtime era
+# ANTERIOR al primer RED — ni un byte cambió entre veredictos. La lectura
+# benigna era la correcta ahí (los RED pedían registrar gaps en el ledger),
+# y ese es justo el problema: el harness no podía distinguirla de un
+# verdict-shopping. Con el sha del diff guardado también en RED, la diferencia
+# pasa a ser mecánica.
+_crv_sandbox() {
+  local d; d="$(mktemp -d)"
+  mkdir -p "$d/scripts/agent-hooks/lib" "$d/.agents/state/markers"
+  cp -R "$PROJECT_ROOT/scripts/agent-hooks/." "$d/scripts/agent-hooks/"
+  cp "$PROJECT_ROOT/.gitignore" "$d/.gitignore" 2>/dev/null
+  (
+    cd "$d" || exit 1
+    git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
+    echo seed > seed.txt; git add -A; git commit -qm init 2>/dev/null
+    echo 'let x = 1' > app.swift; git add app.swift
+    "$1"
+  )
+  local rc=$?; rm -rf "$d"; return $rc
+}
+_crv() { # _crv <mensaje final del sub-agente>
+  printf '{"agent_type":"reviewer","last_assistant_message":%s}' \
+    "$(printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    | bash scripts/agent-hooks/capture-review-verdict.sh >/dev/null 2>&1
+}
+
+_case_red_deja_huella() {
+  _crv 'Hay problemas.
+VERDICT: RED
+FINDINGS: 3
+SCOPE: el adapter'
+  [ -f .agents/state/markers/last_red.txt ] \
+    || { echo "    un RED no dejó huella del diff que juzgó"; return 1; }
+  grep -q '^staged_sha: [0-9a-f]' .agents/state/markers/last_red.txt \
+    || { echo "    la huella del RED no lleva el sha del diff"; return 1; }
+  [ -f .agents/state/review-history.jsonl ] \
+    || { echo "    el RED no entró en el historial de veredictos"; return 1; }
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    && { echo "    un RED escribió marker (desbloquearía el commit)"; return 1; }
+  return 0
+}
+test_un_red_deja_huella_del_diff_juzgado() { _crv_sandbox _case_red_deja_huella; }
+
+_case_green_sobre_el_mismo_diff_se_rechaza() {
+  _crv 'VERDICT: RED
+FINDINGS: 2
+SCOPE: el adapter'
+  _crv 'Ya está.
+VERDICT: GREEN
+FINDINGS: 0
+SCOPE: el adapter'
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    && { echo "    un GREEN sobre EL MISMO diff que fue RED escribió marker (verdict-shopping)"; return 1; }
+  grep -q 'RECHAZADO' .agents/state/review-history.jsonl 2>/dev/null \
+    || { echo "    el rechazo no quedó registrado en el historial"; return 1; }
+  return 0
+}
+test_green_sobre_el_mismo_diff_que_el_red_no_marca() {
+  _crv_sandbox _case_green_sobre_el_mismo_diff_se_rechaza
+}
+
+_case_green_tras_arreglar_si_marca() {
+  # EL GUARD QUE IMPORTA: una remediación de verdad tiene que pasar. Si esto
+  # fallara habríamos cambiado un agujero por un deadlock — el reviewer no
+  # podría aprobar nunca nada que hubiera sido RED alguna vez.
+  _crv 'VERDICT: RED
+FINDINGS: 2
+SCOPE: el adapter'
+  echo 'let x = 2 // arreglado' > app.swift; git add app.swift
+  _crv 'Arreglado.
+VERDICT: GREEN
+FINDINGS: 0
+SCOPE: el adapter'
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    || { echo "    una remediación REAL (diff distinto) no consiguió marker: deadlock"; return 1; }
+}
+test_green_tras_cambiar_el_codigo_si_marca() { _crv_sandbox _case_green_tras_arreglar_si_marca; }
+
+_case_override_auditado() {
+  # Para el RED que se resuelve con un argumento y no con código. Mismo patrón
+  # que REVIEWER_OVERRIDE: existe, pero deja rastro.
+  _crv 'VERDICT: RED
+FINDINGS: 1
+SCOPE: el adapter'
+  printf '{"agent_type":"reviewer","last_assistant_message":"VERDICT: GREEN\\nFINDINGS: 0\\nSCOPE: el adapter"}' \
+    | REVIEW_SAME_DIFF_OVERRIDE=1 REVIEW_SAME_DIFF_REASON="el RED era un malentendido" \
+      bash scripts/agent-hooks/capture-review-verdict.sh >/dev/null 2>&1
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    || { echo "    el override no permitió marcar"; return 1; }
+  grep -q 'same-diff-override' .agents/state/markers/override_log.txt 2>/dev/null \
+    || { echo "    el override NO quedó auditado"; return 1; }
+}
+test_el_override_de_mismo_diff_queda_auditado() { _crv_sandbox _case_override_auditado; }

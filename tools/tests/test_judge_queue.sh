@@ -11,6 +11,11 @@ _jq_sandbox() {
   mkdir -p "$d/scripts/agent-hooks/lib" "$d/.agents/state/trajectory" "$d/tools/findings" "$d/docs/process"
   cp -R "$PROJECT_ROOT/scripts/agent-hooks/." "$d/scripts/agent-hooks/"
   cp "$PROJECT_ROOT/tools/preset" "$d/tools/preset" 2>/dev/null
+  # El .gitignore REAL: sin él, `.agents/state/` no está ignorado y git reporta
+  # `?? .agents/` colapsando el directorio — el filtro de session-end casa
+  # `?? .agents/state/`, no el padre, y todo parecería árbol sucio. El sandbox
+  # tiene que parecerse al repo también en esto.
+  cp "$PROJECT_ROOT/.gitignore" "$d/.gitignore" 2>/dev/null
   (
     cd "$d" || exit 1
     git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
@@ -129,3 +134,40 @@ _case_juez_no_escribe_marker_de_reviewer() {
   return 0
 }
 test_el_juez_no_desbloquea_commits() { _jq_sandbox _case_juez_no_escribe_marker_de_reviewer; }
+
+# ════════════════════════════════════════════════════════════════════
+# f-judge-cola-sesion-equivocada — la señal premiaba dejar basura
+# ════════════════════════════════════════════════════════════════════
+# Encolar según "el árbol quedó sucio" significa que la sesión que cierra BIEN
+# —commitea y deja limpio— es exactamente la que nunca se encola. Medido en un
+# proyecto real: la cola apuntaba a una sesión con 7 tool-calls y CERO
+# ediciones, mientras las dos que escribieron el adapter y el composition root
+# no entraron. Una métrica de calidad sobre la muestra equivocada es peor que
+# ninguna: da confianza sin cubrir nada.
+_case_sesion_que_commitea_si_se_encola() {
+  printf 'sid: s-1\nhead: %s\n' "$(git rev-parse HEAD)" > .agents/state/session-head.txt
+  echo "codigo" > app.txt; git add -A; git commit -qm "trabajo real" 2>/dev/null
+  echo '{"session_id":"s-1"}' | bash scripts/agent-hooks/session-end.sh >/dev/null 2>&1
+  local q=.agents/state/judge-queue.txt
+  [ -s "$q" ] || { echo "    la sesión que COMMITEÓ y dejó el árbol limpio NO se encoló"; return 1; }
+  grep -q 'commits=1' "$q" || { echo "    la cola no registra los commits producidos: $(cat "$q")"; return 1; }
+  grep -qE '\.\.[0-9a-f]{7,}' "$q" \
+    || { echo "    la cola no lleva el RANGO que el juez debe mirar: $(cat "$q")"; return 1; }
+}
+test_la_sesion_que_commitea_y_deja_limpio_SI_se_encola() {
+  _jq_sandbox _case_sesion_que_commitea_si_se_encola
+}
+
+_case_sesion_que_solo_lee_no_se_encola() {
+  # Guard de FALSO POSITIVO: sin commits y sin cambios, no hay nada que juzgar.
+  # Si esto se encolara, la cola volvería a llenarse de sesiones vacías — el
+  # mismo daño por el otro extremo.
+  printf 'sid: s-2\nhead: %s\n' "$(git rev-parse HEAD)" > .agents/state/session-head.txt
+  echo '{"session_id":"s-2"}' | bash scripts/agent-hooks/session-end.sh >/dev/null 2>&1
+  [ -s .agents/state/judge-queue.txt ] \
+    && { echo "    una sesión de solo lectura se encoló"; return 1; }
+  return 0
+}
+test_una_sesion_sin_commits_ni_cambios_no_se_encola() {
+  _jq_sandbox _case_sesion_que_solo_lee_no_se_encola
+}

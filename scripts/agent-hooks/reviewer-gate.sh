@@ -150,11 +150,27 @@ if [ -f "$PROJECT_ROOT/scripts/agent-hooks/lib/skill-matrix.sh" ]; then
   #     — `sed -i s/a/b/ f.swift` pone el script en medio. Así que en estos
   #     comandos se toman TODOS los tokens con pinta de ruta, que es
   #     exactamente lo que `-i` va a reescribir.
-  case "$_CMD_CLEAN" in
-    *sed*-i*|*perl*-i*)
-      _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s\n' "$_CMD_CLEAN" | tr ' \t' '\n\n' \
-        | grep -E '(/|\.[A-Za-z0-9]+$)' | grep -vE '^-|^s/|/$' || true)" ;;
-  esac
+  #
+  # ⚠️ ANCLADO, y esta es la CUARTA ocurrencia del mismo falso positivo.
+  # El patrón era `*sed*-i*`: subcadena, no comando. Bloqueó esto, que no
+  # escribe absolutamente nada:
+  #
+  #     sed -n '54,58p' <archivo>   +   grep -rc "assert(" X --include="*.swift"
+  #
+  # Hay un `sed`… y hay un `-i` DENTRO de `--include`. Lo mismo con
+  # `--interactive`, `--ignore-case` o cualquier flag largo que contenga `-i`.
+  # Y lo que más duele: el anclaje ya se había aplicado a `cp`/`mv` en la
+  # ocurrencia anterior, con un comentario explicando el problema. Se arregló
+  # un caso y no se buscó el hermano — la misma lección que este repo tiene
+  # escrita, cometida sobre la regla donde está escrita.
+  # Ahora `sed`/`perl` tienen que ser el PRIMER token de un comando (inicio de
+  # línea o tras `;` `&&` `||` `|`) y el `-i` tiene que ser argumento SUYO
+  # (token propio `-i`, `-i.bak`, `-pi`…), no subcadena de otro flag.
+  if printf '%s' "$_CMD_CLEAN" \
+     | grep -qE '(^|[;&|][[:space:]]*)(sed|perl)([[:space:]]+-[A-Za-z]*i([^[:alnum:]-]|$)|[[:space:]]+-[A-Za-z]*i$)'; then
+    _WRITE_TARGETS="$_WRITE_TARGETS"$'\n'"$(printf '%s\n' "$_CMD_CLEAN" | tr ' \t' '\n\n' \
+      | grep -E '(/|\.[A-Za-z0-9]+$)' | grep -vE '^-|^s/|/$' || true)"
+  fi
   # (c) cp/mv: el destino es el ÚLTIMO argumento. ANCLADO al principio de un
   #     comando (inicio de línea o tras ; && || |): el patrón antiguo `*cp\ *`
   #     casaba la subcadena en cualquier sitio, así que un `--detail "...cp ..."`

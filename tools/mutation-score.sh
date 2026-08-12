@@ -14,6 +14,15 @@
 # Dirección del ratchet: el piso **SOLO SUBE** (opuesto al drift-ratchet, cuyo
 # techo solo baja). Bajarlo a mano = esconder deuda (AGENTS.md §9).
 #
+#   --state    imprime en qué estado está el NIVEL 4 y termina (no mide):
+#                sin-cablear      no hay runner configurado/instalado
+#                runner-incompleto el runner existe pero NO completa su corrida
+#                sin-medir        cableado y corre, pero nadie ha fijado piso
+#                medido           hay piso real
+#              Son cuatro estados y hasta hoy tres se veían igual ("piso 0").
+#              "No cableado" y "cableado pero el runner no completa" piden cosas
+#              opuestas: uno es trabajo del adoptante, el otro es un bug de la
+#              herramienta y no se arregla escribiendo conf.
 #   --check    exit 1 si el score actual está por DEBAJO del piso
 #   --update   sube el piso al score actual (nunca lo baja)
 #   --report   solo imprime el score
@@ -109,7 +118,61 @@ PY
 }
 
 _ERRTMP="$(mktemp)"
+
+# ── La HUELLA de la última corrida ──────────────────────────────────
+# `--state` tiene que poder decir "el runner está y no completa" sin correr el
+# runner: lo consulta `session-start` en CADA arranque, y muter tarda decenas
+# de minutos. La primera versión resolvía ese estado llamando a `compute_score`
+# — o sea, la función cuya cabecera dice "no mide" lanzaba una corrida entera
+# por cada sesión abierta. Lo cazó su propio test de falso positivo, escrito
+# porque la cabecera PROMETÍA la propiedad; sin ese test, la promesa habría
+# quedado como documentación de algo que no ocurría.
+#
+# La salida es la del invariante nº1: el estado no se AFIRMA, se deriva de una
+# ejecución real. Cada corrida de verdad deja su resultado escrito, y `--state`
+# lo LEE. Vive en `.agents/state/` (local, gitignored): es telemetría de esta
+# máquina, no un hecho del repo — el mismo repo puede estar sano en otra.
+_RUN_REC="${MUTATION_RUN_RECORD:-.agents/state/mutation-last-run.txt}"
+_rec() { # _rec <ok|incompleto>
+  mkdir -p "$(dirname "$_RUN_REC")" 2>/dev/null || return 0
+  printf '%s %s\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$_RUN_REC" 2>/dev/null || true
+}
+
+# ── --state: responde SIN medir, y va ANTES del cálculo ─────────────
+# Cuatro estados, y hasta hoy tres se veían igual ("piso 0"). Los dos que
+# importan piden cosas OPUESTAS: "sin cablear" es trabajo del adoptante;
+# "el runner no completa" es un fallo de la herramienta que no se arregla
+# escribiendo conf. Confundirlos manda a alguien a perder la tarde en el sitio
+# equivocado — pasó: se declaró muter incompatible con Swift 6 mirando
+# `brew info` (release de 2023) cuando su `main` ya lo tenía resuelto.
+if [ "$MODE" = "--state" ]; then
+  _medido=0
+  grep -q '"measured"[[:space:]]*:[[:space:]]*true' "$JSON" 2>/dev/null && _medido=1
+  _f="$(floor)"; case "$_f" in ''|*[!0-9]*) _f=0 ;; esac
+  [ "$_f" -gt 0 ] && _medido=1
+  if [ "$_medido" = "1" ]; then echo "medido"; exit 0; fi
+  if [ -n "${MUTATION_SCORE_OVERRIDE:-}" ]; then echo "sin-medir"; exit 0; fi
+  if ! command -v muter >/dev/null 2>&1 || { [ ! -f muter.conf.yml ] && [ ! -f muter.conf.json ]; }; then
+    echo "sin-cablear"; exit 0
+  fi
+  # El runner está cableado. ¿Qué pasó la última vez que corrió de verdad?
+  # Sin huella la respuesta es `sin-medir`, y su mensaje pide justo la corrida
+  # que producirá la huella: el bucle cierra solo en un arranque.
+  if grep -q '^incompleto' "$_RUN_REC" 2>/dev/null; then
+    echo "runner-incompleto"
+  else
+    echo "sin-medir"
+  fi
+  exit 0
+fi
+
 SCORE="$(compute_score 2>"$_ERRTMP")"; _CRC=$?
+# La huella que lee `--state`. Solo se escribe cuando el runner ESTABA y corrió:
+# el `return 1` ("no hay runner") no es un resultado de ejecución y no deja
+# rastro — si lo dejara, un repo sin cablear se declararía "runner-incompleto"
+# y el mensaje mandaría a abrir un issue contra una herramienta que ni está.
+[ "$_CRC" = "2" ] && _rec incompleto
+[ "$_CRC" = "0" ] && _rec ok
 
 if [ -z "$SCORE" ]; then
   if [ "$_CRC" = "2" ]; then

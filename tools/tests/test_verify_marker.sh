@@ -174,3 +174,55 @@ _case_binario_ausente_es_3_no_1() {
   [ "$?" = "3" ] || { echo "    un binario AUSENTE se presentó como fallo del código (esperaba 3)"; return 1; }
 }
 test_binario_ausente_devuelve_3_no_1() { _vm_sandbox _case_binario_ausente_es_3_no_1; }
+
+# ════════════════════════════════════════════════════════════════════
+# El comando del TEMPLATE heredado no puede pasar por el tuyo
+# ════════════════════════════════════════════════════════════════════
+# El template sí tiene `verify.conf` cableado, y para él es honesto: su producto
+# es el harness, así que su build+tests es la suite de gates. Lo que no puede
+# pasar es que quien adopta herede esa línea: saldría VERDE sin compilar una
+# línea de su app. Es peor que un FILL sin rellenar — un hueco se anuncia solo
+# en cada arranque; una respuesta equivocada no se anuncia nunca.
+_vc_sandbox() {
+  local d; d="$(mktemp -d)"
+  mkdir -p "$d/tools/tests"
+  cp "$PROJECT_ROOT/tools/verify-run.sh" "$d/tools/"
+  printf 'x\n' > "$d/tools/tests/run-tests.sh"
+  printf 'bash tools/tests/run-tests.sh\n' > "$d/tools/verify.conf"
+  ( cd "$d" || exit 1; git init -q . 2>/dev/null; "$1" )
+  local rc=$?; rm -rf "$d"; return $rc
+}
+
+_case_comando_del_template_con_producto() {
+  mkdir -p ios/App; printf 'let x = 1\n' > ios/App/A.swift
+  local out rc; out="$(bash tools/verify-run.sh --cmd-only 2>&1)"; rc=$?
+  [ "$rc" = "3" ] || { echo "    heredar el comando del template devolvió $rc (esperaba 3)"; return 1; }
+  case "$out" in *TEMPLATE*) : ;; *)
+    echo "    el aviso no dice de dónde viene el comando"; return 1 ;; esac
+}
+test_heredar_el_verify_del_template_no_cuenta_como_cableado() {
+  _vc_sandbox _case_comando_del_template_con_producto
+}
+
+# ── FALSO POSITIVO nº1: un repo SIN producto sí está verificado ─────
+# Es el caso del propio template. Si esto fallara, el harness no podría atar
+# una ejecución verde a sus propios commits — que es justo el agujero que
+# `verify-run.sh` existe para cerrar, y llevaba abierto en el único repo que
+# escribe el gate.
+_case_sin_producto_es_valido() {
+  bash tools/verify-run.sh --cmd-only >/dev/null 2>&1 \
+    || { echo "    un repo sin código de producto (el template) fue rechazado"; return 1; }
+}
+test_un_repo_sin_producto_verifica_con_la_suite() { _vc_sandbox _case_sin_producto_es_valido; }
+
+# ── FALSO POSITIVO nº2: encadenar la suite al build propio es CORRECTO ──
+# `xcodebuild ... && bash tools/tests/run-tests.sh` es exactamente lo que
+# queremos que haga un adoptante cuidadoso. Regañarle sería enseñarle a quitar
+# la suite de su comando: el gate produciría lo contrario de lo que persigue.
+_case_encadenado_no_avisa() {
+  mkdir -p ios/App; printf 'let x = 1\n' > ios/App/A.swift
+  printf 'echo build && bash tools/tests/run-tests.sh\n' > tools/verify.conf
+  bash tools/verify-run.sh --cmd-only >/dev/null 2>&1 \
+    || { echo "    FALSO POSITIVO: encadenar la suite al build propio fue rechazado"; return 1; }
+}
+test_encadenar_la_suite_al_build_propio_no_avisa() { _vc_sandbox _case_encadenado_no_avisa; }

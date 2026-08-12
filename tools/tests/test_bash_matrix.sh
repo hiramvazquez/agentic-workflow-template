@@ -170,3 +170,40 @@ _case_sigue_cazando_la_escritura_real() {
 test_la_escritura_real_se_sigue_cazando() {
   _bm_sandbox _case_sigue_cazando_la_escritura_real
 }
+
+# ── CUARTA ocurrencia del mismo FP: `sed` sin anclar ────────────────
+# El patrón era `*sed*-i*` — subcadena, no comando. Bloqueó esto, que no
+# escribe absolutamente nada: hay un `sed -n` (lectura) y hay un `-i` DENTRO
+# de `--include`. El anclaje ya se había aplicado a `cp`/`mv` una ocurrencia
+# antes, con su comentario explicando el problema: se arregló un caso y no se
+# buscó el hermano, sobre la regla donde esa lección está escrita.
+_case_sed_de_lectura_con_include_no_bloquea() {
+  local rc; rc="$(_bmgate 'sed -n 54,58p app/Domain/Movie.swift && grep -rc assert( Pelis --include=*.swift')"
+  [ "$rc" != "2" ] || { echo "    un 'sed -n' de LECTURA + un '--include' se leyó como edición in-place"; return 1; }
+}
+test_sed_de_lectura_con_flag_que_contiene_i_no_bloquea() {
+  _bm_sandbox _case_sed_de_lectura_con_include_no_bloquea
+}
+
+_case_flags_largos_con_i_no_disparan() {
+  # `--interactive`, `--ignore-case`, `--include`: cualquiera contiene `-i`.
+  local rc; rc="$(_bmgate 'grep --ignore-case foo app/Domain/Movie.swift')"
+  [ "$rc" != "2" ] || { echo "    un '--ignore-case' se leyó como edición in-place"; return 1; }
+}
+test_un_flag_largo_que_contiene_i_no_es_edicion_in_place() {
+  _bm_sandbox _case_flags_largos_con_i_no_disparan
+}
+
+_case_sed_i_real_sigue_bloqueando() {
+  # Y el guard del guard: anclar no puede convertirse en dejar de detectar.
+  local rc
+  rc="$(_bmgate 'sed -i s/a/b/ app/Domain/Movie.swift')"
+  [ "$rc" = "2" ] || { echo "    tras anclar, 'sed -i' dejó de detectarse (exit $rc)"; return 1; }
+  rc="$(_bmgate 'perl -pi -e s/a/b/ app/Domain/Movie.swift')"
+  [ "$rc" = "2" ] || { echo "    tras anclar, 'perl -pi' dejó de detectarse (exit $rc)"; return 1; }
+  rc="$(_bmgate 'cat x.txt && sed -i.bak s/a/b/ app/Domain/Movie.swift')"
+  [ "$rc" = "2" ] || { echo "    'sed -i.bak' tras && dejó de detectarse (exit $rc)"; return 1; }
+}
+test_la_edicion_in_place_real_se_sigue_cazando() {
+  _bm_sandbox _case_sed_i_real_sigue_bloqueando
+}
