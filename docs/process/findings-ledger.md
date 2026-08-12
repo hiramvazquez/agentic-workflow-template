@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 66 · Total: 67
+Abiertos: **1** · Cerrados: 67 · Total: 68
 
 ## Abiertos
 
@@ -81,3 +81,4 @@ Abiertos: **1** · Cerrados: 66 · Total: 67
 | `f-gate-cache-stdin-payload` | fixed | Put recibe el unico resumen verde canonico como argumento explicito; get rechaza payloads distintos  |
 | `f-gate-cache-key-race` | fixed | Las consultas ejecutables ocurren antes del snapshot final HEAD+diff; el boundary recalcula la key y |
 | `f-gate-cache-target-race` | fixed | El scanner compara y vuelve a resolver targets tras consultar cache y antes de publicar; una regresi |
+| `f-stat-f-orden-invertido` | fixed | Orden invertido a GNU primero. Detector nuevo en test_shell_hygiene.sh que barre todo el repo y exig |

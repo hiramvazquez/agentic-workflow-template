@@ -86,8 +86,15 @@ test_install_funde_fragmento_generado_y_preserva_prosa_local() {
   _cap_sandbox _case_install_agrega_bloque_sin_pisar_prosa
 }
 
+# GNU primero, BSD despues — el orden IMPORTA y no es estilo: `stat -f` de GNU
+# no falla, imprime el estado del FILESYSTEM con exit 0, asi que con BSD delante
+# el fallback nunca corre y en Linux esto devolvia un volcado en vez del modo.
+# El sintoma era un test rojo que decia "644, esperaba 644": la comparacion
+# estaba rota, no el codigo que probaba. Verde en el Mac de quien lo escribio,
+# rojo en CI. La misma trampa esta documentada en check-verify-marker.sh y en
+# check-review-marker.sh, con este mismo comentario — es la tercera vez.
 _file_mode() {
-  stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null
 }
 
 _case_write_conserva_permisos() {

@@ -114,3 +114,47 @@ test_los_detectores_emiten_su_contrato() {
   [ -z "$bad" ] && return 0
   echo "    detectores que rompieron su contrato de salida:"; printf '%s' "$bad"; return 1
 }
+
+# ── `stat -f` de GNU no falla: el orden del fallback ES el bug ──────
+# Tercera aparicion de la misma trampa en este repo, y la que publico main en
+# rojo: `stat -f` en BSD lee el modo/mtime de un ARCHIVO, pero en GNU lee el
+# estado del FILESYSTEM — y sale con 0. Asi que
+#
+#     stat -f '%Lp' "$f" || stat -c '%a' "$f"      # BSD primero
+#
+# nunca llega al fallback en Linux: devuelve un volcado del filesystem con exit
+# 0 y quien compara obtiene basura. Verde en el Mac de quien lo escribe, rojo en
+# CI, y el mensaje de error dice "644, esperaba 644" — la comparacion rota
+# esconde su propia causa.
+#
+# El orden correcto es GNU primero, BSD despues, y ya estaba escrito con este
+# comentario en check-review-marker.sh y en check-verify-marker.sh. Que volviera
+# a pasar es la ley de siempre: una regla implementada tres veces diverge. Esto
+# la convierte en mecanica.
+test_stat_lee_gnu_primero_y_bsd_despues() {
+  local hits
+  # Se salta lo que es TEXTO, no sintaxis, por dos vias:
+  #   · los COMENTARIOS — los dos archivos que documentan esta trampa la NOMBRAN
+  #     en prosa ("`stat -f` de GNU NO falla").
+  #   · las CADENAS ENTRECOMILLADAS — este mismo test imprime la forma incorrecta
+  #     en su mensaje de error, y se caza a si mismo en la primera pasada. Sexta
+  #     vez que pasa en este repo, y aqui la exencion SI es legitima: quien
+  #     dictamina que lo entrecomillado es dato no es nuestro criterio, es el
+  #     parser de bash. La forma real `stat -f '%Lp' "$f"` sobrevive al desnudado
+  #     porque el flag va FUERA de las comillas; solo el formato va dentro.
+  hits="$(_shell_files "$PROJECT_ROOT"/tools/tests/*.sh | xargs perl -ne '
+      next if /^\s*#/;
+      $probe = $_; $probe =~ s/#.*$//;
+      $probe =~ s/"[^"]*"//g; $probe =~ s/\x27[^\x27]*\x27//g;
+      print "$ARGV:$.: $_" if $probe =~ /stat\s+-f/ && $probe !~ /stat\s+-c.*stat\s+-f/;
+      close ARGV if eof;
+    ' 2>/dev/null)"
+  [ -z "$hits" ] && return 0
+  echo "    \`stat -f\` sin un \`stat -c\` DELANTE en la misma linea:"
+  printf '%s\n' "$hits" | sed 's/^/      /'
+  echo "    En GNU, \`stat -f\` NO falla: imprime el estado del FILESYSTEM con exit 0,"
+  echo "    asi que el fallback nunca corre y en Linux lees basura. Orden correcto:"
+  echo "      stat -c '%a' \"\$f\" 2>/dev/null || stat -f '%Lp' \"\$f\" 2>/dev/null"
+  echo "    Verde en macOS, rojo en CI — asi se publico main en rojo."
+  return 1
+}
