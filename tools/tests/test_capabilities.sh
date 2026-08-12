@@ -75,6 +75,17 @@ _case_write_no_sigue_symlink_fuera_del_repo() {
 }
 test_write_rechaza_symlink_que_escapa_del_repo() { _cap_sandbox _case_write_no_sigue_symlink_fuera_del_repo; }
 
+_case_install_agrega_bloque_sin_pisar_prosa() {
+  printf 'documentación local del adoptante\n' > docs/claims.md
+  bash tools/render-capabilities.sh --install >/dev/null 2>&1 || return 1
+  grep -q '^documentación local del adoptante$' docs/claims.md || return 1
+  grep -q '^<!-- BEGIN GENERATED: capabilities -->$' docs/claims.md || return 1
+  bash tools/render-capabilities.sh --check >/dev/null 2>&1
+}
+test_install_funde_fragmento_generado_y_preserva_prosa_local() {
+  _cap_sandbox _case_install_agrega_bloque_sin_pisar_prosa
+}
+
 _file_mode() {
   stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null
 }
@@ -117,3 +128,19 @@ _case_schema_incompleto_es_exit_3() {
   [ "$rc" = "3" ] || { echo "    contrato incompleto salió con exit $rc, esperaba 3"; return 1; }
 }
 test_manifiesto_sin_capacidades_no_aprueba_en_vacio() { _cap_sandbox _case_schema_incompleto_es_exit_3; }
+
+test_manifiesto_real_cubre_los_tres_docs_operativos() {
+  python3 - "$PROJECT_ROOT/tools/capabilities.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+want = {"README.md", "docs/ADOPTION.md", "ci/README.md"}
+got = set(data.get("documents", []))
+if got != want:
+    print(f"    documents={sorted(got)}; esperaba {sorted(want)}")
+    raise SystemExit(1)
+PY
+}
+
+test_bloques_operativos_del_repo_no_tienen_drift() {
+  (cd "$PROJECT_ROOT" && bash tools/render-capabilities.sh --check >/dev/null)
+}

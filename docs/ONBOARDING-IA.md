@@ -23,11 +23,10 @@
 3. **No evadas gates.** Nada de `--no-verify`, `--amend`, editar `*-ratchet.json` o
    `tools/preset`, ni escribir markers a mano. Si un gate te bloquea injustamente, es un bug
    del gate: arréglalo o repórtalo al ledger — no lo rodees.
-4. **Estado de validación honesto** (transmítelo al humano cuando toque): la suite del
-   harness (163 tests) y el Anillo 1 (lefthook) ya están validados en vivo. **Pendiente de
-   ver funcionar en vivo:** los hooks de Claude Code de este repo (eventos, Anillo 0,
-   SubagentStop→marker, reinyección post-compact), los wrappers de Codex/Cursor, y el run
-   headless completo del backlog. Este onboarding ES esa validación — por eso existe.
+4. **Estado de validación honesto** (transmítelo al humano cuando toque): no copies un número
+   ni un estado de esta guía. Ejecuta `bash tools/tests/run-tests.sh` para el total actual y
+   `bash tools/validate-harness.sh --selftest` para distinguir defensas operativas de dependencias
+   ausentes/rotas. El run headless inicial del backlog sigue siendo supervisado (§Fase 3).
 
 ---
 

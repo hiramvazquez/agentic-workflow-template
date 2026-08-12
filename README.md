@@ -16,14 +16,14 @@ medido, no prometido:
 
 | | Estado | Qué significa al adoptarlo |
 |---|---|---|
-| **La maquinaria** (3 anillos, hooks, trinquetes, marker, ledger, selftest) | **Curtida** — validada en un proyecto real de principio a fin | Portable. No depende del lenguaje. |
+| **La maquinaria** (anillos 0–3, hooks, trinquetes, marker, ledger, selftest) | **Curtida** — validada en un proyecto real de principio a fin | Portable. No depende del lenguaje. |
 | **iOS** (Swift 6 / SwiftUI / MVVM-C / Swift Testing) | **Curtido** — reglas semgrep AST, lint in-loop, capas, skills con ejemplos reales | `/adoptar` y a trabajar. |
 | **Android · web · backend** | **Skeleton** — el esqueleto está, los detectores no | Adoptarlo aquí **no es rellenar FILLs**: es escribir de cero el nivel 1 (lint/typecheck in-loop), el nivel 2 (reglas AST) y el nivel 4 (runner de mutación) para tu stack. Cuenta con **una tarde larga**, no diez minutos. |
 
-Concretamente, hoy: reglas semgrep para `swift` y `universal`; `post-edit-verify` cableado
-para `.swift`, `.sh` y `.json`; ~119 marcadores `FILL` repartidos por el repo. `session-start`
-te dirá en cada arranque qué niveles están MUDOS en TU proyecto — esa es la fuente de verdad,
-no esta tabla.
+Concretamente, hoy hay reglas semgrep para `swift` y `universal`, y `post-edit-verify` está
+cableado para `.swift`, `.sh` y `.json`. No se publica un conteo manual de placeholders:
+`session-start` y `validate-harness` reportan el estado operativo en cada copia. Te dirán qué
+niveles están MUDOS en TU proyecto — esa es la fuente de verdad, no esta tabla.
 
 **Por qué se dice así de claro:** la lección más cara de este harness es que un gate anunciado
 y no operativo es peor que uno ausente, porque compra confianza falsa. Sería incoherente
@@ -79,20 +79,31 @@ El corazón del template. Detalle completo en
 > es *"que los tests pasen"*, y la forma más barata de conseguirlo es escribir tests que no
 > comprueban nada. El mutation score es el único gate que los distingue.
 
-## Los 3 anillos de enforcement (el "plus" cross-tool)
+## Los anillos 0–3 de enforcement (el "plus" cross-tool)
+
+<!-- BEGIN GENERATED: capabilities -->
+| Capacidad | Requerida en full | Requerida en lite | Proveedor | Garantía |
+|---|:---:|:---:|---|---|
+| `architecture_complexity` | no | no | externo | Complejidad ciclomática |
+| `architecture_cycles` | no | no | externo | Detección de ciclos |
+| `architecture_import_direction` | sí | sí | `tools/check-layers.sh` | Dirección de imports directos |
+| `review_marker` | sí | no | `tools/check-review-marker.sh` | Evidencia de review ligada al diff |
+| `ring3` | sí | no | `tools/check-ring3.sh` | Backstop de CI |
+| `skill_reminder` | sí | no | `scripts/agent-hooks/skill-reminder.sh` | Lectura obligatoria por path |
+<!-- END GENERATED: capabilities -->
 
 | Anillo | Mecanismo | Dispara en | Para qué |
 |---|---|---|---|
 | **0 — permisos nativos** | `permissions` de `.claude/settings.json` | Claude Code, antes de ejecutar la tool | Prohibiciones deterministas: `--no-verify`, `--force`, leer `.env`, editar trinquetes. **Ni siquiera llega a ejecutarse.** |
 | **1 — git-nativo** | `lefthook.yml` | Cursor, Claude, Codex, **humano**, todo `git commit` | Secretos, trinquete de drift, capas, **marker de review**, lint. **La única capa universal.** |
 | **2 — hooks de IA** | `.claude/settings.json` + `.cursor/hooks.json` + `.codex/hooks.json` → `scripts/agent-hooks/` | Claude Code (completo) / Cursor y Codex (parcial, vía `gate-adapter`) | Gates *AI-aware*: verificación in-loop, skill-antes-de-editar, reviewer-gate, **derivación del veredicto** (solo Claude), reinyección post-compactación (solo Claude). |
-| **3 — CI (opcional, BYO)** | `ci/run-gates.sh` + `ci/ai-review.sh` desde *tu* CI | server, cada push/PR + nocturno | Backstop independiente del cliente: mutación, semgrep, **review de IA headless**. Cubre commits humanos y todo lo que los hooks de cada cliente no alcanzan. |
+| **3 — CI (BYO; obligatorio en `full`)** | `ci/run-gates.sh` + `ci/ai-review.sh` desde *tu* CI | server, cada push/PR + nocturno | Backstop independiente del cliente: mutación, semgrep, **review de IA headless**. Cubre commits humanos y todo lo que los hooks de cada cliente no alcanzan. |
 
 > **Anillo 0 es nuevo y es el más barato:** una prohibición expresable como patrón va en
 > `permissions.deny`, no en prosa de `AGENTS.md`. El texto es advisory —el modelo puede
 > ignorarlo o perderlo tras una compactación—; el permiso es determinista.
 
-> **Por qué 3 anillos:** los hooks de IA bloquean rápido y local pero cada cliente cubre un
+> **Por qué 0–3:** los permisos y hooks de IA bloquean rápido y local, pero cada cliente cubre un
 > subconjunto distinto (Claude Code: todo; Codex: PreToolUse/PostToolUse vía `gate-adapter`;
 > Cursor: shell/stop, sin derivación de marker). Los git hooks nativos disparan para *todos*
 > los clientes y humanos, pero se pueden saltar con `--no-verify` → por eso CI es el backstop final.
@@ -103,8 +114,9 @@ El corazón del template. Detalle completo en
 > Claude Code / Cursor / Codex.
 >
 > **CI es "bring your own".** No imponemos GitHub. El Anillo 3 es un único script
-> (`ci/run-gates.sh`) que corre los mismos gates; lo invocas desde GitHub Actions, GitLab CI,
-> Bitbucket, Azure, Jenkins o nada. En `ci/examples/` hay stubs opcionales para varios proveedores.
+> (`ci/run-gates.sh`) que corre los mismos gates; en preset `full` debes invocarlo desde el
+> proveedor que elijas (GitHub Actions, GitLab CI, Bitbucket, Azure o Jenkins). En `lite`, operar
+> sin CI es una pérdida explícita que `session-start` declara. Los YAML de `ci/examples/` son stubs.
 >
 > **Capa nativa de Claude Code (opcional, la más fuerte para empresa).** Para enforcement que
 > NI `--no-verify` NI los flags de CLI pueden saltar, despliega `enterprise/managed-settings.json`
@@ -145,7 +157,7 @@ tools/
   check-layers.sh + layers.conf  ← fitness function por grafo de imports (nivel 6)
   semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
-  check-review-marker.sh     ← verificación de review compartida por los 3 anillos
+  check-review-marker.sh     ← verificación local de review en git hooks/adapters
   lesson-detector-link.sh    ← toda lección tiene detector, y el detector (archivo Y test) existe
   check-finding-refs.sh      ← un id de finding citado en la doc resuelve contra el ledger
   check-version-claims.sh    ← declarar una herramienta incapaz por versión exige citar el
@@ -157,13 +169,14 @@ tools/
   findings/findings.sh       ← CLI del ledger (bash+python3, único runtime)
   metrics/escape-rate.sh     ← contención por fase: ¿puedo bajar la revisión humana?
   drift-ratchet.json         ← trinquete de deuda — SOLO BAJA
-  tests/                     ← la suite de shell de los propios gates (163 hoy — el número
-                               real lo da run-tests.sh; un conteo hardcodeado aquí ya se pudrió dos veces)
+  tests/                     ← suite de shell de los propios gates (el total real lo imprime
+                               run-tests.sh; no se mantiene un conteo manual)
                                (⅓ son casos de FALSO POSITIVO; test_meta_fp lo exige)
 
 ci/run-gates.sh + ci/ai-review.sh + ci/examples/ ← Anillo 3 (provider-agnóstico)
 lefthook.yml + .gitleaks.toml                    ← Anillo 1
-.agents/skills/            ← base de conocimiento (frontmatter con `paths:` = auto-carga)
+.agents/skills/            ← base de conocimiento; el enforcement portable lo da
+                             skill-matrix.conf + skill-reminder (paths nativos son cliente-específicos)
 backlog/                   ← historias de usuario tipo Jira → tools/backlog/run.sh las
                              trabaja una a una en ramas story/NNNN (PRD 0003; merge = humano)
 docs/PLAYBOOK.md           ← el día a día del programador: los 4 flujos + qué hacer si un gate bloquea
@@ -183,7 +196,7 @@ Agent(reviewer) ──► emite "VERDICT: GREEN"
                         │
               escribe marker {verdict, head, sha256(diff staged), source: hook}
                         │
-git commit ──► los 3 anillos exigen source: hook
+git commit ──► Anillo 1 valida el marker; Anillo 2 lo deriva donde el cliente lo soporta
 ```
 
 Antes, el marker lo escribía un script que **el modelo** invocaba: un agente que quería
@@ -203,7 +216,7 @@ máquina de un solo usuario, un agente con shell puede hacer lo que puede hacer 
 
 **La defensa contra intención es el Anillo 3.** En CI el marker local no viaja, y
 `ci/ai-review.sh` corre una review independiente en una máquina que el agente no controla. Esa
-es la razón real de que existan tres anillos y no uno.
+es la razón real de que existan capas 0–3 y no una sola.
 
 > Este límite lo encontró el sub-agente `reviewer` revisando el commit que introdujo el
 > mecanismo, con un repro ejecutable. La versión inicial de este README decía "infalsificable".
@@ -247,7 +260,7 @@ PRD → design-review → implementación → reviewer → judge es la misma fam
 (`/speckit.constitution|specify|plan|tasks|implement`) y **AWS Kiro** (Requirements → Design → Tasks).
 Mapeo casi 1:1: `AGENTS.md` ≈ *constitution* · PRD ≈ *specify* · design-review ≈ *plan* ·
 sub-agentes ≈ *tasks/implement* · reviewer/judge ≈ *analyze*. La diferencia: aquí el enforcement
-(3 anillos, drift-ratchet, findings-ledger, reviewer-gate) es **mecánico y cross-tool**, algo que
+(anillos 0–3, drift-ratchet, findings-ledger, reviewer-gate) es **mecánico y cross-tool**, algo que
 Spec Kit no trae. Si ya usas Spec Kit, adopta su vocabulario de comandos y monta estos gates encima.
 
 ## Cómo se adopta

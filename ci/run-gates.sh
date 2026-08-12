@@ -6,7 +6,7 @@
 # (GitHub, GitLab, Bitbucket, Azure, Jenkins) o nada. No imponemos proveedor.
 #
 # Es el backstop que cubre lo que los hooks locales NO pueden:
-#   - Codex (no tiene hooks) → su único enforcement es este.
+#   - Codex/Cursor (hooks parciales) → completa aquí los eventos/veredictos ausentes.
 #   - commits humanos con `--no-verify`.
 #   - máquinas sin lefthook instalado.
 #

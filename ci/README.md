@@ -1,14 +1,26 @@
-# ci/ — Anillo 3 (CI), opcional y provider-agnóstico
+# ci/ — Anillo 3 (CI), obligatorio en `full` y provider-agnóstico
 
 > **No imponemos ningún proveedor de CI.** El Anillo 3 es un único script,
-> `ci/run-gates.sh`, que corre los mismos gates server-side. Lo invocas desde el CI que uses —
-> o desde ninguno (te quedas con los Anillos 1 y 2).
+> `ci/run-gates.sh`, que corre los mismos gates server-side. En preset `full` lo invocas desde
+> el CI que elijas; en `lite`, no tener CI es una pérdida explícita que el arranque declara.
 
-## Por qué existe (aunque sea opcional)
+<!-- BEGIN GENERATED: capabilities -->
+| Capacidad | Requerida en full | Requerida en lite | Proveedor | Garantía |
+|---|:---:|:---:|---|---|
+| `architecture_complexity` | no | no | externo | Complejidad ciclomática |
+| `architecture_cycles` | no | no | externo | Detección de ciclos |
+| `architecture_import_direction` | sí | sí | `tools/check-layers.sh` | Dirección de imports directos |
+| `review_marker` | sí | no | `tools/check-review-marker.sh` | Evidencia de review ligada al diff |
+| `ring3` | sí | no | `tools/check-ring3.sh` | Backstop de CI |
+| `skill_reminder` | sí | no | `scripts/agent-hooks/skill-reminder.sh` | Lectura obligatoria por path |
+<!-- END GENERATED: capabilities -->
+
+## Por qué existe
 
 Es el **backstop independiente del cliente**. Cubre lo que los hooks locales no pueden:
 
-- **Codex** no tiene hooks → este es su único enforcement automático.
+- **Codex/Cursor** tienen cobertura parcial de hooks → CI cubre los eventos y veredictos que
+  sus adapters locales no pueden derivar.
 - Commits con `git commit --no-verify` (saltan el Anillo 1).
 - Máquinas/CI sin `lefthook` instalado.
 

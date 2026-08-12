@@ -38,5 +38,9 @@
       "required_in_lite": false
     }
   },
-  "documents": []
+  "documents": [
+    "README.md",
+    "docs/ADOPTION.md",
+    "ci/README.md"
+  ]
 }

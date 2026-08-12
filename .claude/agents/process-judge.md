@@ -26,5 +26,6 @@ capturada (`.agents/state/trajectory/*.jsonl`) + el diff del trabajo.
 
 - Reporte (`docs/process/reviews/<fecha>-<scope>.md`) con: hallazgos, severidad, y por cada uno:
   (a) fix propuesto, (b) cómo PREVENIRLO (detector en check-drift / regla del reviewer / entrada a lessons_learned).
-- Anexa los hallazgos accionables al ledger: `findings.ts add ...`.
+- Anexa los hallazgos accionables al ledger:
+  `bash tools/findings/findings.sh add --title "..." --area "ruta:línea" --tier auto-fix`.
 - **No editas código ni tooling ni lessons** — propones. El owner decide.

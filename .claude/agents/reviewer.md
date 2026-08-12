@@ -129,4 +129,5 @@ SCOPE: gates del anillo 2 y sus tests
    modelo; eso hacía el gate falsificable. Ahora lo escribe el sistema a partir de tu
    veredicto. No intentes marcarlo tú.
 
-Findings AMBER/RED que el owner debe decidir → sugiere `findings.ts add --tier owner-decision`.
+Findings AMBER/RED que el owner debe decidir → sugiere
+`bash tools/findings/findings.sh add --title "..." --area "ruta:línea" --tier owner-decision`.

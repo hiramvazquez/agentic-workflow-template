@@ -17,7 +17,18 @@
 | `python3` | `tools/findings/findings.sh` (ledger) + utilidades | sí (viene en macOS/Linux) |
 | `jq` | hooks de IA (parsing JSON) | sí para el Anillo 2 |
 | Runner de mutación (muter/Stryker/PIT/mutmut) | nivel 4: calidad real de los tests | recomendada — sin él nada distingue un test real de uno decorativo |
-| Tu CI (GitHub/GitLab/…) | Anillo 3 | opcional |
+| Tu CI (GitHub/GitLab/…) | Anillo 3 | sí en `full`; pérdida explícita en `lite` |
+
+<!-- BEGIN GENERATED: capabilities -->
+| Capacidad | Requerida en full | Requerida en lite | Proveedor | Garantía |
+|---|:---:|:---:|---|---|
+| `architecture_complexity` | no | no | externo | Complejidad ciclomática |
+| `architecture_cycles` | no | no | externo | Detección de ciclos |
+| `architecture_import_direction` | sí | sí | `tools/check-layers.sh` | Dirección de imports directos |
+| `review_marker` | sí | no | `tools/check-review-marker.sh` | Evidencia de review ligada al diff |
+| `ring3` | sí | no | `tools/check-ring3.sh` | Backstop de CI |
+| `skill_reminder` | sí | no | `scripts/agent-hooks/skill-reminder.sh` | Lectura obligatoria por path |
+<!-- END GENERATED: capabilities -->
 
 > `bash scripts/agent-hooks/session-start.sh` (o abrir cualquier sesión de Claude/Cursor) te
 > dice **qué niveles de la pirámide están MUDOS** en tu máquina. Confía en ese reporte, no en

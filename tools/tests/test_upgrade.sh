@@ -415,6 +415,7 @@ _case_sync_trae_la_maquinaria_nueva() {
   ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures tools/findings/fixtures backlog \
     && printf 'let x = 1\n' > tools/semgrep/fixtures/swift-malo.swift \
     && printf '{"id":"f-x","detail":"prosa ajena"}\n' > tools/findings/fixtures/ledger-bueno.jsonl \
+    && printf '{"schema":1,"capabilities":{"ring3":{}}}\n' > tools/capabilities.json \
     && printf 'plantilla v2 del template\n' > backlog/_template.md \
     && printf 'historia del proyecto\n' > backlog/0001-mia.md \
     && git add -A && git commit -qm "template: corpus + plantilla" ) >/dev/null 2>&1
@@ -425,12 +426,54 @@ _case_sync_trae_la_maquinaria_nueva() {
     || { echo "    el corpus de fixtures NO viajó: su test llegaría sin el archivo que busca"; return 1; }
   [ -f tools/findings/fixtures/ledger-bueno.jsonl ] \
     || { echo "    el corpus de PROSA AJENA no viajó: el guard de FP de los checks del ledger llega vacío"; return 1; }
+  [ -f tools/capabilities.json ] \
+    || { echo "    tools/capabilities.json NO viajó: el renderer llega sin su fuente de verdad"; return 1; }
   grep -q 'plantilla v2' backlog/_template.md \
     || { echo "    backlog/_template.md NO viajó: el gate de criterios llega sin sus instrucciones"; return 1; }
   grep -q 'historia LOCAL' backlog/0001-mia.md \
     || { echo "    el sync PISÓ una historia del proyecto (backlog/ es suyo, solo la plantilla es harness)"; return 1; }
 }
 test_sync_trae_la_maquinaria_nueva() { _upg_sandbox_copia _case_sync_trae_la_maquinaria_nueva; }
+
+_case_sync_funde_bloques_y_reporta_prosa() {
+  # El manifiesto viaja como maquinaria, pero README/ADOPTION son del
+  # adoptante. El sync solo puede instalar su fragmento delimitado; la prosa
+  # local sobrevive y los cambios de prosa del template se reportan.
+  ( cd "$TPL_DIR" && mkdir -p tools docs ci \
+    && cp "$PROJECT_ROOT/tools/render-capabilities.sh" tools/render-capabilities.sh \
+    && cp "$PROJECT_ROOT/tools/capabilities.json" tools/capabilities.json \
+    && printf 'README del template\n' > README.md \
+    && printf 'ADOPTION del template\n' > docs/ADOPTION.md \
+    && printf 'CI del template\n' > ci/README.md \
+    && git add -A && git commit -qm "template: capacidades y docs" ) >/dev/null 2>&1
+  mkdir -p docs ci
+  printf 'README LOCAL\n' > README.md
+  printf 'ADOPTION LOCAL\n' > docs/ADOPTION.md
+  printf 'CI LOCAL\n' > ci/README.md
+  git add -A; git commit -qm "proyecto: docs locales" 2>/dev/null
+
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q '^README LOCAL$' README.md || { echo "    el sync pisó la prosa local de README"; return 1; }
+  grep -q '^ADOPTION LOCAL$' docs/ADOPTION.md || { echo "    el sync pisó la prosa local de ADOPTION"; return 1; }
+  grep -q 'BEGIN GENERATED: capabilities' README.md \
+    || { echo "    el sync no instaló el bloque generado en README"; return 1; }
+  bash tools/render-capabilities.sh --check >/dev/null 2>&1 \
+    || { echo "    la maquinaria transportada no quedó operativa"; return 1; }
+  git add -A; git commit -qm "proyecto: sync inicial" 2>/dev/null
+
+  ( cd "$TPL_DIR" \
+    && printf 'README del template v2\n' > README.md \
+    && printf 'ADOPTION del template v2\n' > docs/ADOPTION.md \
+    && git add -A && git commit -qm "template: mejora docs" ) >/dev/null 2>&1
+  local out
+  out="$(bash tools/upgrade.sh 2>&1)"
+  case "$out" in *"README.md"*"docs/ADOPTION.md"*) return 0 ;; esac
+  echo "    el informe no enumeró exactamente los docs report-only cambiados: $out"
+  return 1
+}
+test_sync_funde_fragmentos_y_reporta_docs_compartidos() {
+  _upg_sandbox_copia _case_sync_funde_bloques_y_reporta_prosa
+}
 
 _case_el_informe_no_miente_sobre_lo_traido() {
   # El informe "no lo he tocado" tenía su PROPIA lista de regexes en vez de usar

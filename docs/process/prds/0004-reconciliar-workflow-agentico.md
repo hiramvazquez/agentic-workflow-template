@@ -247,7 +247,7 @@ scope-check.sh --story <path> --base <ref> --head <ref> --worktree <path>
 | scripts/tools y prompts de maquinaria nuevos | template | reemplaza salvo marcador FILL | merge normal |
 | `tools/capabilities.json` y defaults `.example` | template | reemplaza | merge normal |
 | config local sin `.example`, ratchets, AGENTS, skills | adoptante | report-only | merge normal |
-| README/docs/agentes por cliente | compartida | report-only con lista exacta | merge normal |
+| README/docs/agentes por cliente | compartida | bloque generado se funde; resto report-only exacto | merge normal |
 | settings JSON | compartida | merge estructural solo-añade existente | merge normal |
 
 `test_upgrade.sh` crea un template con cada familia y demuestra que el adoptante recibe toda la

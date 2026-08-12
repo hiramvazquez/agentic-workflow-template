@@ -7,8 +7,8 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 3
 
 MODE="${1:---check}"
 case "$MODE" in
-  --render|--check|--write) ;;
-  *) echo "uso: $0 [--render|--check|--write]" >&2; exit 3 ;;
+  --render|--check|--write|--install) ;;
+  *) echo "uso: $0 [--render|--check|--write|--install]" >&2; exit 3 ;;
 esac
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -131,14 +131,19 @@ for value in documents:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         mute(f"no pude leer {path}: {exc}")
-    if text.count(begin) != 1 or text.count(end) != 1:
+    begin_count, end_count = text.count(begin), text.count(end)
+    if mode == "--install" and begin_count == 0 and end_count == 0:
+        separator = "" if text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
+        atomic_write(path, text + separator + begin + "\n" + rendered + end + "\n")
+        continue
+    if begin_count != 1 or end_count != 1:
         mute(f"{path}: esperaba exactamente un par de markers")
     before, rest = text.split(begin, 1)
     current, after = rest.split(end, 1)
     expected = "\n" + rendered
     if current != expected:
         drift.append(str(path))
-    if mode == "--write" and current != expected:
+    if mode in ("--write", "--install") and current != expected:
         updated = before + begin + expected + end + after
         atomic_write(path, updated)
 

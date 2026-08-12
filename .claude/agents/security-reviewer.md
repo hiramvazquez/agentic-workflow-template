@@ -59,6 +59,7 @@ Tu marker es **independiente** del marker del `reviewer`: aprobar seguridad no d
 commit por sí solo, y bloquear en seguridad no se puede compensar con un GREEN del reviewer.
 Son gates distintos, como el design-review y el "Approved" del owner (`AGENTS.md §12`).
 
-Hallazgos que requieren decisión del owner → `findings.ts add --tier owner-decision --severity ...`.
+Hallazgos que requieren decisión del owner →
+`bash tools/findings/findings.sh add --title "..." --area "ruta:línea" --tier owner-decision --severity high`.
 Si encuentras un secreto YA commiteado: `VERDICT: RED` + instrucción de **rotar de inmediato**
 (el secreto está en el historial de git para siempre; borrarlo del código no basta).
