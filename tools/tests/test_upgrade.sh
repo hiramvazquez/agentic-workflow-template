@@ -412,10 +412,17 @@ _case_sync_trae_la_maquinaria_nueva() {
   # se queda con un test que busca un archivo que nunca llegó. Pasó al crear
   # tools/semgrep/fixtures/. Igual con backlog/_template.md: mandar el gate que
   # exige la sección de verificación sin mandar la plantilla que la explica.
-  ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures tools/findings/fixtures backlog \
+  # La enumeración es deliberada: un directorio nuevo de maquinaria no queda
+  # cubierto porque otro directorio vecino sí viaje.
+  ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures tools/findings/fixtures \
+      tools/agent-backends tools/agent-prompts backlog \
     && printf 'let x = 1\n' > tools/semgrep/fixtures/swift-malo.swift \
     && printf '{"id":"f-x","detail":"prosa ajena"}\n' > tools/findings/fixtures/ledger-bueno.jsonl \
     && printf '{"schema":1,"capabilities":{"ring3":{}}}\n' > tools/capabilities.json \
+    && printf '#!/usr/bin/env bash\necho fake\n' > tools/agent-backends/fake.sh \
+    && chmod +x tools/agent-backends/fake.sh \
+    && printf 'prompt portable\n' > tools/agent-prompts/backlog.md \
+    && printf 'cycles.command=<!-- FILL -->\n' > tools/architecture.conf.example \
     && printf 'plantilla v2 del template\n' > backlog/_template.md \
     && printf 'historia del proyecto\n' > backlog/0001-mia.md \
     && git add -A && git commit -qm "template: corpus + plantilla" ) >/dev/null 2>&1
@@ -428,6 +435,12 @@ _case_sync_trae_la_maquinaria_nueva() {
     || { echo "    el corpus de PROSA AJENA no viajó: el guard de FP de los checks del ledger llega vacío"; return 1; }
   [ -f tools/capabilities.json ] \
     || { echo "    tools/capabilities.json NO viajó: el renderer llega sin su fuente de verdad"; return 1; }
+  [ -x tools/agent-backends/fake.sh ] \
+    || { echo "    tools/agent-backends NO viajó: agent-runner llega sin sus adapters"; return 1; }
+  grep -q 'prompt portable' tools/agent-prompts/backlog.md \
+    || { echo "    tools/agent-prompts NO viajó: los consumidores llegan sin contrato común"; return 1; }
+  grep -q 'cycles.command' tools/architecture.conf.example \
+    || { echo "    architecture.conf.example NO viajó: el clasificador llega sin configuración documentada"; return 1; }
   grep -q 'plantilla v2' backlog/_template.md \
     || { echo "    backlog/_template.md NO viajó: el gate de criterios llega sin sus instrucciones"; return 1; }
   grep -q 'historia LOCAL' backlog/0001-mia.md \

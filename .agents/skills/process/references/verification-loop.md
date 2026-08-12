@@ -35,7 +35,7 @@ Esto es lo que separa este harness de un `CLAUDE.md` con buenas intenciones.
  coste ↑    9  Métricas + lección→detector      escape rate, ratchets, postmortems
    de       8  Gate por evidencia                /goal, Stop hook, marker ↔ hash del diff
 detección   7  Review adversarial de IA          contexto fresco, N jueces, prompt a REFUTAR
-   ↑        6  Arquitectura                      grafo de imports, ciclos, tamaños
+   ↑        6  Arquitectura                      imports directos + adapters medidos
    │        5  Contratos                          fake ≡ real, consumer-driven (Pact)
    │        4  CALIDAD del test                   mutation score, property-based
    │        3  Spec ejecutable                    TDD red-first, aserciones / DbC
@@ -151,16 +151,18 @@ promoción**, sin levantar el sistema entero.
 
 ## Nivel 6 — Arquitectura como fitness function
 
-Las reglas de capas son un contrato ejecutable, no un estilo. Se verifican sobre el
-**grafo de dependencias**: dirección de imports, ausencia de ciclos, topes de tamaño
-y complejidad.
+Las reglas de capas son un contrato ejecutable, no un estilo. El baseline portable
+verifica **dirección de imports directos**. Ciclos y complejidad requieren herramientas
+específicas del stack y solo cuentan cuando su adapter está configurado y operativo.
 
 `AGENTS.md §3` — *"el dominio no depende de UI ni de infraestructura"* — **es** una
-fitness function. Verificarla con `grep` la convierte en una sugerencia con falsos
-positivos; verificarla sobre el grafo de imports la convierte en un contrato.
+fitness function. El harness aplica esa dirección al import directo mediante reglas
+explícitas; no infiere transitividad ni afirma detectar ciclos a partir de ese check.
 
-**En el harness:** `tools/check-layers.sh` + `tools/layers.conf`.
-Equivalentes de la industria: ArchUnit, NetArchTest, JDepend.
+**En el harness:** `tools/check-layers.sh` + `tools/layers.conf` cubren imports directos;
+`tools/architecture-check.sh` clasifica los adapters opt-in de ciclos y complejidad como
+`operational|unsupported|missing|broken`. Ausencia de adapter no equivale a arquitectura
+limpia. Equivalentes de la industria: ArchUnit, NetArchTest, JDepend.
 
 ## Nivel 7 — Review adversarial de IA
 
@@ -272,7 +274,8 @@ pregunta **en qué nivel se habría cazado cada riesgo**:
 3. ¿Hay un patrón de Semgrep que lo cubra? (nivel 2)
 4. ¿Los tests **fallan** si rompo la lógica que dicen cubrir? (niveles 3-4)
 5. ¿El fake pasa la misma suite que el real? (nivel 5)
-6. ¿Respeta el grafo de dependencias? (nivel 6)
+6. ¿Respeta la dirección de imports directos y qué evidencia reportan los adapters de
+   ciclos/complejidad? (nivel 6)
 7. ¿Lo revisó algo con contexto fresco? (nivel 7)
 8. ¿La evidencia es una salida de comando o una afirmación? (nivel 8)
 9. Si algo se escapó: **¿qué detector lo habría cazado, y ya existe?** (nivel 9)

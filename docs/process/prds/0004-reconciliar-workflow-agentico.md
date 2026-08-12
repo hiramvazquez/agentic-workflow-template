@@ -175,8 +175,8 @@ Los probes emiten JSONL seguro y parseable:
 ### Runner de agente
 
 ```text
-tools/agent-runner.sh run --prompt-file <path> --cwd <path>
-tools/agent-runner.sh review --prompt-file <path> --base <ref> --head <ref> --cwd <path>
+tools/agent-runner.sh run --prompt-file <path> --cwd <path> [--timeout <segundos>]
+tools/agent-runner.sh review --prompt-file <path> --base <ref> --head <ref> --cwd <path> [--timeout <segundos>]
 ```
 
 `run` y `review` son contratos distintos:
@@ -185,8 +185,9 @@ tools/agent-runner.sh review --prompt-file <path> --base <ref> --head <ref> --cw
   exige ni interpreta `VERDICT`.
 - `review`: stdout es el texto que termina en `VERDICT/FINDINGS/SCOPE`; ausencia o valor inválido
   devuelve 1. Diagnósticos van a stderr.
-- ambos validan que `cwd`, prompt y refs estén dentro del repo; esperan el proceso, propagan
-  timeout/cancelación y nunca usan `eval` ni dejan hijos en background.
+- ambos validan que `cwd`, prompt y refs estén dentro del repo; esperan el proceso, devuelven
+  124 al agotar el timeout (900 s por default), propagan cancelación como `128+señal` y nunca
+  usan `eval` ni dejan hijos en background.
 - el backend declara `run`, `review`, `read_only`, `subagents` y `hooks`. El backlog autónomo exige
   las cinco: `hooks+subagents` preservan la review previa a **cada** commit que exige `AGENTS.md
   §13`; al finalizar, el orquestador ejecuta además `review+read_only` sobre el rango completo,

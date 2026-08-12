@@ -8,7 +8,10 @@ case "${1:-}" in
     else cat "${2:-/dev/null}"
     fi
     ;;
-  review) printf '%s\n' "${FAKE_REVIEW_RESULT:-VERDICT: GREEN
+  review)
+    if [ -n "${FAKE_REVIEW_SCRIPT:-}" ]; then exec bash "$FAKE_REVIEW_SCRIPT" "${2:-}" "${3:-}" "${4:-}" "${5:-}"
+    fi
+    printf '%s\n' "${FAKE_REVIEW_RESULT:-VERDICT: GREEN
 FINDINGS: 0
 SCOPE: fake}" ;;
   *) exit 3 ;;

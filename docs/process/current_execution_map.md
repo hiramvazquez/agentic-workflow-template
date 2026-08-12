@@ -15,7 +15,8 @@
   manifiesto estructurado, bloques documentales generados y upgrade que funde esos fragmentos
   sin pisar la prosa del adoptante; el informe calcula tests/FILLs contra el commit actual en
   vez de copiar conteos manuales; probe funcional con commit/plataforma/fecha y consumo desde
-  arranque/validate. Fases 3a–10 pendientes.
+  arranque/validate; contratos separados `run`/`review`, watchdog con timeout/cancelación
+  y transporte completo de sus adapters/prompts en upgrades. Fases 6b–10 pendientes.
 - **Salud:** las suites herméticas de capabilities, upgrade y clasificación están verdes. La
   capacidad runtime de Semgrep en esta máquina está **broken**: su binario revienta al inicializar
   X509. La fase 2 ya separa ambos hechos; un clasificador verde no convierte el entorno en verde.
@@ -30,7 +31,8 @@
   TDD/DbC conserva red-first, mutación e invariantes, pero la matriz nace del riesgo y del
   comportamiento observable; se eliminaron cuotas universales de casos/aserciones decorativas.
   Existe un boundary portable `agent-runner` con contratos separados `run`/`review`, backend
-  fake hermético y adapter Claude; aún falta migrar backlog/CI a ese boundary.
+  fake hermético, adapter Claude y limpieza del grupo completo ante timeout/cancelación; aún
+  falta migrar backlog/CI a ese boundary.
 
 ## Cómo se trabaja aquí (el bucle, no la historia)
 
