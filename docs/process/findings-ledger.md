@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 58 · Total: 59
+Abiertos: **1** · Cerrados: 63 · Total: 64
 
 ## Abiertos
 
@@ -73,3 +73,8 @@ Abiertos: **1** · Cerrados: 58 · Total: 59
 | `f-metrics-default-window-local-tz` | fixed | La ventana por defecto parte del día UTC; una regresión compara hosts TZ=Pacific/Kiritimati y TZ=Etc |
 | `f-metrics-invalid-date-silent` | fixed | Cada parse inválido emite una señal genérica sin filtrar el dato; Semgrep staged vuelve a 0 warnings |
 | `f-metrics-invalid-date-guard-silent` | fixed | Todos los paths inválidos emiten la misma señal genérica; la regresión exige cuatro warnings para cu |
+| `f-lessons-duplicate-index-after-append` | fixed | El índice se elimina antes de clasificar y se regenera desde todo lessons_archive; el archivo se ded |
+| `f-lessons-live-context-over-budget` | fixed | La cabecera se condensó sin perder contratos y el tramo vivo quedó en 240 líneas; un test sobre el d |
+| `f-readme-hardcoded-evidence-counts` | fixed | Se reemplazaron cifras copiadas por los comandos canónicos que calculan deuda y verifican detectores |
+| `f-lessons-heading-collision-data-loss` | fixed | El corpus combinado acepta retries solo si el cuerpo completo coincide y aborta antes de escribir an |
+| `f-lessons-archive-never-restored` | fixed | Cada corrida reclasifica el corpus live+archive y restaura al tramo vivo cualquier entrada que perdi |

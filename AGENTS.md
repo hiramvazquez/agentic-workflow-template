@@ -5,14 +5,15 @@
 > `CLAUDE.md` (que hace `@AGENTS.md`). Si una regla aquí choca con cualquier otra fuente, **gana esta**.
 >
 > Mantenlo **terso**. El detalle vive en `.agents/skills/` y en `docs/process/`. El racional
-> histórico / post-mortems van en `docs/process/lessons_learned.md`, NO aquí (evita el monolito).
+> histórico / post-mortems mecanizados van en `docs/process/lessons_archive.md`, NO aquí.
 
 ---
 
 ## 0. Antes de escribir código
 
-1. Lee `docs/process/lessons_learned.md` — trampas ya pisadas. Si tocas un área cubierta ahí,
-   sus reglas son obligatorias. Si cazas un patrón nuevo, **agrégalo en el mismo cambio**.
+1. Lee la parte viva de `docs/process/lessons_learned.md` — detente en “Lecciones mecanizadas
+   (índice)”. El índice y `lessons_archive.md` se consultan solo si una señal relevante exige
+   su racional; el histórico no se carga por defecto. Si cazas un patrón nuevo, agrégalo aquí.
 2. Lee `docs/process/current_execution_map.md` — fase actual y próximo paso.
 3. Carga **solo** la skill del área que tocas (ver §11 matriz path→lectura).
 4. Si la skill no cubre tu caso: **NO improvises** — pregunta al owner y actualiza la skill antes de seguir.
@@ -144,7 +145,9 @@ se resuelve en el mismo turno: o lo arreglas, o lo **registras en el ledger** co
 (`tools/findings/`). Reportar = loguear al ledger, no solo mencionarlo en prosa.
 
 **Y toda lección aprendida se convierte en un detector.** `docs/process/lessons_learned.md`
-exige el campo `Detector:` y `tools/lesson-detector-link.sh` lo verifica en CI. Sin ese paso,
+exige el campo `Detector:` y `tools/lesson-detector-link.sh` lo verifica en CI; cuando ese
+detector es un test del Anillo 3, `tools/lessons-rotate.sh --apply` mueve el racional al archivo
+histórico y conserva un índice compacto. Sin detector,
 las lecciones son prosa que nadie relee y que el agente pierde en la primera compactación.
 Con él, cada error cometido una vez se vuelve mecánicamente imposible la segunda — que es el
 único mecanismo por el que la necesidad de revisión humana **decrece** en vez de mantenerse
@@ -268,8 +271,9 @@ sesión — porque el pecado que este harness no comete es anunciar una defensa 
 
 ## 15. Cómo entrar a una sesión nueva
 
-1. Lee este archivo. 2. Lee `docs/process/current_execution_map.md`. 3. Carga la skill del área (§11).
-4. Abre el PRD/ADR relevante. 5. **Verifica los hechos contra el código/DB antes de editar.**
+1. Lee este archivo. 2. Lee `docs/process/current_execution_map.md`. 3. Lee solo el tramo vivo de
+`lessons_learned.md` (§0). 4. Carga la skill del área (§11). 5. Abre el PRD/ADR relevante.
+6. **Verifica los hechos contra el código/DB antes de editar.**
 
 > Si estás retomando tras una compactación de contexto: el hook `SessionStart(source: compact)`
 > te reinyecta el digest de reglas y los findings abiertos (Claude re-inyecta solo el CLAUDE.md

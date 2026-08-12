@@ -10,7 +10,7 @@ SID="${1:-}"
 TRAJ_DIR=".agents/state/trajectory"
 
 echo "═══ REGLAS ═══"
-echo "Lee: AGENTS.md, docs/process/lessons_learned.md, y la skill del área tocada."
+echo "Lee: AGENTS.md, el tramo vivo de docs/process/lessons_learned.md (hasta el índice), y la skill del área tocada. El archivo histórico es bajo demanda."
 
 echo ""; echo "═══ TRAYECTORIA ($SID) ═══"
 if [ -n "$SID" ] && [ -f "$TRAJ_DIR/$SID.jsonl" ]; then

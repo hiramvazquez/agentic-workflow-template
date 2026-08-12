@@ -259,6 +259,9 @@ relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.
 - Toda lección de `docs/process/lessons_learned.md` exige su campo `Detector:` (verificado en
   CI): error cometido → lección → detector → **imposible repetirlo**. Ese es el mecanismo
   completo; sin el tercer paso, las lecciones son prosa.
+- Ejecuta periódicamente `bash tools/lessons-rotate.sh --apply`: mueve al archivo histórico solo
+  las lecciones respaldadas por tests del Anillo 3, conserva las manuales/parciales y regenera
+  un índice único. Al iniciar, lee únicamente el tramo vivo anterior a ese índice.
 - Las sesiones que tocan código quedan encoladas para el `process-judge` hasta que su
   veredicto las cierra (visible en cada turno).
 

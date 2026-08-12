@@ -46,16 +46,33 @@ import os, re, sys
 doc, archive, mode = sys.argv[1], sys.argv[2], sys.argv[3]
 raw = open(doc, encoding="utf-8").read()
 
-# El cuerpo del doc empieza donde empieza la primera entrada real; todo lo de
-# antes (cómo usar, plantilla) es cabecera y NO se toca nunca.
-entries, head = [], raw
-m = re.search(r"^### \[\d{4}-\d{2}-\d{2}\]", raw, re.M)
-if m:
-    head, body = raw[:m.start()], raw[m.start():]
-    # Separador `---` entre entradas: se parte por el encabezado y se
-    # reconstruye, para no depender de que el separador exista siempre.
-    parts = re.split(r"(?m)^(?=### \[\d{4}-\d{2}-\d{2}\])", body)
-    entries = [p for p in parts if p.strip()]
+INDEX_BLOCK = re.compile(
+    r"(?ms)^---\n\n## Lecciones mecanizadas \(índice\)\n.*?"
+    r"(?=^### \[\d{4}-\d{2}-\d{2}\]|\Z)"
+)
+
+def without_indexes(text):
+    # Las lecciones nuevas se agregan al final del doc, que puede quedar
+    # DESPUÉS de un índice de una rotación anterior. El índice es una vista
+    # generada: se elimina antes de clasificar y se reconstruye completo.
+    return INDEX_BLOCK.sub("", text)
+
+def split_document(text):
+    # El cuerpo empieza en la primera entrada real; todo lo anterior (cómo
+    # usar, plantilla) es cabecera y no se toca.
+    entries, head = [], text
+    m = re.search(r"^### \[\d{4}-\d{2}-\d{2}\]", text, re.M)
+    if m:
+        head, body = text[:m.start()], text[m.start():]
+        parts = re.split(r"(?m)^(?=### \[\d{4}-\d{2}-\d{2}\])", body)
+        entries = [p for p in parts if p.strip()]
+    return head, entries
+
+head, live_entries = split_document(without_indexes(raw))
+archive_entries = []
+if os.path.isfile(archive):
+    archive_raw = open(archive, encoding="utf-8").read()
+    _, archive_entries = split_document(archive_raw)
 
 def classify(text):
     title = text.splitlines()[0].strip().lstrip("# ").strip()
@@ -80,16 +97,50 @@ def classify(text):
         return "archivable", title, f"garantizada por {tests[0]} (corre en el Anillo 3)"
     return "viva", title, "detector sin test propio en la suite: garantía PARCIAL"
 
-vivas, archivables = [], []
-for e in entries:
-    kind, title, why = classify(e)
-    (archivables if kind == "archivable" else vivas).append((title, why, e))
+# Reconcilia el corpus COMPLETO en cada corrida. El encabezado fechado es la
+# identidad humana de una lección: repetir exactamente el mismo cuerpo es un
+# retry idempotente; reutilizar el encabezado con otro cuerpo es ambigüedad y
+# aborta ANTES de escribir, nunca elige una versión en silencio.
+corpus = []
+by_heading = {}
+for origin, origin_entries in (("live", live_entries), ("archive", archive_entries)):
+    for entry in origin_entries:
+        normalized = entry.strip()
+        heading = normalized.splitlines()[0].strip()
+        previous = by_heading.get(heading)
+        if previous is not None:
+            if previous[1] != normalized:
+                print(
+                    f"❌ identidad de lección duplicada con cuerpos distintos: {heading}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            continue
+        by_heading[heading] = (origin, normalized)
+        corpus.append((origin, normalized + "\n"))
 
-print(f"ROTATE_SUMMARY vivas={len(vivas)} archivables={len(archivables)}")
+vivas, archived = [], []
+archivables, restorables = [], []
+for origin, entry in corpus:
+    kind, title, why = classify(entry)
+    record = (title, why, entry)
+    if kind == "archivable":
+        archived.append(record)
+        if origin == "live":
+            archivables.append(record)
+    else:
+        vivas.append(record)
+        if origin == "archive":
+            restorables.append(record)
+
+print(
+    f"ROTATE_SUMMARY vivas={len(vivas)} archivables={len(archivables)} "
+    f"restaurables={len(restorables)}"
+)
 
 if mode != "--apply":
     print()
-    print(f"━━━ Rotación de lecciones ({len(entries)} entradas) ━━━")
+    print(f"━━━ Rotación de lecciones ({len(corpus)} entradas) ━━━")
     print()
     print(f"ARCHIVABLES ({len(archivables)}) — su detector es un test que corre en CI:")
     for t, w, _ in archivables:
@@ -97,16 +148,18 @@ if mode != "--apply":
     if not archivables:
         print("  (ninguna todavía)")
     print()
+    print(f"RESTAURABLES ({len(restorables)}) — su garantía mecánica dejó de existir:")
+    for t, w, _ in restorables:
+        print(f"  · {t}\n      {w}")
+    if not restorables:
+        print("  (ninguna)")
+    print()
     print(f"SE QUEDAN VIVAS ({len(vivas)}) — su cumplimiento aún depende de leerlas:")
     for t, w, _ in vivas:
         print(f"  · {t}\n      {w}")
     print()
     print("Aplica con:  bash tools/lessons-rotate.sh --apply")
     print("Nada se borra: se mueve a", archive, "(versionado y verificado igual).")
-    sys.exit(0)
-
-if not archivables:
-    print("Nada que archivar todavía.")
     sys.exit(0)
 
 AHEAD = """# Lecciones archivadas — mecanizadas, ya no hace falta leerlas
@@ -124,19 +177,15 @@ AHEAD = """# Lecciones archivadas — mecanizadas, ya no hace falta leerlas
 
 """
 
-prev = ""
-if os.path.isfile(archive):
-    prev = open(archive, encoding="utf-8").read()
-    if prev.startswith("# Lecciones archivadas"):
-        i = prev.find("\n### [")
-        prev = prev[i + 1:] if i != -1 else ""
+# El archivo y el índice son vistas deterministas del corpus reconciliado.
+# Si un test desaparece, `classify` devuelve esa entrada al documento vivo.
+archived_entries = [entry for _, _, entry in archived]
 
 with open(archive, "w", encoding="utf-8") as f:
     f.write(AHEAD)
-    if prev.strip():
-        f.write(prev if prev.endswith("\n") else prev + "\n")
-    for t, w, e in archivables:
-        f.write(e if e.endswith("\n") else e + "\n")
+    for index, entry in enumerate(archived_entries):
+        f.write(entry.rstrip())
+        f.write("\n\n" if index < len(archived_entries) - 1 else "\n")
 
 # El doc vivo NO pierde la señal, solo el volumen: cada lección archivada deja
 # una línea de índice. Archivarlas del todo cambiaría un problema por otro —
@@ -144,8 +193,7 @@ with open(archive, "w", encoding="utf-8") as f:
 # al ver fallar un test (una vuelta entera más cara que leer una línea).
 # ~10 líneas de prosa por lección pasan a 1: el 90% del ahorro, con el 100%
 # de la discoverability.
-INDEX_HEAD = """
----
+INDEX_HEAD = """---
 
 ## Lecciones mecanizadas (índice)
 
@@ -161,15 +209,20 @@ def index_line(title, why):
     return f"- {title} — `{det}`\n"
 
 with open(doc, "w", encoding="utf-8") as f:
-    f.write(head)
+    f.write(head.rstrip() + "\n\n")
     for t, w, e in vivas:
-        f.write(e if e.endswith("\n") else e + "\n")
-    f.write(INDEX_HEAD)
-    for t, w, _ in archivables:
-        f.write(index_line(t, w))
+        f.write(e.rstrip() + "\n\n")
+    if archived_entries:
+        f.write(INDEX_HEAD)
+        for entry in archived_entries:
+            _, title, why = classify(entry)
+            f.write(index_line(title, why))
 
 print(f"✅ {len(archivables)} lección(es) movidas a {archive}. Quedan {len(vivas)} vivas.")
 for t, _, _ in archivables:
     print(f"   · {t}")
+for t, _, _ in restorables:
+    print(f"   ↩ {t} volvió al documento vivo: perdió su garantía mecánica.")
+print("   Archivo e índice reconciliados desde el conjunto completo.")
 print("   Commitea AMBOS archivos en el mismo cambio.")
 PY

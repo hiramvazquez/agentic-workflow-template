@@ -291,6 +291,131 @@ _case_archivo_sigue_verificado() {
 }
 test_lecciones_archivadas_siguen_verificadas() { _rot_sandbox _case_archivo_sigue_verificado; }
 
+# La fase 8 no solo entrega el rotador: entrega ESTE repositorio ya rotado.
+# Sin fijarlo, cada tanda de lecciones mecanizadas vuelve a inflar el contexto
+# obligatorio aunque el mecanismo exista y sus unit tests estén verdes.
+test_documento_vivo_real_no_conserva_lecciones_archivables() {
+  local out
+  out="$(cd "$PROJECT_ROOT" && bash tools/lessons-rotate.sh)" || return 1
+  case "$out" in *'ROTATE_SUMMARY '*'archivables=0'*) : ;; *)
+    echo "    el documento vivo real aún tiene lecciones mecanizadas por rotar"
+    printf '%s\n' "$out" | head -2 | sed 's/^/      /'
+    return 1
+  esac
+  local indexes
+  indexes="$(grep -c '^## Lecciones mecanizadas (índice)$' "$PROJECT_ROOT/docs/process/lessons_learned.md" || true)"
+  [ "$indexes" = "1" ] || {
+    echo "    el documento vivo debe tener un índice mecanizado único; tiene $indexes"
+    return 1
+  }
+  return 0
+}
+
+test_contexto_vivo_obligatorio_cabe_en_250_lineas() {
+  local index_line
+  index_line="$(grep -n '^## Lecciones mecanizadas (índice)$' \
+    "$PROJECT_ROOT/docs/process/lessons_learned.md" | cut -d: -f1)"
+  [ -n "$index_line" ] || { echo "    falta el límite explícito entre contexto vivo e índice"; return 1; }
+  [ $((index_line - 1)) -le 250 ] || {
+    echo "    el contexto vivo obligatorio ocupa $((index_line - 1)) líneas (>250)"
+    return 1
+  }
+}
+
+test_regla_canonica_no_carga_el_historico_por_defecto() {
+  grep -Fq 'detente en “Lecciones mecanizadas' "$PROJECT_ROOT/AGENTS.md" \
+    || { echo "    AGENTS.md no delimita dónde termina la lectura viva"; return 1; }
+  grep -Fq 'el histórico no se carga por defecto' "$PROJECT_ROOT/AGENTS.md" \
+    || { echo "    AGENTS.md no excluye explícitamente el archivo del arranque"; return 1; }
+  grep -Fq 'hasta “Lecciones' "$PROJECT_ROOT/.cursor/rules/00-canonical.mdc" \
+    || { echo "    Cursor sigue sin límite explícito para la lectura de lecciones"; return 1; }
+}
+
+_case_segunda_rotacion_es_noop() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Regla mecanizada
+- **Detector:** tools/tests/test_ejemplo.sh::test_x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  [ "$(grep -c '^## Lecciones mecanizadas (índice)$' docs/process/lessons_learned.md)" = "1" ] \
+    || { echo "    la primera rotación no dejó un índice único"; return 1; }
+  cp docs/process/lessons_learned.md live.before
+  cp docs/process/lessons_archive.md archive.before
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  cmp -s live.before docs/process/lessons_learned.md \
+    && cmp -s archive.before docs/process/lessons_archive.md \
+    || { echo "    aplicar la rotación por segunda vez reescribió el resultado"; return 1; }
+}
+test_rotacion_aplicada_dos_veces_es_idempotente() {
+  _rot_sandbox _case_segunda_rotacion_es_noop
+}
+
+_case_reconcilia_lecciones_agregadas_despues_del_indice() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Primera mecanizada
+- **Detector:** tools/tests/test_ejemplo.sh::test_a'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  printf '\n### [2026-01-02] Manual posterior al índice\n- **Detector:** n/a-manual — juicio\n' \
+    >> docs/process/lessons_learned.md
+  printf '\n### [2026-01-03] Segunda mecanizada\n- **Detector:** tools/tests/test_ejemplo.sh::test_b\n' \
+    >> docs/process/lessons_learned.md
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+
+  [ "$(grep -c '^## Lecciones mecanizadas (índice)$' docs/process/lessons_learned.md)" = "1" ] \
+    || { echo "    quedaron índices duplicados al rotar entradas posteriores"; return 1; }
+  grep -q '^### .*Manual posterior al índice' docs/process/lessons_learned.md \
+    || { echo "    la entrada manual posterior al índice se perdió"; return 1; }
+  [ "$(grep -c '^### .*mecanizada' docs/process/lessons_archive.md)" = "2" ] \
+    || { echo "    el archivo no contiene exactamente ambas lecciones mecanizadas"; return 1; }
+}
+test_rotacion_reconstruye_indice_si_hay_entradas_nuevas_despues() {
+  _rot_sandbox _case_reconcilia_lecciones_agregadas_despues_del_indice
+}
+
+_case_titulo_igual_con_cuerpo_distinto_falla_sin_escribir() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Misma identidad
+- **Regla:** cuerpo nuevo.
+- **Detector:** tools/tests/test_ejemplo.sh::test_x'
+  printf '# Archivadas\n\n### [2026-01-01] Misma identidad\n- **Regla:** cuerpo anterior.\n- **Detector:** tools/tests/test_ejemplo.sh::test_x\n' \
+    > docs/process/lessons_archive.md
+  cp docs/process/lessons_learned.md live.before
+  cp docs/process/lessons_archive.md archive.before
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1
+  [ "$?" = "1" ] || { echo "    la colisión de identidad no falló cerrado"; return 1; }
+  cmp -s live.before docs/process/lessons_learned.md \
+    && cmp -s archive.before docs/process/lessons_archive.md \
+    || { echo "    la colisión modificó archivos antes de abortar"; return 1; }
+}
+test_rotacion_no_deduplica_cuerpos_distintos_bajo_el_mismo_titulo() {
+  _rot_sandbox _case_titulo_igual_con_cuerpo_distinto_falla_sin_escribir
+}
+
+_case_detector_borrado_devuelve_leccion_al_contexto_vivo() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Garantía que caduca
+- **Regla:** debe volver si pierde su test.
+- **Detector:** tools/tests/test_ejemplo.sh::test_x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  rm -f tools/tests/test_ejemplo.sh
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  grep -q '^### .*Garantía que caduca' docs/process/lessons_learned.md \
+    || { echo "    la lección sin test no volvió al documento vivo"; return 1; }
+  grep -q '^### .*Garantía que caduca' docs/process/lessons_archive.md \
+    && { echo "    la lección restaurada sigue también en el archivo"; return 1; }
+  return 0
+}
+test_rotacion_reclasifica_archivada_si_su_test_desaparece() {
+  _rot_sandbox _case_detector_borrado_devuelve_leccion_al_contexto_vivo
+}
+
 # ════════════════════════════════════════════════════════════════════
 # El ARCHIVO existiendo no basta: el TEST citado también tiene que existir
 # ════════════════════════════════════════════════════════════════════

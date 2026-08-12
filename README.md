@@ -248,9 +248,11 @@ afirmación de abajo es un commit que puedes leer:
   en las reglas habría bloqueado hasta el commit que lo arreglaba (`4f48c49`, resuelto con la
   distinción exit 1 "tu código falla" vs exit 3 "no pude mirar"), y un `grep` sin `-F` que
   trataba datos como patrones (`9060635`, con test verificado por mutación manual).
-- **El ledger está en cero abiertos con 11 findings en estado terminal** — 7 arreglados con
-  test, 4 aceptados con su razón escrita. Las **13 lecciones** de `lessons_learned.md` tienen
-  todas su detector (lo exige `lesson-detector-link.sh` en CI).
+- **Findings y lecciones son evidencia calculada, no conteos copiados.**
+  `bash tools/findings/findings.sh list --status open` muestra la deuda vigente y
+  `bash tools/lesson-detector-link.sh` verifica tanto el tramo vivo como el archivo histórico.
+  Las lecciones mecanizadas salen del contexto obligatorio mediante `lessons-rotate.sh` sin
+  perder su detector ni su trazabilidad.
 
 Ningún proceso produce cero errores. Este produce errores **que se detectan, se cierran y se
 vuelven imposibles de repetir** — que es la única promesa honesta que un harness puede hacer.
