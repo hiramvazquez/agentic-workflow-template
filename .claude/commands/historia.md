@@ -30,7 +30,8 @@ aquí es convertir la idea de arriba en un contrato verificable, no en prosa bon
    humano de cada una desbloquea la siguiente: así ningún run agota el contexto a mitad de
    una capa. Si troceas, escribe TODOS los archivos de la cadena en esta misma pasada.
 4. **Redacta los criterios de aceptación en Dado/cuando/entonces VERIFICABLES.** La prueba de
-   cada criterio: ¿un test puede fallar por él? Mínimo 1 happy path + 2 ramas de error/borde
+   cada criterio: ¿un test puede fallar por él? Incluye happy si existe y cada rama observable,
+   recuperación, permiso o límite aplicable
    (AGENTS.md §5). Un criterio que no se puede convertir en test que falla NO es un criterio —
    reformúlalo o pregunta.
 5. **Escribe el archivo** `backlog/NNNN-<slug>.md`: NNNN = siguiente número libre (mira

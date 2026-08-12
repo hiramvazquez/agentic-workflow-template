@@ -69,21 +69,23 @@
 ## 5. TDD obligatorio + aserciones (🔴 red → 🟢 green → ♻️ refactor)
 
 **Ninguna lógica/orquestación nueva sin un test que falle PRIMERO.** Ciclo: escribe el test y
-míralo fallar → implementación mínima que lo pasa → refactor en verde. Cada unidad: **mínimo
-1 happy path + 2 ramas de error/borde**. Bug fix = primero un test que reproduce el bug (falla),
-luego el fix. Antes de marcar terminado: tests del área + build verde + `bash tools/check-drift.sh`
+míralo fallar → implementación mínima que lo pasa → refactor en verde. La matriz de tests sale
+del contrato y el riesgo: happy path si existe + cada rama que cambie comportamiento observable,
+recuperación, permisos o límites. No inventes casos para cumplir una cuota. Bug fix = primero un
+test que reproduce el bug (falla), luego el fix. Antes de marcar terminado: tests del área + build verde + `bash tools/check-drift.sh`
 sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/tdd-workflow.md`.
 
 - **Un test que pasa con cualquier implementación no es un test.** La prueba de bolsillo: *si
   rompo a propósito la lógica que dice cubrir, ¿falla?* El veredicto mecánico lo da el
   **mutation score** (`tools/mutation-score.sh`), cuyo piso **solo sube**. Es el gate que
   distingue un test que verifica de uno escrito para que pase.
-- **Aserciones / Design by Contract:** toda función pública valida sus precondiciones. Objetivo
-  ≥2 aserciones por función (regla *Power of Ten*, NASA/JPL). Sin efectos secundarios, y con
-  **acción de recuperación explícita** al fallar. Prioriza siempre hacer el estado inválido
+- **Aserciones / Design by Contract:** toda frontera pública expresa las precondiciones e
+  invariantes que realmente tiene; una función sin precondición no inventa dos. Las aserciones
+  son para errores de programación/invariantes, sin efectos secundarios. Input recuperable se
+  valida con tipos/errores explícitos, no con un crash. Prioriza siempre hacer el estado inválido
   **imposible por tipo** antes que verificarlo en runtime.
   *Mecanismo (declarado, no implícito):* la valida el **checklist del `reviewer`** (ítem DbC) y
-  la mide indirectamente el **mutation score** — una precondición ausente deja mutantes vivos.
+  la mide indirectamente el **mutation score** — un contrato sin verificar deja mutantes vivos.
   NO hay detector por grep a propósito: contar aserciones sin un parser real por lenguaje
   produciría ruido, y un detector ruidoso se descarta entero (ley del 10%, §14).
 - **Invariantes → property-based tests.** Si la regla vale para todos los valores, no la

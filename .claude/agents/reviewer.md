@@ -58,7 +58,8 @@ grave que nadie anticipó, es un hallazgo igual. Un contrato no es un permiso pa
 - **Drift policy** (§9): cambio en enum/contrato/puerto compartido actualiza todas las capas + doc en el mismo PR.
 - **Seguridad** (§6): sin secretos, sin PII en logs, storage seguro, authz por recurso (si dudas, llama a `security-reviewer`).
 - **Scope** (§8): nada fuera de lo que el PRD/prompt lista; tooling/meta-doc intactos.
-- **TDD** (§5): cada unidad nueva de lógica/orquestación trae test (happy + ≥2 errores) que prueba **comportamiento**, no implementación; build+test verde. Si la lógica no es testeable sin levantar UI → **RED** (muévela a capa pura). Ver `process/references/tdd-workflow.md`.
+- **TDD** (§5): cada comportamiento/riesgo nuevo trae test red-first; cubre ramas observables,
+  recuperación, permisos y límites aplicables, no cuotas. Si la lógica no es testeable sin levantar UI → **RED** (muévela a capa pura). Ver `process/references/tdd-workflow.md`.
 - **Design System / convenciones de UI**: <!-- FILL: tus reglas (tokens, no valores mágicos). -->
 - **Contratos cliente↔backend**: <!-- FILL: si tocó un contrato, ¿hay test/smoke que lo valide? -->
 
@@ -80,8 +81,8 @@ grave que nadie anticipó, es un hallazgo igual. Un contrato no es un permiso pa
 - **Calidad del test, no solo su existencia** (§5): ¿el test FALLA si rompes la lógica que
   dice cubrir? Un test que pasa con cualquier implementación es decorativo. Comprueba que
   hay aserciones sobre el resultado, no solo sobre "no lanzó excepción".
-- **Aserciones / DbC** (§5): las funciones públicas NUEVAS validan sus precondiciones (objetivo
-  ≥2 aserciones, sin efectos secundarios, con recuperación explícita al fallar). Tú eres el
+- **Aserciones / DbC** (§5): las fronteras públicas NUEVAS expresan precondiciones/invariantes
+  reales (sin cuotas ni efectos secundarios); input recuperable usa tipos/errores. Tú eres el
   mecanismo de esta regla — no existe detector automático a propósito (sería ruido): si una
   función pública nueva acepta cualquier entrada sin validar, repórtalo. Pregunta guía: ¿qué
   input rompería esto en silencio?

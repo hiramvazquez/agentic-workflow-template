@@ -97,11 +97,12 @@ el comportamiento esperado antes de que el modelo elija una implementación y lu
 escriba tests que la describan.
 
 **Aserciones / Design by Contract** es el complemento menos usado y más transferible.
-Las reglas *Power of Ten* de la NASA/JPL (complemento de MISRA C) exigen:
+Las reglas *Power of Ten* de NASA/JPL son una referencia para software crítico. En un template
+multi-stack no se convierten en una cuota universal; se conserva su intención:
 
-- **densidad ≥ 2 aserciones por función** en promedio
+- expresar cada precondición e invariante real, sin aserciones decorativas
 - aserciones **sin efectos secundarios**, tests booleanos
-- fallo de aserción → **acción de recuperación explícita**, nunca ignorar
+- input recuperable → tipo/error explícito; aserción → error de programación visible
 - verificar **todo** valor de retorno · bucles con cota fija · scope mínimo
 - compilar con todos los warnings activos y **cero** warnings
 

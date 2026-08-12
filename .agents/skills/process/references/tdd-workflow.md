@@ -15,11 +15,12 @@ la implementación.** Si el test pasa antes de implementar, no prueba lo que cre
 
 ## El ciclo
 
-1. 🔴 **RED** — escribe UN test del comportamiento esperado (happy path). Córrelo y míralo
+1. 🔴 **RED** — escribe UN test del comportamiento esperado o del riesgo actual. Córrelo y míralo
    **fallar por la razón correcta** (aserción, no un error de compilación/typo).
 2. 🟢 **GREEN** — la implementación **mínima** que lo pone verde. Nada fuera del test (scope = el test).
 3. ♻️ **REFACTOR** — con el test en verde, limpia (nombres, duplicación, capas) y re-corre.
-4. Repite por cada comportamiento. Añade **≥2 ramas de error/borde** antes de cerrar la unidad.
+4. Repite por cada comportamiento observable. Cubre cada rama de error, recuperación, permisos
+   o límite que aplique; no inventes ramas para satisfacer una cuota numérica.
 
 > **Bug fix = regresión primero:** 🔴 un test que **reproduce el bug** (falla) → 🟢 fix → ♻️ limpia.
 > Ese test es la prueba de que lo arreglaste y de que no vuelve.
@@ -152,9 +153,10 @@ struct GreetingUseCase {
 > Los tests comprueban los casos que **se te ocurrieron**. Las aserciones comprueban
 > los que no.
 
-Las reglas *Power of Ten* de la NASA/JPL (complemento de MISRA C, escritas para software
-que no puede fallar) fijan el estándar: **densidad media ≥ 2 aserciones por función**,
-sin efectos secundarios, y con **acción de recuperación explícita** cuando fallan.
+Las reglas *Power of Ten* de NASA/JPL motivan una alta densidad de checks en software crítico,
+pero una cuota universal por función produce aserciones decorativas. Aquí el estándar es:
+cada precondición/invariante real se expresa, sin efectos secundarios; input recuperable usa
+tipos/errores y las aserciones quedan para errores de programación.
 
 **Por qué importa especialmente con agentes:** un agente que escribe aserciones produce
 código que **falla ruidosamente en vez de silenciosamente**, y deja una especificación
@@ -250,7 +252,7 @@ bash tools/mutation-score.sh --update    # sube el piso (SOLO sube)
 | Gate | Qué comprueba |
 |---|---|
 | `tester` (sub-agente) | Escribe los tests siguiendo este loop |
-| `reviewer` | RED si una unidad nueva no trae happy + ≥2 errores, **y si los tests pasan con cualquier implementación** |
+| `reviewer` | RED si falta un comportamiento/riesgo o rama observable aplicable, **y si los tests pasan con cualquier implementación** |
 | `check-drift.sh` | Señala lógica nueva sin archivo de test espejo (señal, no veredicto) |
 | `tools/mutation-score.sh` | **El veredicto real**: piso de mutation score con trinquete que solo sube |
 | DoD del PRD | "tests (happy + errores) verdes" es checkbox obligatorio de cierre |

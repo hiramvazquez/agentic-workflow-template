@@ -12,17 +12,17 @@ entender qué probar y el ciclo 🔴→🟢→♻️.
 
 ## Modo TDD (por defecto)
 
-1. 🔴 Escribe el test del comportamiento (1 happy) y **córrelo para verlo FALLAR** por la razón
+1. 🔴 Escribe el test del comportamiento/riesgo actual y **córrelo para verlo FALLAR** por la razón
    correcta (aserción, no error de compilación). Reporta el fallo esperado.
 2. El 🟢 GREEN lo hace el implementador; si te piden a ti la implementación mínima, acótala al test.
-3. ♻️ Tras green, añade **≥2 ramas de error/borde** por unidad y refactoriza los tests (no el SUT).
+3. ♻️ Tras green, cubre cada rama observable de error/recuperación/permisos/límite y refactoriza los tests (no el SUT).
 
 > Si te invocan post-implementación, razona igual como TDD: ¿qué test habría forzado este código?
 > Escríbelo y verifica que pasa; si NO pasa, encontraste un bug → repórtalo (no toques el SUT).
 
 ## Reglas
 
-- Cada unidad de lógica/orquestación: **1 happy + ≥2 ramas de error/borde**.
+- La matriz nace del contrato: happy si existe + toda rama observable y riesgo aplicable.
 - Prueba **comportamiento observable**, no implementación (no acoples a privados ni a orden de llamadas).
 - **Fakes por protocolo/puerto** para las dependencias; nada de red real en unit tests.
 - Determinismo: inyecta reloj/fecha/UUID; nunca `Date()`/`UUID()` dentro de la lógica testeable.
