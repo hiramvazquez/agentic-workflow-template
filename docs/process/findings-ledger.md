@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 44 · Total: 45
+Abiertos: **1** · Cerrados: 45 · Total: 46
 
 ## Abiertos
 
@@ -59,3 +59,4 @@ Abiertos: **1** · Cerrados: 44 · Total: 45
 | `f-detector-cita-un-test-fantasma` | fixed | Toda referencia archivo::test_x de la linea Detector se resuelve contra las funciones del archivo, l |
 | `f-template-sin-verify-cableado` | fixed | verify.conf cableado con bash tools/tests/run-tests.sh (el producto del template es el harness). El  |
 | `f-version-claims-fp-en-espanol` | fixed | Verbos de posesion y cobertura fuera (tiene, trae, cubre); solo quedan los de soporte. El sujeto no  |
+| `f-mapa-de-ejecucion-rancio` | fixed | Mapa reescrito con el estado real (bucle con el adoptante, 347 verde, 1 finding abierto y por que si |

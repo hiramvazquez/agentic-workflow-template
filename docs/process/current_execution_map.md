@@ -8,27 +8,45 @@
 > ⚠️ Este bloque describe el estado del **template en sí**. Cuando lo clones para un proyecto
 > real, sustitúyelo por el estado de TU proyecto.
 
-- **Fase:** template — pirámide de verificación + bucle de aprendizaje cerrados; pendiente de
-  cablear a un stack real.
-- **En curso:** nada — PRDs 0001, 0002 y 0003 shipped.
-- **Último ship:** PRD 0003 · backlog runner: historias de usuario en `backlog/*.md` →
-  ramas `story/NNNN` trabajadas en headless con todos los gates, review humana antes de
-  merge, dependencias resueltas por el propio merge. + `docs/EXAMPLES.md` (4 escenarios iOS).
+- **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
+  Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
+  vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
+- **En curso:** nada abierto. La última tanda cerró los dos checks de credibilidad del ledger,
+  el nivel 4 con cuatro estados, el gate de evidencia del propio template y el corpus de prosa
+  ajena.
+- **Salud:** `bash tools/tests/run-tests.sh` → **347 verde**. Findings abiertos: **1**
+  (`f-mutation-score-nunca-medido`, decisión del owner — bloqueo de runner del adoptante,
+  no del template). 75 lecciones, todas con detector.
+
+## Cómo se trabaja aquí (el bucle, no la historia)
+
+1. El adoptante corre `bash tools/upgrade.sh`, usa el harness y manda un informe de lo que
+   falló, con la medición.
+2. El arreglo se hace **en el template**, con su test **verificado fallando contra la versión
+   anterior** — no basta con que el test pase.
+3. Lección en `lessons_learned.md` (con `Detector:`) + entrada en el ledger, en el mismo cambio.
+4. `git add -A && bash tools/verify-run.sh && git commit` → `git push`. El adoptante sincroniza
+   y **verifica en su repo**, que es la única verificación independiente que existe: quien
+   escribe el arreglo no es quien lo aprueba (§14).
 
 ## Próximo paso
 
-**Cablear el stack.** El harness está montado pero varios niveles están MUDOS hasta que se
-rellenen sus `<!-- FILL -->`. El `session-start.sh` te dice cuáles en cada sesión. En orden
-de impacto:
+- **Esperando informe del adoptante** sobre la última tanda.
+- Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
+  SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`
+  caza la cita si alguien la pega).
+- `f-mutation-score-nunca-medido` sigue abierto **a propósito**: el bloqueo es que el runner de
+  mutación del adoptante no localiza su bundle de tests. Es issue upstream de esa herramienta,
+  no trabajo del template. No lo cierres sin que él lo confirme.
 
-1. `AGENTS.md §2` — stack, build, tests, lint. Sin esto nada más se puede cablear.
-2. `scripts/agent-hooks/post-edit-verify.sh` §FILL — **el gate de mayor ROI**. Sin él el
-   agente no recibe señal in-loop y descubre sus errores 40 turnos tarde.
-3. `brew install semgrep` + reglas en `tools/semgrep/rules/` — nivel 2 de la pirámide.
-4. `tools/mutation-score.sh` §FILL — runner de mutación. Es lo único que distingue un test
-   real de uno decorativo; hasta entonces el piso está en 0 y el gate no dice nada.
-5. `tools/layers.conf` — ajusta los globs de capa a tus rutas reales.
-6. `ci/run-gates.sh` paso 6 — build+tests de tu stack.
+## Lo que ya NO es el próximo paso (estaba aquí y confundía)
+
+Este bloque decía "cablear el stack" y listaba seis FILLs. Cuatro ya están hechos —
+`tools/verify.conf`, el paso 6 de CI, `mutation-score.sh` y las reglas de semgrep— y quien
+leyera esto en frío se ponía a rehacerlos. Se deja anotado porque **un mapa desactualizado es
+peor que no tener mapa**: no dice "no sé", dice algo falso con tono de instrucción.
+Los FILLs que de verdad falten los declara `session-start.sh` en cada arranque, con el estado
+real medido; esa es la fuente, no esta lista.
 
 ## Lo que NO hacemos todavía (explícito)
 
