@@ -4,7 +4,7 @@
 # ════════════════════════════════════════════════════════════════════
 # El ciclo del PRD 0003, con la práctica 2026 de los orquestadores:
 #   next.sh elige → `git worktree add` crea un directorio AISLADO con la rama
-#   story/<id>-<slug> → claude -p headless trabaja AHÍ (los MISMOS gates de
+#   story/<id>-<slug> → agent-runner trabaja AHÍ (los MISMOS gates de
 #   siempre: TDD, reviewer VERDICT, trinquetes, capas — el worktree tiene su
 #   propio .agents/state, así que markers y baselines arrancan limpios) →
 #   commits EN LA RAMA → historia a `in-review` → el humano revisa y mergea.
@@ -21,14 +21,17 @@
 # ramas independientes esperando review, no varios agentes escribiendo a la
 # vez. Repite el ciclo un cron/schedule o un humano.
 #
-# Exit codes:  0 ok/no-op · 1 precondición/infra git · 3 infra (claude
-# ausente) · otro: el rc del run de claude (worktree queda para inspección).
-#
-# Config por entorno:
-#   BACKLOG_CLAUDE_FLAGS   flags extra para claude -p (p.ej. --model X)
-#   BACKLOG_MAX_TURNS      si se define, añade --max-turns N
+# Exit codes: 0 ok/no-op · 1 precondición/git · 3 infra/backend · 4 trabajo
+# pendiente · 5 criterios · 6 scope · 7 review final RED/inválida.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+BACKEND=claude
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --backend) [ $# -ge 2 ] || { echo "backlog: falta backend" >&2; exit 3; }; BACKEND="$2"; shift 2 ;;
+    *) echo "backlog: argumento desconocido: $1" >&2; exit 3 ;;
+  esac
+done
 
 # ── Árbol sucio: ya NO bloquea (el worktree aísla) — solo informa ───
 DIRTY="$(git status --porcelain 2>/dev/null | grep -vE '^\?\?' || true)"
@@ -68,10 +71,10 @@ if ! grep -qi "riterios de aceptaci" "$STORY" || ! grep -q "Dado " "$STORY"; the
   exit 0
 fi
 
-# ── Guard 2: claude presente ────────────────────────────────────────
-if ! command -v claude >/dev/null 2>&1; then
-  echo "❌ backlog: el binario \`claude\` no está en PATH — no puedo trabajar la historia." >&2
-  echo "   npm i -g @anthropic-ai/claude-code   (y autentícate)" >&2
+# ── Guard 2: backend portable con todas las capacidades autónomas ──
+if ! bash tools/agent-runner.sh capabilities --backend "$BACKEND" \
+  --require run,review,read_only,subagents,hooks >/dev/null 2>&1; then
+  echo "❌ backlog: backend '$BACKEND' ausente o sin run+review+read_only+subagents+hooks." >&2
   exit 3
 fi
 
@@ -100,6 +103,10 @@ TRUSTED_SCOPE_SOURCE="$(git show "HEAD:tools/backlog/scope-check.sh" 2>/dev/null
   || { echo "❌ backlog: scope-check no existe en HEAD; commitéalo antes del run." >&2; exit 1; }
 TRUSTED_STORY_CONTENT="$(git show "HEAD:${STORY}" 2>/dev/null)" \
   || { echo "❌ backlog: la historia no existe en HEAD; commitéala antes del run." >&2; exit 1; }
+TRUSTED_BACKLOG_PROMPT="$(git show HEAD:tools/agent-prompts/backlog.md 2>/dev/null)" \
+  || { echo "❌ backlog: falta tools/agent-prompts/backlog.md en HEAD." >&2; exit 1; }
+TRUSTED_REVIEW_PROMPT="$(git show HEAD:tools/agent-prompts/review.md 2>/dev/null)" \
+  || { echo "❌ backlog: falta tools/agent-prompts/review.md en HEAD." >&2; exit 1; }
 
 # ── Rama nueva o retomar — SIEMPRE vía worktree, jamás checkout aquí ─
 if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
@@ -133,81 +140,32 @@ BASE_OID="$(git rev-parse --verify "${BASE}^{commit}" 2>/dev/null)" \
 ( cd "$WT" && _set_status "$STORY" in-progress \
   && git commit -qm "chore(backlog): ${ID} in-progress" -- "$STORY" 2>/dev/null )
 
-# ── El prompt: la historia + el contrato del harness ────────────────
-PROMPT="$(cat <<EOF
-Trabaja la siguiente historia de usuario de principio a fin. Estás en un
-WORKTREE AISLADO sobre la rama ${BRANCH} (creada desde ${BASE}) y SOLO
-trabajas aquí — la copia principal del humano no existe para ti.
-
-$(cat "$WT/$STORY")
-
-CONTRATO (no negociable — AGENTS.md es la fuente canónica y sus gates están activos):
-1. Lee AGENTS.md y la skill del área que toques (§11) antes de editar.
-1b. ACUERDA EL CONTRATO DE REVIEW ANTES DE ESCRIBIR CÓDIGO: invoca al
-   sub-agente \`reviewer\` con la palabra CONTRATO y esta historia. Te
-   devolverá los riesgos que aplican, qué comprobará y qué sería RED, y
-   cerrará con \`CONTRACT: READY\` (sin veredicto y sin marker: correcto,
-   aún no hay diff). Pega su respuesta en una sección
-   '## Contrato de review' de la historia y commitéala antes de programar.
-   Motivo: una review que llega a ciegas al final re-verifica todo en cada
-   vuelta; con el contrato acordado, la final es dirigida y mucho más barata.
-   Si algo del contrato contradice la historia, es una Open Question para el
-   owner (§1.4) — no lo resuelvas tú.
-2. TDD estricto: cada criterio de aceptación se convierte PRIMERO en un test
-   que falla, luego la implementación mínima, luego refactor (§5).
-3. Scope EXCLUSIVO: los paths listados en el frontmatter \`scope: |\`.
-   El cuerpo no amplía esa allowlist. Hallazgos fuera de scope → al ledger
-   (bash tools/findings/findings.sh add), jamás "de paso" (§8, §10).
-4. Antes de cada commit: invoca el sub-agente \`reviewer\` y atiende su
-   veredicto. Sin VERDICT GREEN/AMBER real, el commit está bloqueado — no
-   intentes rodearlo.
-5. Commits atómicos con formato §7, terminando con: Part of STORY-${ID}.
-6. PROHIBIDO: git push, merge, tocar otras ramas, --no-verify, --amend.
-7. Si un criterio es imposible o ambiguo: NO lo improvises. Documenta el
-   bloqueo al final de la historia (sección '## Bloqueos') y termina.
-8. Al terminar: resumen de qué hiciste, tests añadidos, y la salida REAL de
-   la suite de tests del área.
-9. NO TERMINES EL TURNO CON TRABAJO SIN COMMITEAR NI PROCESOS EN VUELO. Si
-   lanzaste algo en background (una suite, un build), ESPERA su salida real y
-   pégala; "me notificará al terminar" no es un resultado. El runner comprueba
-   el árbol al cerrar: si queda algo sin commitear, la historia vuelve a
-   in-progress y el run cuenta como NO terminado.
-10. Rellena en la historia la sección '## Verificación de criterios': una línea
-   por criterio de aceptación, con la ruta del test que lo fija
-   (\`ruta/al/test::nombre\`). Si alguno de verdad no es mecanizable, escribe
-   \`n/a-manual — <razón>\`. Un criterio "verificado" con un grep pegado en el
-   informe no impide la regresión de mañana; el runner lo comprueba y bloquea.
-EOF
-)"
-
-# ── Registro del run: la salida de claude NO se evapora en la terminal ─
+# ── Registro + prompt portable (concatenación literal, sin templates/eval) ─
 # Cada run queda en .agents/state/backlog/<id>-<ts>.log (gitignored). Es la
 # materia prima de tools/harness-report.sh: sin esto, "¿cómo se comportó el
 # agente?" solo se puede responder de memoria — y la memoria no es evidencia.
 LOG_DIR="$(pwd)/.agents/state/backlog"; mkdir -p "$LOG_DIR"
 RUN_LOG="$LOG_DIR/${ID}-$(date -u +%Y%m%dT%H%M%SZ).log"
+PROMPT_FILE="$LOG_DIR/${ID}-prompt.md"
+{ printf '%s\n\n' "$TRUSTED_BACKLOG_PROMPT"; printf '%s\n' "$TRUSTED_STORY_CONTENT"; } > "$PROMPT_FILE"
 {
   echo "═══ backlog run · story=${STORY} · branch=${BRANCH} · base=${BASE}"
-  echo "═══ fecha=$(date -u +%Y-%m-%dT%H:%M:%SZ) · max_turns=${BACKLOG_MAX_TURNS:-∞} · flags=${BACKLOG_CLAUDE_FLAGS:-—}"
+  echo "═══ fecha=$(date -u +%Y-%m-%dT%H:%M:%SZ) · backend=${BACKEND}"
 } > "$RUN_LOG"
 
 echo "━━━ backlog: trabajando ${STORY} en ${BRANCH} (worktree ${WT}, base ${BASE}) ━━━"
 echo "    log del run: ${RUN_LOG}"
-set +e
-# shellcheck disable=SC2086
-( cd "$WT" && claude -p "$PROMPT" \
-    --permission-mode acceptEdits \
-    ${BACKLOG_MAX_TURNS:+--max-turns "$BACKLOG_MAX_TURNS"} \
-    ${BACKLOG_CLAUDE_FLAGS:-} ) 2>&1 | tee -a "$RUN_LOG"
+bash tools/agent-runner.sh run --backend "$BACKEND" \
+  --require run,review,read_only,subagents,hooks \
+  --prompt-file "$PROMPT_FILE" --cwd "$WT" 2>&1 | tee -a "$RUN_LOG"
 RC=${PIPESTATUS[0]}
-set -e 2>/dev/null || true
 echo "═══ fin del run · rc=$RC" >> "$RUN_LOG"
 
 # ════════════════════════════════════════════════════════════════════
 # UN RUN QUE DEJA TRABAJO SIN COMMITEAR NO HA TERMINADO
 # ════════════════════════════════════════════════════════════════════
 # Cazado en vivo con la 0007: el agente lanzó la suite en background, dijo "me
-# notificará al terminar" y ahí acabó su turno. `claude -p` salió con 0, así
+# notificará al terminar" y ahí acabó su turno. El backend salió con 0, así
 # que esto marcaba `in-review` y salía 0 también. Desde fuera la historia
 # parecía terminada — pero 691 líneas del adapter estaban sin commitear, el
 # composition root sin cablear, y `git diff base...rama` no mostraba nada de
@@ -265,7 +223,7 @@ if [ $RC -eq 0 ]; then
         && git commit -qm "chore(backlog): ${ID} in-progress — criterios sin test que los fije" -- "$STORY" 2>/dev/null )
       {
         echo ""
-        printf '%s\n' "$CRIT_OUT" | grep -v '^CRITERIA_SUMMARY'
+        printf '%s\n' "$CRIT_OUT"
         echo "   La historia queda en 'in-progress'. El worktree sigue en ${WT}."
       } >&2
       exit 5
@@ -294,6 +252,23 @@ if [ $RC -eq 0 ]; then
   else
     echo "❌ backlog: falta el checker confiable en memoria — no puedo demostrar el scope." >&2
     exit 3
+  fi
+  # Review final independiente/read-only del rango completo. Guarda la salida
+  # antes de cambiar el estado; una review final no valida retroactivamente
+  # los commits, pero sí impide presentar el conjunto sin un juicio parseable.
+  REVIEW_LOG="$LOG_DIR/${ID}-review-$(date -u +%Y%m%dT%H%M%SZ).log"
+  REVIEW_PROMPT_FILE="$LOG_DIR/${ID}-review-prompt.md"
+  { printf '%s\n\n' "$TRUSTED_REVIEW_PROMPT"; printf '%s\n' "$TRUSTED_STORY_CONTENT"; } > "$REVIEW_PROMPT_FILE"
+  bash tools/agent-runner.sh review --backend "$BACKEND" --require review,read_only \
+    --prompt-file "$REVIEW_PROMPT_FILE" --base "$BASE_OID" --head HEAD --cwd "$WT" \
+    > "$REVIEW_LOG" 2>&1
+  REVIEW_RC=$?
+  if [ "$REVIEW_RC" != 0 ]; then
+    ( cd "$WT" && _set_status "$STORY" in-progress \
+      && git commit -qm "chore(backlog): ${ID} in-progress — review final no aprobó" -- "$STORY" 2>/dev/null ) || true
+    echo "❌ backlog: review final no aprobó (rc=$REVIEW_RC). Evidencia: $REVIEW_LOG" >&2
+    [ "$REVIEW_RC" = 1 ] && exit 7
+    exit "$REVIEW_RC"
   fi
   ( cd "$WT" && _set_status "$STORY" in-review \
     && git commit -qm "chore(backlog): ${ID} in-review — lista para revisión humana" -- "$STORY" 2>/dev/null )

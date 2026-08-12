@@ -6,11 +6,17 @@
 
 _bl_sandbox() {
   local d; d="$(mktemp -d)"
-  mkdir -p "$d/tools/backlog" "$d/backlog"
+  mkdir -p "$d/tools/backlog" "$d/tools/agent-backends" "$d/tools/agent-prompts" \
+    "$d/scripts/agent-hooks/lib" "$d/backlog"
   cp "$PROJECT_ROOT/tools/backlog/next.sh" "$d/tools/backlog/" 2>/dev/null
   cp "$PROJECT_ROOT/tools/backlog/run.sh" "$d/tools/backlog/" 2>/dev/null
   cp "$PROJECT_ROOT/tools/backlog/criteria-link.sh" "$d/tools/backlog/" 2>/dev/null
   cp "$PROJECT_ROOT/tools/backlog/scope-check.sh" "$d/tools/backlog/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/agent-runner.sh" "$d/tools/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/check-review-marker.sh" "$d/tools/" 2>/dev/null
+  cp -R "$PROJECT_ROOT/tools/agent-backends/." "$d/tools/agent-backends/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/agent-prompts/"*.md "$d/tools/agent-prompts/" 2>/dev/null
+  cp "$PROJECT_ROOT/scripts/agent-hooks/lib/verdict.sh" "$d/scripts/agent-hooks/lib/" 2>/dev/null
   (
     cd "$d" || exit 1
     git init -q -b develop . 2>/dev/null; git config user.email t@t.t; git config user.name t
@@ -96,7 +102,7 @@ test_sin_backlog_es_noop() { _bl_sandbox _case_sin_backlog_silencio; }
 # ── guards del runner (contrato WORKTREE: el checkout del humano es intocable) ─
 _fake_claude() { # instala un claude falso que registra invocaciones en $CLAUDE_LOG
   mkdir -p bin
-  printf '#!/usr/bin/env bash\n[ -n "${CLAUDE_LOG:-}" ] && echo run >> "$CLAUDE_LOG"\nexit 0\n' > bin/claude
+  printf '#!/usr/bin/env bash\ncase " $* " in *" --permission-mode plan "*) printf "{\\"result\\":\\"VERDICT: GREEN\\\\\\\\nFINDINGS: 0\\\\\\\\nSCOPE: fake-claude\\"}\\n"; exit 0;; esac\n[ -n "${CLAUDE_LOG:-}" ] && echo run >> "$CLAUDE_LOG"\nexit 0\n' > bin/claude
   chmod +x bin/claude
 }
 
@@ -107,9 +113,9 @@ _case_arbol_sucio_ya_no_bloquea() {
   git add backlog/0001-a.md; git commit -qm historia
   echo dirty > seed.txt
   _fake_claude
-  PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1
-  local rc=$?
-  [ "$rc" = "0" ] || { echo "    con worktrees, el árbol sucio no debería bloquear (rc=$rc)"; return 1; }
+  local out rc
+  out="$(PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || { echo "    con worktrees, el árbol sucio no debería bloquear (rc=$rc): $out"; return 1; }
   [ "$(cat seed.txt)" = "dirty" ] || { echo "    el run TOCÓ los cambios sin commitear del humano"; return 1; }
 }
 test_arbol_sucio_ya_no_bloquea() { _bl_sandbox _case_arbol_sucio_ya_no_bloquea; }
@@ -512,7 +518,7 @@ _case_run_limpio_si_cierra() {
   _story 0001-a.md 0001 ready ""
   git add backlog/0001-a.md; git commit -qm historia
   mkdir -p bin
-  printf '#!/usr/bin/env bash\nprintf "hecho\\n" > Adapter.swift\ngit add -A >/dev/null 2>&1\ngit -c user.email=a@a -c user.name=a commit -qm "feat: adapter" >/dev/null 2>&1\nexit 0\n' > bin/claude
+  printf '#!/usr/bin/env bash\ncase " $* " in *" --permission-mode plan "*) printf "{\\"result\\":\\"VERDICT: GREEN\\\\\\\\nFINDINGS: 0\\\\\\\\nSCOPE: fake-claude\\"}\\n"; exit 0;; esac\nprintf "hecho\\n" > Adapter.swift\ngit add -A >/dev/null 2>&1\ngit -c user.email=a@a -c user.name=a commit -qm "feat: adapter" >/dev/null 2>&1\nexit 0\n' > bin/claude
   chmod +x bin/claude
   local rc; PATH="$(pwd)/bin:/usr/bin:/bin" bash tools/backlog/run.sh >/dev/null 2>&1; rc=$?
   [ "$rc" = "0" ] || { echo "    un run LIMPIO fue rechazado (rc=$rc)"; return 1; }
@@ -521,3 +527,57 @@ _case_run_limpio_si_cierra() {
   echo "    un run limpio no cerró en in-review ($st)"; return 1
 }
 test_run_limpio_si_cierra_en_in_review() { _bl_sandbox _case_run_limpio_si_cierra; }
+
+_case_backend_fake_sin_claude() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  printf '#!/usr/bin/env bash\ngrep -q "AGENTS.md es la fuente canónica" "$1" || exit 8\ngrep -q "id: 0001" "$1" || exit 9\nprintf "hecho\\n" > Adapter.swift\ngit add -A\nbash tools/agent-backends/fake-evidence.sh approve || exit 10\ngit -c user.email=a@a -c user.name=a commit -qm "feat: adapter"\n' \
+    > fake-run.sh; chmod +x fake-run.sh
+  local rc evidence="$PWD/fake-evidence.log"
+  PATH="/usr/bin:/bin" FAKE_RUN_SCRIPT="$PWD/fake-run.sh" \
+    FAKE_AUTONOMY_EVIDENCE="$evidence" \
+    bash tools/backlog/run.sh --backend fake >/dev/null 2>&1; rc=$?
+  [ "$rc" = 0 ] || { echo "    backlog con fake y sin claude falló rc=$rc"; return 1; }
+  git show story/0001-a:backlog/0001-a.md | grep -q '^status: in-review' \
+    || { echo "    el backend fake no llegó a in-review"; return 1; }
+  ls .agents/state/backlog/0001-review-*.log >/dev/null 2>&1 \
+    || { echo "    falta evidencia persistida de la review final"; return 1; }
+  local approved committed
+  approved="$(grep '^approved:' "$evidence")"; committed="$(grep '^committed:' "$evidence")"
+  [ "${approved#approved:}" = "${committed#committed:}" ] \
+    || { echo "    review y commit no quedaron ligados al mismo staged SHA"; return 1; }
+}
+test_backlog_funciona_con_fake_sin_claude() { _bl_sandbox _case_backend_fake_sin_claude; }
+
+_case_review_fake_red_no_cierra() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  printf '#!/usr/bin/env bash\nprintf "hecho\\n" > Adapter.swift\ngit add -A\nbash tools/agent-backends/fake-evidence.sh approve\ngit -c user.email=a@a -c user.name=a commit -qm "feat: adapter"\n' \
+    > fake-run.sh; chmod +x fake-run.sh
+  FAKE_RUN_SCRIPT="$PWD/fake-run.sh" \
+    FAKE_AUTONOMY_EVIDENCE="$PWD/fake-evidence.log" \
+    FAKE_REVIEW_RESULT=$'VERDICT: RED\nFINDINGS: 1\nSCOPE: fake-red' \
+    bash tools/backlog/run.sh --backend fake >/dev/null 2>&1
+  local rc=$? st
+  [ "$rc" = 7 ] || { echo "    review RED devolvió $rc, no 7"; return 1; }
+  st="$(git show story/0001-a:backlog/0001-a.md | grep '^status:')"
+  case "$st" in *in-progress*) return 0 ;; esac
+  echo "    review RED dejó la historia como $st"; return 1
+}
+test_review_final_red_impide_in_review() { _bl_sandbox _case_review_fake_red_no_cierra; }
+
+_case_fake_sin_evidencia_no_commitea_producto() {
+  _story 0001-a.md 0001 ready ""
+  git add backlog/0001-a.md; git commit -qm historia
+  printf '#!/usr/bin/env bash\nprintf "sin review\\n" > Adapter.swift\ngit add -A\ngit -c user.email=a@a -c user.name=a commit -qm "feat: sin review"\n' \
+    > fake-run.sh; chmod +x fake-run.sh
+  FAKE_RUN_SCRIPT="$PWD/fake-run.sh" FAKE_AUTONOMY_EVIDENCE="$PWD/fake-evidence.log" \
+    bash tools/backlog/run.sh --backend fake >/dev/null 2>&1
+  [ "$?" != 0 ] || { echo "    fake permitió commit de producto sin evidencia previa"; return 1; }
+  git -C .agents/worktrees/story-0001-a log --format=%s | grep -q 'feat: sin review' \
+    && { echo "    el commit sin review sí entró a la rama"; return 1; }
+  return 0
+}
+test_fake_bloquea_commit_de_producto_sin_evidencia() {
+  _bl_sandbox _case_fake_sin_evidencia_no_commitea_producto
+}

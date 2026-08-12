@@ -38,6 +38,13 @@
 #   AI_REVIEW_REQUIRED        default 1
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
+AI_BACKEND=claude
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --backend) [ $# -ge 2 ] || { echo "run-gates: falta backend" >&2; exit 3; }; AI_BACKEND="$2"; shift 2 ;;
+    *) echo "run-gates: argumento desconocido: $1" >&2; exit 3 ;;
+  esac
+done
 FAIL=0
 step() { echo ""; echo "━━━ $1 ━━━"; }
 
@@ -162,7 +169,8 @@ fi
 #     que es OBLIGATORIO por defecto: si fuera opt-in, un runner sin `claude`
 #     aprobaría en silencio justo los commits que este anillo existe para cubrir.
 if [ -f ci/ai-review.sh ]; then
-  AI_REVIEW_REQUIRED="${AI_REVIEW_REQUIRED:-1}" bash ci/ai-review.sh || FAIL=1
+  AI_REVIEW_REQUIRED="${AI_REVIEW_REQUIRED:-1}" \
+    bash ci/ai-review.sh --backend "$AI_BACKEND" || FAIL=1
 else
   echo "❌ ci/ai-review.sh ausente — sin él, Codex y los commits humanos no pasan por ninguna review."; FAIL=1
 fi

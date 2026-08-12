@@ -2,7 +2,9 @@
 # Traducción del contrato portable al CLI de Claude; sin lógica del workflow.
 set -uo pipefail
 case "${1:-}" in
-  capabilities) echo 'run=true review=true read_only=true subagents=true hooks=true' ;;
+  capabilities)
+    command -v claude >/dev/null 2>&1 || exit 3
+    echo 'run=true review=true read_only=true subagents=true hooks=true' ;;
   run)
     command -v claude >/dev/null 2>&1 || exit 3
     cd "$3" || exit 3

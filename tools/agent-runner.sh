@@ -7,20 +7,21 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 3
 
 MODE="${1:-}"; [ -n "$MODE" ] && shift || true
 BACKEND=claude; PROMPT_FILE=""; CWD="$ROOT"; BASE=""; HEAD_REF=""
-TIMEOUT=900
+TIMEOUT=900; REQUIRE=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --backend|--prompt-file|--cwd|--base|--head|--timeout)
+    --backend|--prompt-file|--cwd|--base|--head|--timeout|--require)
       [ $# -ge 2 ] || { echo "agent-runner: falta valor para $1" >&2; exit 3; }
       case "$1" in
         --backend) BACKEND="$2" ;; --prompt-file) PROMPT_FILE="$2" ;; --cwd) CWD="$2" ;;
         --base) BASE="$2" ;; --head) HEAD_REF="$2" ;; --timeout) TIMEOUT="$2" ;;
+        --require) REQUIRE="$2" ;;
       esac
       shift 2 ;;
     *) echo "agent-runner: argumento desconocido: $1" >&2; exit 3 ;;
   esac
 done
-case "$MODE" in run|review) ;; *) echo "agent-runner: usa run|review" >&2; exit 3 ;; esac
+case "$MODE" in run|review|capabilities) ;; *) echo "agent-runner: usa run|review|capabilities" >&2; exit 3 ;; esac
 case "$BACKEND" in ''|*[!A-Za-z0-9_-]*) echo "agent-runner: backend inválido" >&2; exit 3 ;; esac
 case "$TIMEOUT" in ''|*[!0-9]*|0) echo "agent-runner: timeout inválido" >&2; exit 3 ;; esac
 ADAPTER="$ROOT/tools/agent-backends/$BACKEND.sh"
@@ -37,11 +38,13 @@ except ValueError: raise SystemExit(1)
 print(path)
 PY
 }
-PROMPT_ABS="$(resolve_inside "$PROMPT_FILE" 2>/dev/null)" \
-  || { echo "agent-runner: prompt ausente/fuera del repo" >&2; exit 3; }
-CWD_ABS="$(resolve_inside "$CWD" 2>/dev/null)" \
-  || { echo "agent-runner: cwd ausente/fuera del repo" >&2; exit 3; }
-[ -d "$CWD_ABS" ] || { echo "agent-runner: cwd no es directorio" >&2; exit 3; }
+if [ "$MODE" != capabilities ]; then
+  PROMPT_ABS="$(resolve_inside "$PROMPT_FILE" 2>/dev/null)" \
+    || { echo "agent-runner: prompt ausente/fuera del repo" >&2; exit 3; }
+  CWD_ABS="$(resolve_inside "$CWD" 2>/dev/null)" \
+    || { echo "agent-runner: cwd ausente/fuera del repo" >&2; exit 3; }
+  [ -d "$CWD_ABS" ] || { echo "agent-runner: cwd no es directorio" >&2; exit 3; }
+fi
 
 if [ "$MODE" = review ]; then
   for ref in "$BASE" "$HEAD_REF"; do
@@ -53,11 +56,21 @@ fi
 
 CAPS="$($ADAPTER capabilities 2>/dev/null)" \
   || { echo "agent-runner: backend no declara capacidades" >&2; exit 3; }
-case "$MODE:$CAPS" in
-  run:*run=true*) ;;
-  review:*review=true*read_only=true*) ;;
-  *) echo "agent-runner: backend unsupported para $MODE ($CAPS)" >&2; exit 3 ;;
+cap_true() { case " $CAPS " in *" $1=true "*) return 0 ;; *) return 1 ;; esac; }
+case "$MODE" in
+  run) MODE_REQUIRE=run ;;
+  review) MODE_REQUIRE=review,read_only ;;
+  capabilities) MODE_REQUIRE="" ;;
 esac
+ALL_REQUIRE="$MODE_REQUIRE${MODE_REQUIRE:+${REQUIRE:+,}}$REQUIRE"
+for capability in $(printf '%s' "$ALL_REQUIRE" | tr ',' ' '); do
+  case "$capability" in run|review|read_only|subagents|hooks) : ;;
+    *) echo "agent-runner: capacidad inválida: $capability" >&2; exit 3 ;;
+  esac
+  cap_true "$capability" \
+    || { echo "agent-runner: backend unsupported; requiere $capability ($CAPS)" >&2; exit 3; }
+done
+[ "$MODE" = capabilities ] && { printf '%s\n' "$CAPS"; exit 0; }
 
 # Python crea una sesión propia para el backend: así TERM/KILL alcanzan al
 # adapter y a todos sus descendientes. La gracia termina SIEMPRE en KILL del

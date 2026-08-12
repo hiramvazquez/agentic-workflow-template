@@ -62,8 +62,10 @@ config del CI: `AI_REVIEW_REQUIRED=0`, `GATES_REQUIRE_SEMGREP=0`, `GATES_SKIP_TE
 (En local la política es la inversa para los fallos del propio detector — exit 3 avisa sin
 bloquear — porque un typo en las reglas no puede impedir el commit que lo arregla: §14.3.)
 
-`ci/ai-review.sh` necesita el binario `claude` + `ANTHROPIC_API_KEY` en el runner, y emite el
-mismo contrato `VERDICT:` que el sub-agente local: GREEN/AMBER pasan, RED falla el job.
+`ci/run-gates.sh --backend <nombre>` reenvía la selección a `ci/ai-review.sh` y al
+`tools/agent-runner.sh` (default: `claude`).
+Cada adapter declara `review+read_only`; el backend Claude necesita su CLI y autenticación.
+Todos emiten el mismo contrato `VERDICT:`: GREEN/AMBER pasan, RED falla el job.
 
 > Recomendación: corre también un job **nocturno** con `GATES_SECRET_MODE=history` para validar
 > que el scrub histórico de secretos se mantiene.

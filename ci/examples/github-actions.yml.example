@@ -44,8 +44,8 @@ jobs:
           # un gate siempre rojo se aprende a ignorar.
           GATES_BASE_REF: origin/${{ github.base_ref || 'main' }}
           # Renuncia EXPLÍCITA (contrato fail-closed): sin esta línea, la
-          # ausencia del binario `claude` falla el job — a propósito. Bórrala
-          # cuando instales Claude Code y el secret de la API:
+          # ausencia del backend de review falla el job — a propósito. Bórrala
+          # cuando instales/configures el backend elegido (default: Claude):
           AI_REVIEW_REQUIRED: "0"
           # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

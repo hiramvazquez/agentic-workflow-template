@@ -12,10 +12,14 @@
 
 _fc_sandbox() {
   local d; d="$(mktemp -d)"
-  mkdir -p "$d/tools/semgrep/rules" "$d/bin"
+  mkdir -p "$d/tools/semgrep/rules" "$d/tools/agent-backends" \
+    "$d/tools/agent-prompts" "$d/bin" "$d/ci"
   cp "$PROJECT_ROOT/tools/semgrep-scan.sh" "$d/tools/"
   cp "$PROJECT_ROOT/tools/mutation-score.sh" "$d/tools/"
   cp "$PROJECT_ROOT/ci/ai-review.sh" "$d/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/agent-runner.sh" "$d/tools/" 2>/dev/null
+  cp -R "$PROJECT_ROOT/tools/agent-backends/." "$d/tools/agent-backends/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/agent-prompts/"*.md "$d/tools/agent-prompts/" 2>/dev/null
   mkdir -p "$d/scripts/agent-hooks/lib"
   cp "$PROJECT_ROOT/scripts/agent-hooks/lib/verdict.sh" "$d/scripts/agent-hooks/lib/"
   ( cd "$d" || exit 1; git init -q . 2>/dev/null; PATH="$d/bin:$PATH" "$1" )
@@ -245,6 +249,59 @@ _case_ai_review_optout_explicito() {
   [ "$?" = "0" ] || { echo "    el opt-out explícito no funcionó"; return 1; }
 }
 test_ai_review_permite_optout_explicito() { _fc_sandbox _case_ai_review_optout_explicito; }
+
+_case_ai_review_fake_sin_claude() {
+  echo base > f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm base
+  echo cambio >> f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm cambio
+  PATH="/usr/bin:/bin" GATES_BASE_REF=HEAD^ AI_REVIEW_REQUIRED=1 \
+    FAKE_REVIEW_RESULT=$'VERDICT: GREEN\nFINDINGS: 0\nSCOPE: fake-ci' \
+    bash ai-review.sh --backend fake >/dev/null 2>&1 || return 1
+  grep -q 'VERDICT: GREEN' .agents/state/ci/ai-review.md \
+    || { echo "    AI review fake no guardó evidencia parseable"; return 1; }
+}
+test_ai_review_funciona_con_fake_sin_claude() { _fc_sandbox _case_ai_review_fake_sin_claude; }
+
+_case_ai_review_fake_red_bloquea() {
+  echo base > f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm base
+  echo cambio >> f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm cambio
+  PATH="/usr/bin:/bin" GATES_BASE_REF=HEAD^ AI_REVIEW_REQUIRED=1 \
+    FAKE_REVIEW_RESULT=$'VERDICT: RED\nFINDINGS: 1\nSCOPE: fake-ci-red' \
+    bash ai-review.sh --backend fake >/dev/null 2>&1
+  [ "$?" = 1 ] || { echo "    AI review RED no bloqueó"; return 1; }
+}
+test_ai_review_fake_red_bloquea() { _fc_sandbox _case_ai_review_fake_red_bloquea; }
+
+_case_ai_review_green_con_findings_bloquea() {
+  echo base > f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm base
+  echo cambio >> f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm cambio
+  GATES_BASE_REF=HEAD^ AI_REVIEW_REQUIRED=1 \
+    FAKE_REVIEW_RESULT=$'VERDICT: GREEN\nFINDINGS: 2\nSCOPE: contradictorio' \
+    bash ai-review.sh --backend fake >/dev/null 2>&1
+  [ "$?" = 1 ] || { echo "    CI aprobó GREEN contradictorio que el runner rechazó"; return 1; }
+}
+test_ai_review_respeta_rc_de_green_con_findings() {
+  _fc_sandbox _case_ai_review_green_con_findings_bloquea
+}
+
+_case_ai_review_green_incompleto_bloquea() {
+  echo base > f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm base
+  echo cambio >> f.txt; git add f.txt
+  git -c user.email=t@t.t -c user.name=t commit -qm cambio
+  GATES_BASE_REF=HEAD^ AI_REVIEW_REQUIRED=1 \
+    FAKE_REVIEW_RESULT=$'VERDICT: GREEN\nFINDINGS: 0' \
+    bash ai-review.sh --backend fake >/dev/null 2>&1
+  [ "$?" = 1 ] || { echo "    CI aprobó GREEN sin SCOPE que el runner rechazó"; return 1; }
+}
+test_ai_review_respeta_rc_de_green_incompleto() {
+  _fc_sandbox _case_ai_review_green_incompleto_bloquea
+}
 
 _case_hallazgo_real_da_exit_1() {
   # El otro lado del contrato: un hallazgo REAL debe dar exit 1, NUNCA 3.

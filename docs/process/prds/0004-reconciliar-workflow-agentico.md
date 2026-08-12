@@ -177,6 +177,7 @@ Los probes emiten JSONL seguro y parseable:
 ```text
 tools/agent-runner.sh run --prompt-file <path> --cwd <path> [--timeout <segundos>]
 tools/agent-runner.sh review --prompt-file <path> --base <ref> --head <ref> --cwd <path> [--timeout <segundos>]
+tools/agent-runner.sh capabilities --backend <nombre> [--require <cap1,cap2>]
 ```
 
 `run` y `review` son contratos distintos:
@@ -197,6 +198,8 @@ tools/agent-runner.sh review --prompt-file <path> --base <ref> --head <ref> --cw
 - selección única: `--backend <nombre>`; si se omite, el default es `claude`. No hay config ni
   variables de entorno implícitas para cambiar de proveedor. El nombre se valida contra un
   allowlist de adapters bajo `tools/agent-backends/`, nunca se interpreta como path libre.
+- `capabilities` es un preflight sin efectos laterales: valida una lista exacta de capacidades
+  requeridas y devuelve 3 si el adapter está ausente, roto o incompleto.
 - `--prompt-file` recibe maquinaria común transportable: `tools/agent-prompts/backlog.md` para
   `run` y `tools/agent-prompts/review.md` para `review`. Los adapters no dependen de prompts
   compartidos `report-only` bajo directorios específicos de un cliente.

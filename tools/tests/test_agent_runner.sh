@@ -4,7 +4,7 @@ _ar_repo() {
   local d; d="$(mktemp -d)"
   mkdir -p "$d/tools/agent-backends" "$d/scripts/agent-hooks/lib"
   cp "$PROJECT_ROOT/tools/agent-runner.sh" "$d/tools/"
-  cp "$PROJECT_ROOT/tools/agent-backends/fake.sh" "$d/tools/agent-backends/"
+  cp -R "$PROJECT_ROOT/tools/agent-backends/." "$d/tools/agent-backends/"
   cp "$PROJECT_ROOT/scripts/agent-hooks/lib/verdict.sh" "$d/scripts/agent-hooks/lib/"
   ( cd "$d" && git init -q . && git config user.email t@t.t && git config user.name t \
     && echo seed > seed && git add seed && git commit -qm seed && printf 'prompt\n' > prompt.md && "$1" )
@@ -186,3 +186,17 @@ _case_backend_inyectado() {
   [ "$?" = 3 ]
 }
 test_backend_es_allowlist_no_path() { _ar_repo _case_backend_inyectado; }
+
+_case_capacidades_requeridas() {
+  FAKE_AUTONOMY_EVIDENCE="$PWD/evidence.log" \
+    bash tools/agent-runner.sh capabilities --backend fake \
+    --require run,review,read_only,subagents,hooks >/dev/null || return 1
+  bash tools/agent-runner.sh capabilities --backend fake --require hooks >/dev/null 2>&1 \
+    && { echo "    fake declaró hooks sin instrumentación"; return 1; }
+  printf '#!/usr/bin/env bash\n[ "$1" = capabilities ] && echo "run=true review=false read_only=false subagents=false hooks=false"\n' \
+    > tools/agent-backends/limited.sh; chmod +x tools/agent-backends/limited.sh
+  bash tools/agent-runner.sh capabilities --backend limited --require run,review \
+    >/dev/null 2>&1
+  [ "$?" = 3 ]
+}
+test_capabilities_rechaza_backend_incompleto() { _ar_repo _case_capacidades_requeridas; }
