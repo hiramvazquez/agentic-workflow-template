@@ -99,7 +99,8 @@ fi
 
 # ── Telemetría: cada review es un dato de contención (nivel 9) ──────
 # Registra CUÁNTO encontró la fase de review — la fuente principal del bucket
-# `review` de escape-rate. Best-effort: jamás afecta al flujo.
+# actividad `review` de gate-value; su finding durable alimenta escape-rate.
+# Best-effort: jamás afecta al flujo.
 _N="$FINDINGS"; case "$_N" in ''|'?'|*[!0-9]*) [ "$VERDICT" = "GREEN" ] && _N=0 || _N=1 ;; esac
 [ "${_N:-0}" -gt 0 ] && hook_log_detection "$AGENT" "verdict-$VERDICT" "$SCOPE" "$_N"
 

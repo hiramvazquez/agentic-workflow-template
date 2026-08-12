@@ -18,110 +18,16 @@
 #   ci        → lo cazó el Anillo 3                             (coste alto)
 #   prod      → lo cazó un usuario                              (coste máximo)
 #
-# El dato sale del ledger: cada finding lleva `source`, que ya identifica quién
-# lo encontró. Esto solo lo agrega.
+# El dato sale SOLO del ledger: un ID durable cuenta una vez, aunque tenga
+# varios source_event_ids o siga presente en la telemetría local. `source`
+# identifica la primera fase reconocible. Unknown queda fuera del denominador,
+# visible; imputarlo sería fabricar confianza.
 #
-#   bash tools/metrics/escape-rate.sh            # resumen
-#   bash tools/metrics/escape-rate.sh --json     # para dashboards
+#   bash tools/metrics/escape-rate.sh                         # últimos 30 días
+#   bash tools/metrics/escape-rate.sh --days 90 --json
+#   bash tools/metrics/escape-rate.sh --since 2026-01-01 --until 2026-03-31
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
-
-LEDGER="${FINDINGS_LEDGER:-tools/findings/ledger.jsonl}"
-DETECTIONS="${DETECTIONS_LOG:-.agents/state/metrics/detections.jsonl}"
-MODE="${1:---text}"
-
-# La transición no reescribe telemetría histórica: se normaliza a una vista
-# temporal. v1 queda con triage=unknown y event_id=null; v2 conserva ambos.
-EVENTS_VIEW="$DETECTIONS"
-EVENTS_TMP=""
-if [ -f "$DETECTIONS" ] && command -v python3 >/dev/null 2>&1 \
-   && [ -f tools/metrics/read-events.py ]; then
-  EVENTS_TMP="$(mktemp 2>/dev/null)"
-  if [ -n "$EVENTS_TMP" ] \
-     && python3 tools/metrics/read-events.py "$DETECTIONS" > "$EVENTS_TMP"; then
-    EVENTS_VIEW="$EVENTS_TMP"
-    trap 'rm -f "$EVENTS_TMP" 2>/dev/null' EXIT
-  else
-    [ -n "$EVENTS_TMP" ] && rm -f "$EVENTS_TMP" 2>/dev/null
-    EVENTS_TMP=""
-  fi
-fi
-
-[ -f "$LEDGER" ] || [ -f "$DETECTIONS" ] || { echo "Sin ledger ni eventos — nada que medir todavía."; exit 0; }
-
-# Dos fuentes que se SUMAN:
-#   ledger      → findings curados y durables (committeado)
-#   detections  → eventos de los gates en ESTA máquina (gitignored, como la
-#                 trayectoria). Los escriben los propios gates vía
-#                 hook_log_detection — el eslabón que faltaba: antes cuatro
-#                 scripts leían el ledger y cero lo escribían.
-count_source() {
-  local a b
-  a="$(grep -c "\"source\": *\"$1\"" "$LEDGER" 2>/dev/null | head -1)"; : "${a:=0}"
-  case "$a" in ''|*[!0-9]*) a=0 ;; esac
-  b=0
-  if [ -f "$EVENTS_VIEW" ]; then
-    # Suma los `n` de cada evento del source (no cuenta líneas: un evento
-    # puede agrupar N hallazgos).
-    b="$(awk -F'"source":"' -v s="$1" '
-      index($0, "\"source\":\""s"\"") {
-        n=1; if (match($0, /"n":[0-9]+/)) n=substr($0, RSTART+4, RLENGTH-4)+0
-        total+=n }
-      END { print total+0 }' "$EVENTS_VIEW" 2>/dev/null)"
-    case "$b" in ''|*[!0-9]*) b=0 ;; esac
-  fi
-  echo $((a + b))
-}
-
-# <!-- FILL: mapea los `source` de TU ledger a estas fases. Los de abajo son
-#      los que produce el harness por defecto. -->
-IN_LOOP=$(( $(count_source "post-edit-verify") + $(count_source "linter") + $(count_source "typecheck") ))
-GATE=$((    $(count_source "canon-enforce") + $(count_source "check-drift") + $(count_source "check-layers") + $(count_source "semgrep") ))
-REVIEW=$((  $(count_source "reviewer") + $(count_source "security-reviewer") + $(count_source "design-reviewer") + $(count_source "process-judge") ))
-CI=$(       count_source "ci" )
-PROD=$((    $(count_source "prod") + $(count_source "user-report") + $(count_source "incident") ))
-HUMAN=$(    count_source "human-review" )
-
-TOTAL=$((IN_LOOP + GATE + REVIEW + CI + PROD + HUMAN))
-[ "$TOTAL" -eq 0 ] && { echo "Ledger sin findings con \`source\` reconocible — nada que medir."; exit 0; }
-
-pct() { [ "$TOTAL" -eq 0 ] && { echo 0; return; }; echo $(( $1 * 100 / TOTAL )); }
-
-# "Escaped" = todo lo que pasó de largo los gates automáticos y necesitó a un
-# humano, a CI o —lo peor— a un usuario en producción.
-ESCAPED=$((CI + PROD + HUMAN))
-ESCAPE_RATE=$(pct $ESCAPED)
-AUTOMATED=$((IN_LOOP + GATE + REVIEW))
-
-if [ "$MODE" = "--json" ]; then
-  cat <<EOF
-{"total":$TOTAL,"in_loop":$IN_LOOP,"gate":$GATE,"review":$REVIEW,"ci":$CI,"human":$HUMAN,"prod":$PROD,"escape_rate_pct":$ESCAPE_RATE,"automated_pct":$(pct $AUTOMATED)}
-EOF
-  exit 0
-fi
-
-cat <<EOF
-
-━━━ Contención por fase (n=$TOTAL findings) ━━━
-
-  in-loop   $(printf '%4d' $IN_LOOP)  $(printf '%3d' "$(pct $IN_LOOP)")%   coste ~0   post-edit-verify, tipos, linter
-  gate      $(printf '%4d' $GATE)  $(printf '%3d' "$(pct $GATE)")%   bajo       canon-enforce, drift, capas, semgrep
-  review    $(printf '%4d' $REVIEW)  $(printf '%3d' "$(pct $REVIEW)")%   medio      sub-agentes de review
-  ─────────────────────────────────────────────────────────────
-  ci        $(printf '%4d' $CI)  $(printf '%3d' "$(pct $CI)")%   alto       Anillo 3
-  humano    $(printf '%4d' $HUMAN)  $(printf '%3d' "$(pct $HUMAN)")%   alto       revisión manual
-  prod      $(printf '%4d' $PROD)  $(printf '%3d' "$(pct $PROD)")%   MÁXIMO     lo encontró un usuario
-
-  ESCAPE RATE: ${ESCAPE_RATE}%   (findings que los gates automáticos NO cazaron)
-  Automatizado: $(pct $AUTOMATED)%
-
-Cómo leerlo:
-  · La tendencia importa MUCHO más que el valor absoluto. Compáralo mes a mes.
-  · Cada finding en 'humano' o 'prod' es una oportunidad concreta: ¿qué detector
-    lo habría cazado antes? Créalo y anota la lección (el enlace lección→detector
-    lo verifica \`tools/lesson-detector-link.sh\`).
-  · Un escape rate que BAJA es la única evidencia real de que puedes reducir la
-    revisión humana. Uno plano significa que estás añadiendo ceremonia, no calidad.
-  · Si 'prod' > 0, ese caso va SIEMPRE a lessons_learned.md con su detector.
-
-EOF
+command -v python3 >/dev/null 2>&1 \
+  || { echo "⚠️  escape-rate: python3 ausente — no pude leer JSONL con seguridad." >&2; exit 3; }
+exec python3 tools/metrics/metrics-report.py escape-rate "$@"

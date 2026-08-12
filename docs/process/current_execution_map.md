@@ -11,7 +11,7 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–7a implementadas:
+- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fases 1a–7b implementadas:
   manifiesto estructurado, bloques documentales generados y upgrade que funde esos fragmentos
   sin pisar la prosa del adoptante; el informe calcula tests/FILLs contra el commit actual en
   vez de copiar conteos manuales; probe funcional con commit/plataforma/fecha y consumo desde
@@ -20,7 +20,9 @@
   el boundary portable con preflight de capacidades y review final observable; la telemetría
   ya emite eventos v2 con identidad/fase/commit/triage desconocido, los lectores normalizan
   streams mixtos v1/v2 sin reescribirlos y el ledger puede promover detecciones mediante
-  `source_event_ids[]`. Fases 7b–10 pendientes.
+  `source_event_ids[]`; `escape-rate` ya cuenta findings únicos en una ventana explícita y
+  `gate-value` separa eventos únicos, actividad, promoción y cobertura de latencia sin llamar
+  “false-positive” a lo que sigue sin triar. Fases 8–10 pendientes.
 - **Salud:** las suites herméticas de capabilities, upgrade y clasificación están verdes. La
   capacidad runtime de Semgrep en esta máquina está **broken**: su binario revienta al inicializar
   X509. La fase 2 ya separa ambos hechos; un clasificador verde no convierte el entorno en verde.
@@ -54,8 +56,8 @@
 
 ## Próximo paso
 
-- **Siguiente entrega:** fase 7b — `escape-rate` desde findings únicos y `gate-value` desde
-  eventos de actividad/latencia, sin doble conteo entre ledger y telemetría.
+- **Siguiente entrega:** fase 8 — ejecutar/fijar la rotación existente de lecciones y reducir
+  la obligación de lectura al arranque sin perder detectores ni el archivo histórico.
 - El informe del adoptante sigue siendo una verificación posterior, no bloquea esta iniciativa.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
   SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`

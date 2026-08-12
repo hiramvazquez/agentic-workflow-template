@@ -1283,7 +1283,7 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
 - **Regla:** para contadores, captura la salida con `|| true` y normaliza vacío después
   (`: "${COUNT:=0}"`). No uses `grep -c ... || echo 0`. Fija también el conjunto vacío: es donde
   se ve el salto de línea que los casos con datos ocultan.
-- **Detector:** tools/tests/test_findings_cli.sh::test_gate_value_reporta_cero_una_sola_vez_con_stream_vacio
+- **Detector:** tools/tests/test_metrics.sh::test_gate_value_reporta_cero_una_sola_vez_con_stream_vacio
 - **Área:** tools/metrics/gate-value.sh
 
 ### [2026-08-12] Añadir campos al evento no migra a sus productores
@@ -1304,8 +1304,60 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   descarta su stdout antes de aplicar el fallback.
 - **Detector:** tools/tests/test_findings_cli.sh::test_anti_rafaga_no_colapsa_fases_ni_commits_distintos
   + ::test_evento_v2_normaliza_ceros_iniciales_a_json_valido
-  + ::test_reviewer_gate_registra_una_deteccion_y_duracion_en_ms
+  + tools/tests/test_metrics.sh::test_reviewer_gate_registra_una_deteccion_y_duracion_en_ms
   + ::test_evento_v2_repo_sin_head_usa_unknown_sin_stdout_residual
   + ::test_source_event_explicito_sin_valor_falla_sin_escribir
   + ::test_evento_v2_reemplaza_todos_los_controles_que_invalidan_json
 - **Área:** scripts/agent-hooks/lib/io.sh · scripts/agent-hooks/reviewer-gate.sh · tools/findings/findings.sh
+
+### [2026-08-12] Omitir una línea corrupta convirtió “no pude medir” en cero
+- **Qué pasó:** los lectores de métricas advertían y saltaban una línea JSONL inválida. Si la
+  fuente solo contenía esa línea —o si los registros válidos quedaban fuera de la ventana— el
+  reporte terminaba con exit 0 y una población vacía indistinguible de “no hubo actividad”.
+- **Causa raíz:** se trató una lectura parcial como un dataset válido. La advertencia en stderr
+  no cambia el contrato de éxito ni impide que automatización posterior consuma el JSON.
+- **Regla:** una fuente de evidencia existente pero estructuralmente corrupta es “no pude
+  medir”: el lector aborta con exit 3 y no emite un reporte de éxito, aunque ya haya leído filas
+  válidas. Esto aplica también al normalizador standalone: primero valida/materializa el stream
+  completo y solo después publica stdout. Los datos semánticamente incompletos que sí se acepten
+  deben quedar cuantificados en la salida; la corrupción de transporte no se normaliza a cero.
+- **Detector:** tools/tests/test_metrics.sh::test_jsonl_corrupto_es_exit3_no_poblacion_cero
+- **Área:** tools/metrics/read-events.py · tools/metrics/metrics-report.py
+
+### [2026-08-12] Validar el prefijo de un timestamp no valida el instante
+- **Qué pasó:** `gate-value` recortaba `ts[:10]` y parseaba solo la fecha. Un valor como
+  `2026-08-10NOT-A-TIME` entraba en la ventana, sumaba actividad y dejaba `invalid_dates=0`.
+- **Causa raíz:** el campo se usó como clave de agrupación antes de validar su contrato completo;
+  un prefijo casualmente válido convirtió basura semántica en evidencia medible.
+- **Regla:** valida el valor completo antes de derivar una clave parcial. Para eventos v1/v2,
+  parsea el timestamp ISO entero, exige zona horaria y normaliza el instante a UTC; solo después
+  extrae el día. Dos representaciones del mismo instante deben caer en la misma ventana. Los
+  valores inválidos quedan fuera del denominador y cuantificados explícitamente.
+- **Detector:** tools/tests/test_metrics.sh::test_gate_value_valida_timestamp_completo_no_solo_prefijo_fecha
+- **Área:** tools/metrics/metrics-report.py
+
+### [2026-08-12] Normalizar los datos a UTC no basta si la ventana sigue siendo local
+- **Qué pasó:** los eventos ya derivaban su día en UTC, pero el `--until` implícito se calculaba
+  con `date.today()` en el timezone del host. Cerca de medianoche, local y CI podían medir rangos
+  distintos sobre el mismo log.
+- **Causa raíz:** se normalizó solo un lado de la comparación temporal. Un dato UTC comparado con
+  límites locales sigue teniendo semántica dependiente del entorno.
+- **Regla:** datos y límites comparten la misma base temporal. Si la métrica agrupa por día UTC,
+  su ventana por defecto también nace del día UTC; los overrides explícitos siguen siendo fechas
+  literales. Verifícalo con zonas cuyo desfase total garantice días locales distintos.
+- **Detector:** tools/tests/test_metrics.sh::test_ventana_default_usa_dia_utc_en_cualquier_timezone_del_host
+- **Área:** tools/metrics/metrics-report.py
+
+### [2026-08-12] Cuantificar un descarte no reemplaza la señal de su causa
+- **Qué pasó:** los reportes contaban `invalid_dates`, pero sus parsers capturaban el error y
+  devolvían `None` en silencio. El agregado decía cuántos datos faltaban sin dejar una señal local
+  de por qué fueron descartados, y el trinquete de Semgrep bloqueó el commit.
+- **Causa raíz:** se confundió observabilidad del resultado con observabilidad del fallo. Son dos
+  contratos distintos: el contador sirve al consumidor del reporte; stderr sirve al operador que
+  debe diagnosticar una fuente dañada.
+- **Regla:** si una entrada inválida se excluye legítimamente, cuantifica el descarte y emite una
+  señal genérica sin copiar el dato potencialmente sensible. No tragues la excepción ni relajes el
+  detector que la encontró. Enumera también los retornos tempranos: la ruta de excepción no es la
+  única forma de descartar una entrada.
+- **Detector:** tools/tests/test_metrics.sh::test_gate_value_valida_timestamp_completo_no_solo_prefijo_fecha
+- **Área:** tools/metrics/metrics-report.py

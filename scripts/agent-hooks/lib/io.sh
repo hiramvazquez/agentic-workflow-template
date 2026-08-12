@@ -131,12 +131,12 @@ hook_block_or_warn() {
   printf '%s\n' "$1" >&2; exit 2
 }
 
-# ── Telemetría de detecciones (alimenta escape-rate) ────────────────
+# ── Telemetría de detecciones (alimenta gate-value) ─────────────────
 # hook_log_detection <source> <rule> <area> [n] [duration_ms] [phase]
 #
 # El eslabón que faltaba en el bucle de aprendizaje: los gates DETECTABAN y
-# todo se descartaba — cuatro scripts leían el ledger, cero lo escribían, así
-# que escape-rate.sh nunca iba a tener datos (PRD 0002 §2).
+# todo se descartaba. Desde el schema v2, los eventos miden actividad/latencia
+# en gate-value; solo su promoción durable al ledger alimenta escape-rate.
 #
 # Es un EVENTO de métrica, no un finding curado: va a un canal local separado
 # (.agents/state/, gitignored, como la trayectoria) para no ahogar el ledger.
@@ -205,10 +205,9 @@ hook_log_detection() {
     # ── Anti-ráfaga: el MISMO evento repetido no son N detecciones ─────
     # Observado en vivo: un SubagentStop puede dispararse 8-10 veces para el
     # mismo veredicto, y el log acababa con diez líneas idénticas separadas
-    # por segundos. Eso no es ruido cosmético: escape-rate mide contención
-    # por fase CONTANDO estos eventos, así que una ráfaga inventa nueve
-    # detecciones que nunca ocurrieron y sesga la única métrica que dice si
-    # el harness sirve. Ventana corta y caché de una ranura (las ráfagas son
+    # por segundos. Eso no es ruido cosmético: gate-value mide actividad y
+    # latencia contando estos eventos, así que una ráfaga inventa nueve
+    # detecciones que nunca ocurrieron. Ventana corta y caché de una ranura (las ráfagas son
     # contiguas): barato, sin parsear el JSONL y sin tocar su esquema.
     # Un evento legítimamente repetido más tarde SÍ se registra.
     local win="${DETECTION_DEDUP_WINDOW:-120}" now prev commit

@@ -251,7 +251,8 @@ relaja **solo el marker** (juicio humano), jamás un trinquete o las capas.
 
 ## 9. El bucle que hace que esto mejore solo
 
-- Los gates registran cada detección → `bash tools/metrics/escape-rate.sh` te dice en qué
+- Los gates registran cada detección → `bash tools/metrics/gate-value.sh` mide actividad/latencia;
+  `bash tools/metrics/escape-rate.sh` cuenta los findings promovidos y te dice en qué
   fase se caza cada defecto. **La tendencia de ese número es la única evidencia real de que
   puedes bajar la revisión humana.**
 - Todo hallazgo va al ledger: `bash tools/findings/findings.sh add|close|list`.

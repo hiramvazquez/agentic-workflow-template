@@ -119,7 +119,7 @@ por diseño, y evadirlo con shell solo engaña al anillo local — en CI no cuel
   `Detector:`** (un archivo/test que exista — se verifica). Lección sin detector = prosa.
 - **Preset `full` (equipo):** las sesiones que tocan código quedan en la cola del
   `process-judge` hasta que su veredicto las cierra. En `lite` no hay cola.
-- **De vez en cuando:** `bash tools/metrics/escape-rate.sh` — en qué fase se caza cada
+- **De vez en cuando:** `bash tools/metrics/escape-rate.sh --days 30` — en qué fase se caza cada
   defecto. Esa tendencia es la única evidencia real de que puedes delegar más.
 
 ## 5. Chuleta

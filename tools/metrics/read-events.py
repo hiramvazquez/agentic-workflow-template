@@ -57,7 +57,7 @@ def read(path: Path) -> Iterable[dict[str, Any]]:
                     raise ValueError("el evento no es un objeto")
             except (json.JSONDecodeError, ValueError) as error:
                 print(f"⚠️  evento inválido en {path}:{line_number}: {error}", file=sys.stderr)
-                continue
+                raise ValueError(f"evento inválido en {path}:{line_number}") from error
             yield normalize(raw)
 
 
@@ -65,7 +65,14 @@ def main(argv: list[str]) -> int:
     if len(argv) != 2:
         print("uso: read-events.py <detections.jsonl>", file=sys.stderr)
         return 2
-    for event in read(Path(argv[1])):
+    try:
+        # Valida el stream completo antes de publicar una sola fila: stdout
+        # parcial + exit 3 sigue siendo un artefacto consumible por callers
+        # descuidados y no cumple el contrato fail-loud de esta evidencia.
+        events = list(read(Path(argv[1])))
+    except ValueError:
+        return 3
+    for event in events:
         print(json.dumps(event, ensure_ascii=False, separators=(",", ":")))
     return 0
 

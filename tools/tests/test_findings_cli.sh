@@ -11,11 +11,8 @@
 
 _fcli_sandbox() {
   local d; d="$(mktemp -d)"
-  mkdir -p "$d/tools/findings" "$d/tools/metrics" "$d/docs/process" "$d/scripts/agent-hooks/lib"
+  mkdir -p "$d/tools/findings" "$d/docs/process" "$d/scripts/agent-hooks/lib"
   cp "$PROJECT_ROOT/tools/findings/findings.sh" "$d/tools/findings/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/read-events.py" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/escape-rate.sh" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/gate-value.sh" "$d/tools/metrics/" 2>/dev/null
   cp "$PROJECT_ROOT/scripts/agent-hooks/lib/io.sh" "$d/scripts/agent-hooks/lib/" 2>/dev/null
   ( cd "$d" || exit 1; git init -q . 2>/dev/null; "$1" )
   local rc=$?; rm -rf "$d"; return $rc
@@ -264,80 +261,6 @@ PY
 }
 test_anti_rafaga_no_colapsa_fases_ni_commits_distintos() {
   _fcli_sandbox _case_dedup_distingue_fase_y_commit
-}
-
-_case_reviewer_gate_cablea_duracion_en_ms() {
-  grep -Fq 'hook_log_detection "reviewer-gate" "budget-warning" "pre-commit" 1 "$(( (GATE_T1 - GATE_T0) * 1000 ))" gate' \
-    "$PROJECT_ROOT/scripts/agent-hooks/reviewer-gate.sh" \
-    || { echo "    reviewer-gate aún pasa segundos como n en vez de duration_ms"; return 1; }
-}
-test_reviewer_gate_registra_una_deteccion_y_duracion_en_ms() {
-  _case_reviewer_gate_cablea_duracion_en_ms
-}
-
-_case_lector_normaliza_v1_y_preserva_v2() {
-  mkdir -p .agents/state/metrics
-  printf '%s\n' \
-    '{"ts":"2026-08-01T00:00:00Z", "source": "semgrep", "rule":"x", "area":"a", "n":2}' \
-    '{"schema":2,"event_id":"evt-real","ts":"2026-08-02T00:00:00Z","phase":"review","source":"reviewer","duration_ms":41,"commit":"abc","triage":"unknown","n":1}' \
-    > .agents/state/metrics/detections.jsonl
-  python3 tools/metrics/read-events.py .agents/state/metrics/detections.jsonl > normalized.jsonl \
-    || { echo "    el lector mixto falló"; return 1; }
-  python3 - <<'PY'
-import json
-events = [json.loads(line) for line in open("normalized.jsonl", encoding="utf-8")]
-legacy, current = events
-assert legacy["schema"] == 1
-assert legacy["event_id"] is None
-assert legacy["triage"] == "unknown"
-assert legacy["phase"] == "gate"
-assert legacy["duration_ms"] is None and legacy["commit"] is None
-assert current["schema"] == 2 and current["event_id"] == "evt-real"
-assert current["phase"] == "review" and current["duration_ms"] == 41
-PY
-}
-test_lector_acepta_jsonl_v1_y_v2_y_v1_queda_unknown() {
-  _fcli_sandbox _case_lector_normaliza_v1_y_preserva_v2
-}
-
-_case_metricas_consumen_stream_mixto() {
-  mkdir -p .agents/state/metrics tools/findings
-  : > tools/findings/ledger.jsonl
-  printf '%s\n' \
-    '{"ts":"2026-08-01T00:00:00Z", "source": "semgrep", "rule":"x", "area":"a", "n":2}' \
-    '{"schema":2,"event_id":"evt-real","ts":"2026-08-02T00:00:00Z","phase":"review","source":"reviewer","duration_ms":41,"commit":"abc","triage":"unknown","n":3}' \
-    > .agents/state/metrics/detections.jsonl
-
-  local escape gate
-  escape="$(bash tools/metrics/escape-rate.sh --json)" || return 1
-  gate="$(bash tools/metrics/gate-value.sh)" || return 1
-  python3 - "$escape" <<'PY'
-import json, sys
-report = json.loads(sys.argv[1])
-assert report["total"] == 5
-assert report["gate"] == 2
-assert report["review"] == 3
-PY
-  printf '%s\n' "$gate" | grep -Eq '^  semgrep +1 +activo' \
-    || { echo "    gate-value no contó el evento v1 con espacios"; return 1; }
-  printf '%s\n' "$gate" | grep -Eq '^  reviewer +1 +activo' \
-    || { echo "    gate-value no contó el evento v2"; return 1; }
-}
-test_escape_rate_y_gate_value_aceptan_stream_mixto_v1_v2() {
-  _fcli_sandbox _case_metricas_consumen_stream_mixto
-}
-
-_case_gate_value_stream_vacio_no_duplica_ceros() {
-  mkdir -p .agents/state/metrics tools/findings
-  : > .agents/state/metrics/detections.jsonl
-  : > tools/findings/ledger.jsonl
-  local out
-  out="$(bash tools/metrics/gate-value.sh)" || return 1
-  printf '%s\n' "$out" | grep -q 'Eventos registrados: 0   ·   findings en el ledger: 0' \
-    || { echo "    un stream vacío produjo un contador partido/duplicado: $out"; return 1; }
-}
-test_gate_value_reporta_cero_una_sola_vez_con_stream_vacio() {
-  _fcli_sandbox _case_gate_value_stream_vacio_no_duplica_ceros
 }
 
 _case_evento_jamas_rompe() {

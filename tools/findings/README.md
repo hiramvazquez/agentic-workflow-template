@@ -48,7 +48,8 @@ bash tools/findings/findings.sh add --title "..." --area "file:line" \
 bash tools/findings/findings.sh close f-xxxx --resolution "commit abc123"
 bash tools/findings/findings.sh list --status open
 bash tools/findings/findings.sh render      # regenera la vista humana
-bash tools/metrics/escape-rate.sh           # contención por fase (ledger + eventos)
+bash tools/metrics/escape-rate.sh           # defectos únicos del ledger (ventana 30d)
+bash tools/metrics/gate-value.sh            # actividad/latencia de eventos (ventana 30d)
 ```
 
 Los gates escriben **eventos** solos (`hook_log_detection`), siempre con `triage:"unknown"`.
@@ -56,6 +57,12 @@ Después del triage, `add/import --source-event <event_id>` guarda la relación 
 `source_event_ids[]` del finding durable. Puede repetirse el flag para unir varias detecciones;
 los IDs se deduplican sin cambiar su orden. El evento local no se reescribe: una detección no
 se disfraza retrospectivamente de true-positive (AGENTS.md §10).
+
+Las dos métricas no comparten denominador: `escape-rate` cuenta una vez cada `id` del ledger
+dentro de `--days` o `--since/--until`; jamás suma eventos. `gate-value` cuenta eventos únicos,
+actividad `n` y cobertura de `duration_ms`. Un evento enlazado está **promovido**; uno sin enlace
+sigue **untriaged**, no “false-positive”. Mientras no exista triage negativo durable, el FP rate
+se muestra `n/a` — ausencia de promoción no es evidencia de falsedad.
 
 ## Invariante clave (auto-flow)
 

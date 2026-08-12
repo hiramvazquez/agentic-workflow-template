@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 51 · Total: 52
+Abiertos: **1** · Cerrados: 58 · Total: 59
 
 ## Abiertos
 
@@ -66,3 +66,10 @@ Abiertos: **1** · Cerrados: 51 · Total: 52
 | `f-event-unborn-head` | fixed | El rc fallido descarta stdout y fija unknown; regresión test_evento_v2_repo_sin_head_usa_unknown_sin |
 | `f-source-event-sin-valor` | fixed | Validación fail-closed para argumento ausente o vacío antes de escribir; regresión test_source_event |
 | `f-event-json-control-chars` | fixed | El emisor reemplaza U+0001–U+001F por espacios antes de escapar JSON; regresión test_evento_v2_reemp |
+| `f-metrics-corrupt-jsonl-empty-green` | fixed | Los lectores abortan con exit 3 ante cualquier línea inválida, incluso después de registros válidos; |
+| `f-read-events-partial-on-corrupt` | fixed | El CLI materializa y valida todo el stream antes de imprimir; la regresión de JSONL corrupto exige e |
+| `f-metrics-timestamp-prefix` | fixed | Se parsea el timestamp ISO completo, se exige zona horaria y se cuantifican como invalid_dates los v |
+| `f-metrics-window-timezone` | fixed | El timestamp válido se normaliza a UTC antes de derivar el día; la regresión usa dos representacione |
+| `f-metrics-default-window-local-tz` | fixed | La ventana por defecto parte del día UTC; una regresión compara hosts TZ=Pacific/Kiritimati y TZ=Etc |
+| `f-metrics-invalid-date-silent` | fixed | Cada parse inválido emite una señal genérica sin filtrar el dato; Semgrep staged vuelve a 0 warnings |
+| `f-metrics-invalid-date-guard-silent` | fixed | Todos los paths inválidos emiten la misma señal genérica; la regresión exige cuatro warnings para cu |

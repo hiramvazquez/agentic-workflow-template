@@ -415,7 +415,7 @@ _case_sync_trae_la_maquinaria_nueva() {
   # La enumeración es deliberada: un directorio nuevo de maquinaria no queda
   # cubierto porque otro directorio vecino sí viaje.
   ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures tools/findings/fixtures \
-      tools/agent-backends tools/agent-prompts backlog \
+      tools/agent-backends tools/agent-prompts tools/metrics backlog \
     && printf 'let x = 1\n' > tools/semgrep/fixtures/swift-malo.swift \
     && printf '{"id":"f-x","detail":"prosa ajena"}\n' > tools/findings/fixtures/ledger-bueno.jsonl \
     && printf '{"schema":1,"capabilities":{"ring3":{}}}\n' > tools/capabilities.json \
@@ -423,6 +423,8 @@ _case_sync_trae_la_maquinaria_nueva() {
     && chmod +x tools/agent-backends/fake.sh \
     && printf 'prompt portable\n' > tools/agent-prompts/backlog.md \
     && printf 'cycles.command=<!-- FILL -->\n' > tools/architecture.conf.example \
+    && cp "$PROJECT_ROOT/tools/metrics/read-events.py" tools/metrics/read-events.py \
+    && cp "$PROJECT_ROOT/tools/metrics/metrics-report.py" tools/metrics/metrics-report.py \
     && printf 'plantilla v2 del template\n' > backlog/_template.md \
     && printf 'historia del proyecto\n' > backlog/0001-mia.md \
     && git add -A && git commit -qm "template: corpus + plantilla" ) >/dev/null 2>&1
@@ -441,6 +443,8 @@ _case_sync_trae_la_maquinaria_nueva() {
     || { echo "    tools/agent-prompts NO viajó: los consumidores llegan sin contrato común"; return 1; }
   grep -q 'cycles.command' tools/architecture.conf.example \
     || { echo "    architecture.conf.example NO viajó: el clasificador llega sin configuración documentada"; return 1; }
+  [ -f tools/metrics/read-events.py ] && [ -f tools/metrics/metrics-report.py ] \
+    || { echo "    tools/metrics llegó incompleto: wrappers/tests sin lectores y reporte compartido"; return 1; }
   grep -q 'plantilla v2' backlog/_template.md \
     || { echo "    backlog/_template.md NO viajó: el gate de criterios llega sin sus instrucciones"; return 1; }
   grep -q 'historia LOCAL' backlog/0001-mia.md \
