@@ -208,7 +208,7 @@ git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
 # del proyecto (sus historias), pero la PLANTILLA es harness — y desde que
 # `run.sh` exige la sección de verificación de criterios, mandar el gate sin
 # mandar la plantilla sería mandar la exigencia sin las instrucciones.
-SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/tests tools/semgrep/rules tools/semgrep/fixtures tools/metrics .github/workflows backlog/_template.md"
+SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/tests tools/semgrep/rules tools/semgrep/fixtures tools/findings/fixtures tools/metrics .github/workflows backlog/_template.md"
 SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
 
 # ── Qué cuenta como marcador FILL (y qué NO) ────────────────────────

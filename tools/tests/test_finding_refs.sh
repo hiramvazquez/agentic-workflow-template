@@ -195,3 +195,62 @@ test_los_dos_checks_corren_limpios_contra_el_repo_real() {
     echo "    check-version-claims falla contra el ledger real del repo (exit $rc):"
     printf '%s\n' "$out" | tail -8 | sed 's/^/      /'; return 1; }
 }
+
+# ════════════════════════════════════════════════════════════════════
+# EL CORPUS DE PROSA AJENA (tools/findings/fixtures/)
+# ════════════════════════════════════════════════════════════════════
+# `check-version-claims` se validó contra el ledger del template —38 entradas,
+# disparó en 1, y era la defectuosa— y pareció cirugía. El primer adoptante lo
+# corrió contra el suyo (61 entradas, prosa española densa, historias y
+# criterios numerados) y disparó 3 veces con DOS falsos positivos: 67%, muy por
+# encima del 10% que el propio detector cita como criterio de diseño.
+#
+# La lección, que es la del ciclo anterior un piso más arriba:
+#   **"contra el artefacto real" incluye el artefacto real de OTRO.**
+#   Quien escribe el detector escribe, sin querer, el corpus que lo aprueba.
+#
+# Estos dos tests son el mecanismo. El BUENO es el que importa: es el guard de
+# falsos positivos de toda la capa, y sus entradas `[adoptante]` son texto real
+# copiado literal — su valor está en no haberlo escrito nosotros.
+_FIX="tools/findings/fixtures"
+
+test_el_corpus_de_prosa_ajena_no_produce_ni_un_hallazgo() {
+  local f="$PROJECT_ROOT/$_FIX/ledger-bueno.jsonl"
+  [ -f "$f" ] || { echo "    falta el corpus BUENO ($_FIX/ledger-bueno.jsonl)"; return 1; }
+  local out rc
+  out="$(cd "$PROJECT_ROOT" && FINDINGS_LEDGER="$_FIX/ledger-bueno.jsonl" \
+         bash tools/check-version-claims.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    FALSO POSITIVO sobre prosa que no escribimos nosotros (exit $rc):"
+    printf '%s\n' "$out" | grep '^  - ' | sed 's/^/      /'
+    echo "    Recuerda el reparto: 'no tiene' en español es CARECER, no 'no soporta';"
+    echo "    y <palabra> <número> casa con 'criterio 6', 'la 0006', 'Los 3 casts'."
+    return 1; }
+  case "$out" in *"afirmaciones=0"*) : ;; *)
+    echo "    contó afirmaciones donde no las hay: $out"; return 1 ;; esac
+}
+
+test_el_corpus_malo_dispara_en_todas_sus_formas() {
+  # El guard del guard: arreglar los falsos positivos no puede vaciar el
+  # detector. Cada forma que caza tiene su línea aquí.
+  local f="$PROJECT_ROOT/$_FIX/ledger-malo.jsonl" n
+  [ -f "$f" ] || { echo "    falta el corpus MALO ($_FIX/ledger-malo.jsonl)"; return 1; }
+  n="$(grep -c '"id"' "$f" 2>/dev/null || echo 0)"
+  local out; out="$(cd "$PROJECT_ROOT" && FINDINGS_LEDGER="$_FIX/ledger-malo.jsonl" \
+                    bash tools/check-version-claims.sh 2>&1)"
+  case "$out" in *"afirmaciones=$n"*) : ;; *)
+    echo "    el corpus MALO tiene $n entradas y el detector no las cazó todas:"
+    printf '%s\n' "$out" | head -2 | sed 's/^/      /'
+    echo "    Una forma que deja de dispararse es un agujero, no una mejora."
+    return 1 ;; esac
+}
+
+test_el_corpus_ajeno_lleva_los_textos_que_produjeron_el_fallo() {
+  # Un corpus que se reescribe "para que quede mejor" deja de reproducir nada.
+  # Los dos textos que el adoptante midió tienen que seguir ahí, literales.
+  local f="$PROJECT_ROOT/$_FIX/ledger-bueno.jsonl"
+  grep -q 'no tiene test que lo verifique' "$f" 2>/dev/null \
+    || { echo "    desapareció del corpus el FP 'criterio 6 ... no tiene test'"; return 1; }
+  grep -q 'no tiene alternativa' "$f" 2>/dev/null \
+    || { echo "    desapareció del corpus el FP 'Los 3 casts ... no tiene alternativa'"; return 1; }
+}

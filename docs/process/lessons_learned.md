@@ -1220,3 +1220,35 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   + ::test_encadenar_la_suite_al_build_propio_no_avisa (regañar a quien encadena la suite a su
   build le enseñaría a QUITARLA: el gate produciría lo contrario de lo que persigue)
 - **Área:** tools/verify.conf · tools/verify-run.sh
+
+### [2026-08-12] El detector se validó contra el único ledger que no lo iba a romper
+- **Qué pasó:** `check-version-claims.sh` se midió contra el ledger de este repo —38 entradas,
+  disparó en 1, y era la defectuosa— y esa cifra se escribió en su cabecera como prueba de que
+  era quirúrgico. El primer adoptante lo corrió contra el suyo: 61 entradas, prosa española
+  densa, historias y criterios numerados. **3 disparos, 2 falsos positivos: 67%**, seis veces por
+  encima del 10% que el propio detector cita como criterio de diseño, y bloqueando su push.
+- **Causa raíz:** dos defectos que por separado eran tolerables y juntos rompen el detector.
+  `<palabra> <número>` es, en prosa española real, todas partes (*criterio 6*, *la 0006*, *Los 3
+  únicos casts*, *nivel 4*); y `tiene` estaba en la lista de verbos de incapacidad cuando en
+  español **"no tiene" es CARECER**, no "no soporta" (*no tiene test*, *no tiene alternativa*).
+  Ninguno de los dos podía verse desde dentro: el corpus contra el que se validó lo había
+  escrito el mismo que escribió el detector.
+- **Regla:** **"contra el artefacto real" incluye el artefacto real de OTRO.** Un detector que
+  lee prosa se valida contra prosa que no escribiste tú — otro idioma, otra densidad de números,
+  otras muletillas. Es la evolución de la ley anterior (*el primer fallo de una pieza que procesa
+  un artefacto del repo aparece contra ESE artefacto*): resulta que hay un fallo posterior, y
+  aparece contra el artefacto del primero que lo instale. Mecanismo, no buena intención:
+  `tools/findings/fixtures/` con un `ledger-bueno.jsonl` de prosa ajena —entradas `[adoptante]`
+  copiadas **literales**, sin "mejorarlas"— y un `ledger-malo.jsonl` con una línea por forma que
+  el detector caza. Mismo patrón que `tools/semgrep/fixtures/`, y por el mismo motivo: el fixture
+  BUENO es el guard de falsos positivos de toda la capa.
+  Corolario para las listas de verbos: distingue **soporte** (`soporta`, `parsea`, `entiende`,
+  `admite`, `implementa`) de **posesión y cobertura** (`tiene`, `trae`, `cubre`). Las segundas
+  son lenguaje corriente y meterlas en un detector es meter el idioma entero.
+- **Detector:** tools/tests/test_finding_refs.sh::test_el_corpus_de_prosa_ajena_no_produce_ni_un_hallazgo
+  + ::test_el_corpus_malo_dispara_en_todas_sus_formas (arreglar los FP no puede vaciar el
+  detector) + ::test_el_corpus_ajeno_lleva_los_textos_que_produjeron_el_fallo (un corpus que se
+  reescribe para que "quede mejor" deja de reproducir nada), y
+  tools/tests/test_upgrade.sh::test_sync_trae_la_maquinaria_nueva, porque un corpus que no viaja
+  deja al adoptante con el test y sin el archivo que busca.
+- **Área:** tools/check-version-claims.sh · tools/findings/fixtures/

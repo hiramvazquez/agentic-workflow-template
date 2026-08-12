@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 43 · Total: 44
+Abiertos: **1** · Cerrados: 44 · Total: 45
 
 ## Abiertos
 
@@ -58,3 +58,4 @@ Abiertos: **1** · Cerrados: 43 · Total: 44
 | `f-state-lanzaba-el-runner` | fixed | El estado se DERIVA de una ejecucion real (invariante n1): cada corrida escribe .agents/state/mutati |
 | `f-detector-cita-un-test-fantasma` | fixed | Toda referencia archivo::test_x de la linea Detector se resuelve contra las funciones del archivo, l |
 | `f-template-sin-verify-cableado` | fixed | verify.conf cableado con bash tools/tests/run-tests.sh (el producto del template es el harness). El  |
+| `f-version-claims-fp-en-espanol` | fixed | Verbos de posesion y cobertura fuera (tiene, trae, cubre); solo quedan los de soporte. El sujeto no  |

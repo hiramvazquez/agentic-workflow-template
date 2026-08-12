@@ -65,23 +65,77 @@ ledger = os.environ["CVC_LEDGER"]
 #                                            puede verificar con la copia que
 #                                            tienes: exige mirar la fuente.
 #
-# Sin esa distinción el check saltaría con cada número de versión del ledger
-# (medido: 2 de 38 entradas disparan; con la regla ingenua, muchas más) y
+# Sin esa distinción el check saltaría con cada número de versión del ledger y
 # moriría por la ley del 10% en su primera semana.
-_TOOL_VER = r'[A-Za-z][A-Za-z0-9_.+@/-]{1,24}[ ]+v?\d+(?:\.\d+)*'
-_NO_PUEDE = (r'no[ ]+(?:lo[ ]+)?(?:soporta|parsea|entiende|admite|implementa|'
-             r'trae|tiene|cubre)|no[ ]+est[aá][ ]+disponible|'
+#
+# ⚠️ Y ESO ES EXACTAMENTE LO QUE HIZO en el primer ledger ajeno que vio.
+# Medición del adoptante: 3 disparos, 2 falsos positivos (67%). Las dos causas,
+# que por separado eran tolerables y juntas rompen el detector:
+#
+#   1. `<palabra> <número>` es, en prosa española, todas partes: "criterio 6",
+#      "la 0006", "Los 3 únicos casts", "nivel 4", "sección 5".
+#   2. `tiene` estaba en la lista de verbos, y **en español "no tiene" es
+#      CARECER, no "no soporta"**: "no tiene test", "no tiene alternativa".
+#
+# La lista de verbos se queda solo con los que hablan de SOPORTE. `tiene`,
+# `trae` y `cubre` son posesión y cobertura — se van, y con ellos los dos FP,
+# sin perder el verdadero positivo (que entra por `parsea`).
+_NO_PUEDE = (r'no[ ]+(?:lo[ ]+)?(?:soporta|parsea|entiende|admite|implementa)|'
+             r'no[ ]+est[aá][ ]+disponible|'
              r'no[ ]+(?:es|resulta)[ ]+compatible')
-DISPARA = [
-    # <herramienta> <versión> … <no puede X>   (la afirmación y su sujeto, en
-    # la misma oración: el corte en [.;|] impide cruzar de frase y atribuir
-    # una negación a un número que estaba tres frases más arriba)
-    re.compile(rf'{_TOOL_VER}[^.;|]{{0,90}}?(?:{_NO_PUEDE})', re.I),
-    # "no hay / no existe versión|release|upgrade que…"  (aquí ni siquiera hay
-    # número: es la conclusión negativa en su forma más pura)
-    re.compile(r'no[ ]+(?:hay|existe|queda)[ ]+(?:ning[uú]n[ao]?[ ]+)?'
-               r'(?:versi[oó]n|release|upgrade|actualizaci[oó]n)', re.I),
-]
+
+# Y el sujeto tiene que poder ser una HERRAMIENTA. Dos filtros baratos que no
+# dependen de conocer los nombres de las herramientas del mundo:
+#
+#   · un número de versión no lleva ceros a la izquierda. "0006" es una
+#     historia, un PRD o un ticket — nunca una versión.
+#   · el token de delante no puede ser un determinante ni un enumerador. Una
+#     herramienta no se llama "los", "la", "criterio" ni "nivel".
+#
+# Es una lista corta y cerrada de palabras ESTRUCTURALES, no un diccionario:
+# cada entrada se defiende sola y no crece con el vocabulario del proyecto.
+_NO_ES_HERRAMIENTA = {
+    # determinantes / artículos (ES + EN)
+    "el", "la", "los", "las", "un", "una", "unos", "unas", "lo", "al", "del",
+    "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas", "su", "sus",
+    "the", "a", "an", "this", "that", "these", "those", "its",
+    # enumeradores: cosas que en este dominio se numeran y NO son herramientas
+    "criterio", "criterios", "historia", "historias", "nivel", "niveles",
+    "seccion", "sección", "paso", "pasos", "capa", "capas", "anillo", "anillos",
+    "regla", "reglas", "punto", "puntos", "fase", "fases", "item", "items",
+    "ítem", "prd", "adr", "tipo", "tipos", "opcion", "opción", "opciones",
+    "linea", "línea", "lineas", "líneas", "caso", "casos", "ejemplo", "ejemplos",
+    "entrada", "entradas", "hallazgo", "hallazgos", "finding", "findings",
+    "tabla", "apartado", "capitulo", "capítulo", "test", "tests", "commit",
+    "commits", "issue", "issues", "ticket", "step", "layer", "rule", "line",
+}
+# `versión` NO está en la lista, y es deliberado: "la versión 16 de muter no
+# soporta X" es justo el caso que este detector existe para pedir.
+_TOOL_VER = re.compile(r'(?<![A-Za-z0-9_.-])([A-Za-z][A-Za-z0-9_.+@/-]{1,24})[ ]+'
+                       r'v?(\d+(?:\.\d+)*)(?![0-9])')
+
+_TRAS_LA_VERSION = re.compile(rf'^[^.;|]{{0,90}}?(?:{_NO_PUEDE})', re.I)
+# La conclusión negativa en su forma más pura: aquí ni siquiera hay número.
+_SIN_VERSION = re.compile(r'no[ ]+(?:hay|existe|queda)[ ]+(?:ning[uú]n[ao]?[ ]+)?'
+                          r'(?:versi[oó]n|release|upgrade|actualizaci[oó]n)', re.I)
+
+def dispara(texto):
+    """Devuelve la frase que dispara, o None. La afirmación y su sujeto tienen
+    que ir en la MISMA oración: el corte en [.;|] impide atribuir una negación
+    a un número que estaba tres frases más arriba."""
+    m = _SIN_VERSION.search(texto)
+    if m:
+        return m.group(0)
+    for m in _TOOL_VER.finditer(texto):
+        nombre, numero = m.group(1), m.group(2)
+        if nombre.lower() in _NO_ES_HERRAMIENTA:
+            continue
+        if len(numero) > 1 and numero[0] == "0":
+            continue          # "0006" es una historia, no una versión
+        cola = _TRAS_LA_VERSION.search(texto[m.end():])
+        if cola:
+            return (m.group(0) + cola.group(0)).strip()
+    return None
 
 # ── Qué SATISFACE ──────────────────────────────────────────────────
 # La procedencia: el repositorio, no el escaparate del gestor de paquetes.
@@ -114,14 +168,13 @@ with open(ledger, encoding="utf-8") as f:
         if not isinstance(d, dict):
             continue
         texto = " | ".join(str(d.get(k) or "") for k in CAMPOS)
-        disparo = next((r.search(texto) for r in DISPARA if r.search(texto)), None)
+        disparo = dispara(texto)
         if not disparo:
             continue
         afirmaciones += 1
         if REPO.search(texto) or EXCEPCION.search(texto):
             continue
-        sin_repo.append((d.get("id", "?"), disparo.group(0).strip(),
-                         bool(GESTOR.search(texto))))
+        sin_repo.append((d.get("id", "?"), disparo, bool(GESTOR.search(texto))))
 
 if malas:
     print(f"⚠️  check-version-claims: {malas} línea(s) del ledger no son JSON.",

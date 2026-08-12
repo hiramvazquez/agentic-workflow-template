@@ -412,8 +412,9 @@ _case_sync_trae_la_maquinaria_nueva() {
   # se queda con un test que busca un archivo que nunca llegó. Pasó al crear
   # tools/semgrep/fixtures/. Igual con backlog/_template.md: mandar el gate que
   # exige la sección de verificación sin mandar la plantilla que la explica.
-  ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures backlog \
+  ( cd "$TPL_DIR" && mkdir -p tools/semgrep/fixtures tools/findings/fixtures backlog \
     && printf 'let x = 1\n' > tools/semgrep/fixtures/swift-malo.swift \
+    && printf '{"id":"f-x","detail":"prosa ajena"}\n' > tools/findings/fixtures/ledger-bueno.jsonl \
     && printf 'plantilla v2 del template\n' > backlog/_template.md \
     && printf 'historia del proyecto\n' > backlog/0001-mia.md \
     && git add -A && git commit -qm "template: corpus + plantilla" ) >/dev/null 2>&1
@@ -422,6 +423,8 @@ _case_sync_trae_la_maquinaria_nueva() {
   bash tools/upgrade.sh >/dev/null 2>&1
   [ -f tools/semgrep/fixtures/swift-malo.swift ] \
     || { echo "    el corpus de fixtures NO viajó: su test llegaría sin el archivo que busca"; return 1; }
+  [ -f tools/findings/fixtures/ledger-bueno.jsonl ] \
+    || { echo "    el corpus de PROSA AJENA no viajó: el guard de FP de los checks del ledger llega vacío"; return 1; }
   grep -q 'plantilla v2' backlog/_template.md \
     || { echo "    backlog/_template.md NO viajó: el gate de criterios llega sin sus instrucciones"; return 1; }
   grep -q 'historia LOCAL' backlog/0001-mia.md \
