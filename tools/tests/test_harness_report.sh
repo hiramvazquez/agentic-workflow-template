@@ -64,3 +64,23 @@ _case_acota_el_tamano() {
   esac
 }
 test_report_acota_y_declara_el_truncado() { _hr_sandbox _case_acota_el_tamano; }
+
+_case_inventario_se_calcula_en_runtime() {
+  printf '%s\n' '#!/usr/bin/env bash' 'test_uno() { :; }' 'test_dos() { :; }' \
+    > tools/tests/test_fixture.sh
+  printf '<!-- FILL: uno -->\n<!-- FILL -->\nEsta prosa menciona `<!-- FILL: ejemplo -->` pero no es marker.\n' > placeholders.md
+  git add tools/tests/test_fixture.sh placeholders.md
+  git commit -qm inventario 2>/dev/null
+  # El inventario declara evidence_commit=HEAD: cambios del worktree no deben
+  # contaminar el snapshot aunque parezcan tests/markers válidos.
+  printf '%s\n' 'test_tres() { :; }' >> tools/tests/test_fixture.sh
+  printf '<!-- FILL: tres -->\n' >> placeholders.md
+  local out
+  out="$(bash tools/harness-report.sh 2>/dev/null)"
+  assert_contains "$out" 'tests_discovered=2'
+  assert_contains "$out" 'fill_markers=2'
+  assert_contains "$out" 'evidence_commit='
+}
+test_report_calcula_tests_y_fills_sin_conteos_manuales() {
+  _hr_sandbox _case_inventario_se_calcula_en_runtime
+}

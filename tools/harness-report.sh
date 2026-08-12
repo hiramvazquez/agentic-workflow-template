@@ -52,6 +52,18 @@ _tailf() { # _tailf <archivo> <n> [descripcion]
     echo "_(sin datos: \`$1\` no existe${3:+ — $3})_"
   fi
 }
+_runtime_inventory() {
+  local tests=0 fills=0 commit="unknown"
+  tests="$(git grep -hE '^test_[A-Za-z0-9_]+[[:space:]]*\(\)' HEAD -- 'tools/tests/test_*.sh' 2>/dev/null \
+    | wc -l | tr -d ' ')"
+  fills="$(git grep -I -h -E '^[[:space:]]*([#;]|//|--)?[[:space:]]*<!--[[:space:]]*FILL([[:space:]:>-]|$)' HEAD -- . 2>/dev/null \
+    | wc -l | tr -d ' ')"
+  commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  echo "tests_discovered=${tests:-0}"
+  echo "fill_markers=${fills:-0}"
+  echo "evidence_commit=$commit"
+  echo "evidence_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
 
 {
   echo "# Harness report — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -67,6 +79,11 @@ _tailf() { # _tailf <archivo> <n> [descripcion]
   for b in claude git semgrep gitleaks lefthook jq python3; do
     printf '%-9s %s\n' "$b:" "$(_ver "$b")"
   done
+  echo '```'
+
+  _section "1b. Inventario calculado (no snapshots manuales)"
+  echo '```'
+  _runtime_inventory
   echo '```'
 
   _section "2. Salud (validate-harness, checks estáticos)"
