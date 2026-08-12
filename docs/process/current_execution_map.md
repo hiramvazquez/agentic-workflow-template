@@ -11,12 +11,11 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** nada abierto. La última tanda cerró los dos checks de credibilidad del ledger,
-  el nivel 4 con cuatro estados, el gate de evidencia del propio template y el corpus de prosa
-  ajena.
-- **Salud:** `bash tools/tests/run-tests.sh` → **347 verde**. Findings abiertos: **1**
-  (`f-mutation-score-nunca-medido`, decisión del owner — bloqueo de runner del adoptante,
-  no del template). 75 lecciones, todas con detector.
+- **En curso:** PRD 0004, reconciliación del workflow agéntico. Fase 1a implementada: manifiesto
+  estructurado de capacidades y renderer/check de bloques exactos; fases 1b–10 pendientes.
+- **Salud:** tests dirigidos de capacidades → **9/9 verdes**. Snapshot de suite completa del
+  2026-08-11 tras fase 1a: **354/356 verdes**; los dos fallos son el smoke real de Semgrep, cuyo binario
+  local revienta al inicializar X509. La fase 2 separará salud del clasificador y del entorno.
 
 ## Cómo se trabaja aquí (el bucle, no la historia)
 
@@ -31,7 +30,9 @@
 
 ## Próximo paso
 
-- **Esperando informe del adoptante** sobre la última tanda.
+- **Siguiente entrega:** fase 1b — migrar claims operativos de README/ADOPTION/CI a bloques
+  generados desde `tools/capabilities.json` y corregir rutas/CLIs obsoletos.
+- El informe del adoptante sigue siendo una verificación posterior, no bloquea esta iniciativa.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en
   SU ledger, no en este — los ids de un adoptante no resuelven aquí, y `check-finding-refs.sh`
   caza la cita si alguien la pega).

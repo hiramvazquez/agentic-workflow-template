@@ -1,6 +1,6 @@
 # PRD — Reconciliar y simplificar el workflow agéntico
 
-> **Tipo:** Forward · **Status:** Approved
+> **Tipo:** Forward · **Status:** In progress
 > **Autor:** Codex + owner · **Fecha:** 2026-08-11 · **Tracking:** commits de las fases 1a–10
 > **Design-review:** OK (2026-08-11) — AMBER final atendido antes de aprobación
 

@@ -51,6 +51,7 @@ tools/lesson-detector-link.sh                :: test_lessons.sh
 tools/findings/findings.sh                   :: test_findings_cli.sh
 tools/check-finding-refs.sh                  :: test_finding_refs.sh
 tools/check-version-claims.sh                :: test_finding_refs.sh
+tools/render-capabilities.sh                 :: test_capabilities.sh
 "
 
 test_todo_detector_tiene_tests_de_falso_positivo() {
