@@ -132,7 +132,7 @@ hook_block_or_warn() {
 }
 
 # ── Telemetría de detecciones (alimenta escape-rate) ────────────────
-# hook_log_detection <source> <rule> <area> [n]
+# hook_log_detection <source> <rule> <area> [n] [duration_ms] [phase]
 #
 # El eslabón que faltaba en el bucle de aprendizaje: los gates DETECTABAN y
 # todo se descartaba — cuatro scripts leían el ledger, cero lo escribían, así
@@ -144,15 +144,63 @@ hook_block_or_warn() {
 # CONTRATO DURO: best-effort TOTAL. La telemetría JAMÁS puede romper al gate
 # que la llama — siempre devuelve 0, pase lo que pase (sin python3, sin disco,
 # sin git). Fijado por test_telemetria_rota_jamas_rompe_al_gate.
+_hook_json_string() {
+  local value="${1:-}" oct ch
+  # JSON prohíbe U+0000–U+001F crudos. Bash no puede transportar NUL, pero sí
+  # los otros 31; se reemplazan por espacio para conservar una sola línea y
+  # no depender de python/jq en el emisor best-effort.
+  for oct in 001 002 003 004 005 006 007 010 011 012 013 014 015 016 017 \
+             020 021 022 023 024 025 026 027 030 031 032 033 034 035 036 037; do
+    printf -v ch '%b' "\\$oct"
+    value="${value//$ch/ }"
+  done
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
 hook_log_detection() {
   (
     set +e
     local src="${1:-?}" rule="${2:-?}" area="${3:-?}" n="${4:-1}"
+    local duration="${5:-}" phase="${6:-}" duration_json="null"
     local dir="${PROJECT_ROOT:-$(pwd)}/.agents/state/metrics"
     mkdir -p "$dir" 2>/dev/null || exit 0
-    case "$n" in ''|*[!0-9]*) n=1 ;; esac
-    # JSON a mano con saneo mínimo: sin dependencia de python3/jq a propósito.
-    src="${src//\"/}"; rule="${rule//\"/}"; area="${area//\"/}"
+    case "$n" in
+      ''|*[!0-9]*) n=1 ;;
+      *) while [ "$n" != "0" ] && [ "${n#0}" != "$n" ]; do n="${n#0}"; done ;;
+    esac
+    case "$duration" in
+      ''|*[!0-9]*) : ;;
+      *)
+        while [ "$duration" != "0" ] && [ "${duration#0}" != "$duration" ]; do
+          duration="${duration#0}"
+        done
+        duration_json="$duration" ;;
+    esac
+
+    # La fase no se infiere después desde prosa ni desde `rule`: se fija al
+    # emitir. Los callers viejos no la pasaban, así que el fallback explícito
+    # conserva su bucket histórico por source durante la transición v1→v2.
+    case "$phase" in
+      in-loop|gate|review|ci|human|prod) : ;;
+      *)
+        case "$src" in
+          post-edit-verify|linter|typecheck) phase="in-loop" ;;
+          reviewer|security-reviewer|design-reviewer|process-judge) phase="review" ;;
+          ci) phase="ci" ;;
+          human-review) phase="human" ;;
+          prod|user-report|incident) phase="prod" ;;
+          *) phase="gate" ;;
+        esac ;;
+    esac
+
+    # JSON a mano, sin dependencia de python3/jq a propósito: una máquina sin
+    # runtime puede perder telemetría, pero jamás romper el gate que la llama.
+    # Se eliminan todos los controles que harían inválida una línea JSONL.
+    src="$(_hook_json_string "$src")"
+    rule="$(_hook_json_string "$rule")"
+    area="$(_hook_json_string "$area")"
 
     # ── Anti-ráfaga: el MISMO evento repetido no son N detecciones ─────
     # Observado en vivo: un SubagentStop puede dispararse 8-10 veces para el
@@ -163,9 +211,14 @@ hook_log_detection() {
     # el harness sirve. Ventana corta y caché de una ranura (las ráfagas son
     # contiguas): barato, sin parsear el JSONL y sin tocar su esquema.
     # Un evento legítimamente repetido más tarde SÍ se registra.
-    local win="${DETECTION_DEDUP_WINDOW:-120}" now prev
+    local win="${DETECTION_DEDUP_WINDOW:-120}" now prev commit
     now="$(date +%s 2>/dev/null || echo 0)"
-    local key="$src|$rule|$area|$n"
+    if ! commit="$(git -C "${PROJECT_ROOT:-$(pwd)}" rev-parse HEAD 2>/dev/null)"; then
+      commit="unknown"
+    fi
+    [ -n "$commit" ] || commit="unknown"
+    commit="$(_hook_json_string "$commit")"
+    local key="$src|$rule|$area|$n|$phase|$commit"
     local cache="$dir/.last-detection"
     if [ "$now" != "0" ] && [ -f "$cache" ]; then
       prev="$(cat "$cache" 2>/dev/null)"
@@ -180,9 +233,21 @@ hook_log_detection() {
     fi
     printf '%s|%s' "$now" "$key" > "$cache" 2>/dev/null
 
-    printf '{"ts":"%s","source":"%s","rule":"%s","area":"%s","n":%s}\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo '?')" \
-      "$src" "$rule" "$area" "$n" >> "$dir/detections.jsonl" 2>/dev/null
+    # `mktemp` presta unicidad local/concurrente sin depender de uuidgen. El
+    # archivo solo reserva el sufijo y se retira antes de appendear el evento.
+    local token_file token event_id ts
+    token_file="$(mktemp "$dir/.event-id.XXXXXX" 2>/dev/null)"
+    if [ -n "$token_file" ]; then
+      token="${token_file##*.event-id.}"
+      rm -f "$token_file" 2>/dev/null
+    else
+      token="$$-${RANDOM:-0}"
+    fi
+    event_id="evt-${now}-${token}"
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo '?')"
+    printf '{"schema":2,"event_id":"%s","ts":"%s","phase":"%s","source":"%s","duration_ms":%s,"commit":"%s","triage":"unknown","rule":"%s","area":"%s","n":%s}\n' \
+      "$event_id" "$ts" "$phase" "$src" "$duration_json" "$commit" \
+      "$rule" "$area" "$n" >> "$dir/detections.jsonl" 2>/dev/null
     exit 0
   ) 2>/dev/null
   return 0

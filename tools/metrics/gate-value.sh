@@ -34,6 +34,23 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 DETECTIONS="${DETECTIONS_LOG:-.agents/state/metrics/detections.jsonl}"
 LEDGER="${FINDINGS_LEDGER:-tools/findings/ledger.jsonl}"
 
+# Vista mixta durante la migración: JSONL v1 se expone como unknown/null y
+# JSONL v2 conserva su identidad. El log local nunca se reescribe.
+EVENTS_VIEW="$DETECTIONS"
+EVENTS_TMP=""
+if [ -f "$DETECTIONS" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -f tools/metrics/read-events.py ]; then
+  EVENTS_TMP="$(mktemp 2>/dev/null)"
+  if [ -n "$EVENTS_TMP" ] \
+     && python3 tools/metrics/read-events.py "$DETECTIONS" > "$EVENTS_TMP"; then
+    EVENTS_VIEW="$EVENTS_TMP"
+    trap 'rm -f "$EVENTS_TMP" 2>/dev/null' EXIT
+  else
+    [ -n "$EVENTS_TMP" ] && rm -f "$EVENTS_TMP" 2>/dev/null
+    EVENTS_TMP=""
+  fi
+fi
+
 echo "━━━ Valor por gate: ¿sigue siendo load-bearing? ━━━"
 echo ""
 
@@ -43,8 +60,9 @@ if [ ! -f "$DETECTIONS" ]; then
   exit 0
 fi
 
-TOTAL="$(grep -c . "$DETECTIONS" 2>/dev/null || echo 0)"
-echo "Eventos registrados: $TOTAL   ·   findings en el ledger: $(grep -c . "$LEDGER" 2>/dev/null || echo 0)"
+TOTAL="$(grep -c . "$EVENTS_VIEW" 2>/dev/null || true)"; : "${TOTAL:=0}"
+LEDGER_TOTAL="$(grep -c . "$LEDGER" 2>/dev/null || true)"; : "${LEDGER_TOTAL:=0}"
+echo "Eventos registrados: $TOTAL   ·   findings en el ledger: $LEDGER_TOTAL"
 echo ""
 
 # Inventario de gates DECLARADOS: los que el harness dice tener. Se compara
@@ -57,7 +75,7 @@ mutation-score exec-bits reviewer skill-reminder"
 printf '  %-22s %8s   %s\n' "GATE" "EVENTOS" "LECTURA"
 printf '  %-22s %8s   %s\n' "──────────────────────" "───────" "─────────────────────────────"
 for g in $GATES; do
-  n="$(grep -c "\"source\":\"$g\"" "$DETECTIONS" 2>/dev/null || true)"
+  n="$(grep -c "\"source\":\"$g\"" "$EVENTS_VIEW" 2>/dev/null || true)"
   case "$n" in ''|*[!0-9]*) n=0 ;; esac
   if [ "$n" -gt 0 ]; then
     printf '  %-22s %8s   %s\n' "$g" "$n" "activo — está cazando cosas"

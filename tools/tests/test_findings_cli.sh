@@ -11,8 +11,11 @@
 
 _fcli_sandbox() {
   local d; d="$(mktemp -d)"
-  mkdir -p "$d/tools/findings" "$d/docs/process" "$d/scripts/agent-hooks/lib"
+  mkdir -p "$d/tools/findings" "$d/tools/metrics" "$d/docs/process" "$d/scripts/agent-hooks/lib"
   cp "$PROJECT_ROOT/tools/findings/findings.sh" "$d/tools/findings/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/metrics/read-events.py" "$d/tools/metrics/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/metrics/escape-rate.sh" "$d/tools/metrics/" 2>/dev/null
+  cp "$PROJECT_ROOT/tools/metrics/gate-value.sh" "$d/tools/metrics/" 2>/dev/null
   cp "$PROJECT_ROOT/scripts/agent-hooks/lib/io.sh" "$d/scripts/agent-hooks/lib/" 2>/dev/null
   ( cd "$d" || exit 1; git init -q . 2>/dev/null; "$1" )
   local rc=$?; rm -rf "$d"; return $rc
@@ -76,6 +79,76 @@ EOF
 }
 test_import_es_idempotente_y_respeta_estados() { _fcli_sandbox _case_import_idempotente; }
 
+# ── promoción explícita: evento local → finding durable ───────────
+_case_add_promueve_evento_sin_reescribirlo() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" \
+    hook_log_detection "semgrep" "regla-x" "src/x.swift" 1
+  local log=".agents/state/metrics/detections.jsonl" event_id before after
+  event_id="$(python3 -c 'import json,sys; print(json.loads(open(sys.argv[1], encoding="utf-8").readline())["event_id"])' "$log")"
+  before="$(cksum < "$log")"
+
+  _cli add --id f-linked --title "Promovido" --area src/x.swift \
+    --source semgrep --source-event "$event_id" --source-event "$event_id" >/dev/null 2>&1 \
+    || { echo "    add --source-event falló"; return 1; }
+  after="$(cksum < "$log")"
+
+  [ "$before" = "$after" ] || { echo "    promover el evento reescribió detections.jsonl"; return 1; }
+  python3 - <<'PY'
+import json
+item = json.loads(open("tools/findings/ledger.jsonl", encoding="utf-8").readline())
+assert item["source_event_ids"] == [json.loads(open(".agents/state/metrics/detections.jsonl", encoding="utf-8").readline())["event_id"]]
+assert "triage" not in item
+PY
+}
+test_add_source_event_promueve_sin_reescribir_evento() {
+  _fcli_sandbox _case_add_promueve_evento_sin_reescribirlo
+}
+
+_case_import_fusiona_source_events() {
+  printf '%s\n' '[{"id":"f-i","title":"Importado","area":"a","source":"reviewer","source_event_ids":["evt-a"]}]' > batch.json
+  _cli import batch.json --source-event evt-b --source-event evt-a >/dev/null 2>&1 \
+    || { echo "    import --source-event falló"; return 1; }
+  printf '%s\n' '[{"id":"f-i","title":"Importado","area":"a","source":"reviewer","source_event_ids":["evt-c"]}]' > batch.json
+  _cli import batch.json --source-event evt-b >/dev/null 2>&1
+  python3 - <<'PY'
+import json
+item = json.loads(open("tools/findings/ledger.jsonl", encoding="utf-8").readline())
+assert item["source_event_ids"] == ["evt-a", "evt-b", "evt-c"]
+PY
+}
+test_import_source_event_fusiona_ids_sin_duplicarlos() {
+  _fcli_sandbox _case_import_fusiona_source_events
+}
+
+_case_source_event_sin_valor_falla() {
+  bash tools/findings/findings.sh add --id f-bad --title Malo --area a \
+    --source-event >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    add aceptó --source-event sin valor"; return 1; }
+  [ ! -s tools/findings/ledger.jsonl ] \
+    || { echo "    add inválido igualmente escribió el ledger"; return 1; }
+
+  bash tools/findings/findings.sh add --id f-empty --title Vacío --area a \
+    --source-event '' >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    add aceptó --source-event con valor vacío"; return 1; }
+  [ ! -s tools/findings/ledger.jsonl ] \
+    || { echo "    add con valor vacío igualmente escribió el ledger"; return 1; }
+
+  printf '%s\n' '[{"id":"f-import","title":"Importado","area":"a"}]' > batch.json
+  bash tools/findings/findings.sh import batch.json --source-event >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    import aceptó --source-event sin valor"; return 1; }
+  [ ! -s tools/findings/ledger.jsonl ] \
+    || { echo "    import inválido igualmente escribió el ledger"; return 1; }
+  bash tools/findings/findings.sh import batch.json --source-event '' >/dev/null 2>&1
+  [ "$?" = "2" ] || { echo "    import aceptó --source-event con valor vacío"; return 1; }
+  [ ! -s tools/findings/ledger.jsonl ] \
+    || { echo "    import con valor vacío igualmente escribió el ledger"; return 1; }
+}
+test_source_event_explicito_sin_valor_falla_sin_escribir() {
+  _fcli_sandbox _case_source_event_sin_valor_falla
+}
+
 # ── render: la vista se regenera y avisa de no editarla ─────────────
 _case_render() {
   _cli add --id f-t4 --title "Visible" --area x --severity high --tier owner-decision --source test >/dev/null 2>&1
@@ -97,6 +170,175 @@ _case_evento_se_appendea() {
     || { echo "    el evento no registró el source"; return 1; }
 }
 test_evento_de_deteccion_se_registra() { _fcli_sandbox _case_evento_se_appendea; }
+
+_case_evento_v2_tiene_contrato_explicito() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" \
+    hook_log_detection "canon-enforce" "secreto" "src/x.swift" 2
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" \
+    hook_log_detection "reviewer" "verdict-AMBER" "src/y.swift" 1 37 review
+  python3 - <<'PY'
+import json
+events = [json.loads(line) for line in open(".agents/state/metrics/detections.jsonl", encoding="utf-8")]
+assert len(events) == 2
+gate, review = events
+assert gate["schema"] == 2
+assert gate["event_id"].startswith("evt-")
+assert gate["ts"] and gate["commit"]
+assert gate["phase"] == "gate"
+assert gate["duration_ms"] is None
+assert gate["triage"] == "unknown"
+assert gate["source"] == "canon-enforce" and gate["n"] == 2
+assert review["phase"] == "review" and review["duration_ms"] == 37
+assert review["event_id"] != gate["event_id"]
+PY
+}
+test_evento_v2_declara_identidad_fase_duracion_commit_y_triage() {
+  _fcli_sandbox _case_evento_v2_tiene_contrato_explicito
+}
+
+_case_evento_v2_numeros_son_json_canonico() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" \
+    hook_log_detection "semgrep" "x" "a" 01 08 gate
+  python3 - <<'PY'
+import json
+event = json.loads(open(".agents/state/metrics/detections.jsonl", encoding="utf-8").readline())
+assert event["n"] == 1
+assert event["duration_ms"] == 8
+PY
+}
+test_evento_v2_normaliza_ceros_iniciales_a_json_valido() {
+  _fcli_sandbox _case_evento_v2_numeros_son_json_canonico
+}
+
+_case_evento_v2_escapa_controles_json() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  DETECTION_DEDUP_WINDOW=0 PROJECT_ROOT="$(pwd)" \
+    hook_log_detection $'sem\bgrep' $'control\fchar' $'src/vertical\vtab' 1
+  python3 - <<'PY'
+import json
+event = json.loads(open(".agents/state/metrics/detections.jsonl", encoding="utf-8").readline())
+assert event["source"] == "sem grep"
+assert event["rule"] == "control char"
+assert event["area"] == "src/vertical tab"
+PY
+}
+test_evento_v2_reemplaza_todos_los_controles_que_invalidan_json() {
+  _fcli_sandbox _case_evento_v2_escapa_controles_json
+}
+
+_case_evento_sin_head_declara_unknown() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  PROJECT_ROOT="$(pwd)" hook_log_detection "semgrep" "x" "a" 1
+  python3 - <<'PY'
+import json
+event = json.loads(open(".agents/state/metrics/detections.jsonl", encoding="utf-8").readline())
+assert event["commit"] == "unknown", event["commit"]
+PY
+}
+test_evento_v2_repo_sin_head_usa_unknown_sin_stdout_residual() {
+  _fcli_sandbox _case_evento_sin_head_declara_unknown
+}
+
+_case_dedup_distingue_fase_y_commit() {
+  # shellcheck disable=SC1091
+  . scripts/agent-hooks/lib/io.sh
+  git config user.email t@t.t; git config user.name t
+  printf one > tracked; git add tracked; git commit -qm one
+  PROJECT_ROOT="$(pwd)" hook_log_detection "semgrep" "x" "a" 1 "" gate
+  PROJECT_ROOT="$(pwd)" hook_log_detection "semgrep" "x" "a" 1 "" ci
+  printf two >> tracked; git add tracked; git commit -qm two
+  PROJECT_ROOT="$(pwd)" hook_log_detection "semgrep" "x" "a" 1 "" gate
+  python3 - <<'PY'
+import json
+events = [json.loads(line) for line in open(".agents/state/metrics/detections.jsonl", encoding="utf-8")]
+assert len(events) == 3, events
+assert [event["phase"] for event in events] == ["gate", "ci", "gate"]
+assert events[0]["commit"] != events[2]["commit"]
+PY
+}
+test_anti_rafaga_no_colapsa_fases_ni_commits_distintos() {
+  _fcli_sandbox _case_dedup_distingue_fase_y_commit
+}
+
+_case_reviewer_gate_cablea_duracion_en_ms() {
+  grep -Fq 'hook_log_detection "reviewer-gate" "budget-warning" "pre-commit" 1 "$(( (GATE_T1 - GATE_T0) * 1000 ))" gate' \
+    "$PROJECT_ROOT/scripts/agent-hooks/reviewer-gate.sh" \
+    || { echo "    reviewer-gate aún pasa segundos como n en vez de duration_ms"; return 1; }
+}
+test_reviewer_gate_registra_una_deteccion_y_duracion_en_ms() {
+  _case_reviewer_gate_cablea_duracion_en_ms
+}
+
+_case_lector_normaliza_v1_y_preserva_v2() {
+  mkdir -p .agents/state/metrics
+  printf '%s\n' \
+    '{"ts":"2026-08-01T00:00:00Z", "source": "semgrep", "rule":"x", "area":"a", "n":2}' \
+    '{"schema":2,"event_id":"evt-real","ts":"2026-08-02T00:00:00Z","phase":"review","source":"reviewer","duration_ms":41,"commit":"abc","triage":"unknown","n":1}' \
+    > .agents/state/metrics/detections.jsonl
+  python3 tools/metrics/read-events.py .agents/state/metrics/detections.jsonl > normalized.jsonl \
+    || { echo "    el lector mixto falló"; return 1; }
+  python3 - <<'PY'
+import json
+events = [json.loads(line) for line in open("normalized.jsonl", encoding="utf-8")]
+legacy, current = events
+assert legacy["schema"] == 1
+assert legacy["event_id"] is None
+assert legacy["triage"] == "unknown"
+assert legacy["phase"] == "gate"
+assert legacy["duration_ms"] is None and legacy["commit"] is None
+assert current["schema"] == 2 and current["event_id"] == "evt-real"
+assert current["phase"] == "review" and current["duration_ms"] == 41
+PY
+}
+test_lector_acepta_jsonl_v1_y_v2_y_v1_queda_unknown() {
+  _fcli_sandbox _case_lector_normaliza_v1_y_preserva_v2
+}
+
+_case_metricas_consumen_stream_mixto() {
+  mkdir -p .agents/state/metrics tools/findings
+  : > tools/findings/ledger.jsonl
+  printf '%s\n' \
+    '{"ts":"2026-08-01T00:00:00Z", "source": "semgrep", "rule":"x", "area":"a", "n":2}' \
+    '{"schema":2,"event_id":"evt-real","ts":"2026-08-02T00:00:00Z","phase":"review","source":"reviewer","duration_ms":41,"commit":"abc","triage":"unknown","n":3}' \
+    > .agents/state/metrics/detections.jsonl
+
+  local escape gate
+  escape="$(bash tools/metrics/escape-rate.sh --json)" || return 1
+  gate="$(bash tools/metrics/gate-value.sh)" || return 1
+  python3 - "$escape" <<'PY'
+import json, sys
+report = json.loads(sys.argv[1])
+assert report["total"] == 5
+assert report["gate"] == 2
+assert report["review"] == 3
+PY
+  printf '%s\n' "$gate" | grep -Eq '^  semgrep +1 +activo' \
+    || { echo "    gate-value no contó el evento v1 con espacios"; return 1; }
+  printf '%s\n' "$gate" | grep -Eq '^  reviewer +1 +activo' \
+    || { echo "    gate-value no contó el evento v2"; return 1; }
+}
+test_escape_rate_y_gate_value_aceptan_stream_mixto_v1_v2() {
+  _fcli_sandbox _case_metricas_consumen_stream_mixto
+}
+
+_case_gate_value_stream_vacio_no_duplica_ceros() {
+  mkdir -p .agents/state/metrics tools/findings
+  : > .agents/state/metrics/detections.jsonl
+  : > tools/findings/ledger.jsonl
+  local out
+  out="$(bash tools/metrics/gate-value.sh)" || return 1
+  printf '%s\n' "$out" | grep -q 'Eventos registrados: 0   ·   findings en el ledger: 0' \
+    || { echo "    un stream vacío produjo un contador partido/duplicado: $out"; return 1; }
+}
+test_gate_value_reporta_cero_una_sola_vez_con_stream_vacio() {
+  _fcli_sandbox _case_gate_value_stream_vacio_no_duplica_ceros
+}
 
 _case_evento_jamas_rompe() {
   # FALSO POSITIVO del peor tipo posible: la TELEMETRÍA rompiendo un GATE.

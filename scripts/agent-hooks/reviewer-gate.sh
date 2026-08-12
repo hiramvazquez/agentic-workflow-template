@@ -291,7 +291,7 @@ printf '%s\n' "$out" | grep -q '^⚠️' && { printf '%s\n' "$out" >&2; hook_all
 GATE_T1="$(date +%s 2>/dev/null || echo 0)"
 if [ "$GATE_T1" -gt 0 ] && [ "$GATE_T0" -gt 0 ] && [ $((GATE_T1 - GATE_T0)) -gt 45 ]; then
   echo "⚠️  reviewer-gate tardó $((GATE_T1 - GATE_T0))s (presupuesto 90s). Si llega al timeout, el gate NO bloquea — se salta en silencio. Acota DRIFT_SRC_DIRS o sube el timeout en settings.json." >&2
-  hook_log_detection "reviewer-gate" "budget-warning" "pre-commit" "$((GATE_T1 - GATE_T0))"
+  hook_log_detection "reviewer-gate" "budget-warning" "pre-commit" 1 "$(( (GATE_T1 - GATE_T0) * 1000 ))" gate
 fi
 
 echo "✅ reviewer-gate: detectores verdes + marker válido. Commit permitido." >&2

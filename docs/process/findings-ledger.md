@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 45 · Total: 46
+Abiertos: **1** · Cerrados: 51 · Total: 52
 
 ## Abiertos
 
@@ -60,3 +60,9 @@ Abiertos: **1** · Cerrados: 45 · Total: 46
 | `f-template-sin-verify-cableado` | fixed | verify.conf cableado con bash tools/tests/run-tests.sh (el producto del template es el harness). El  |
 | `f-version-claims-fp-en-espanol` | fixed | Verbos de posesion y cobertura fuera (tiene, trae, cubre); solo quedan los de soporte. El sujeto no  |
 | `f-mapa-de-ejecucion-rancio` | fixed | Mapa reescrito con el estado real (bucle con el adoptante, 347 verde, 1 finding abierto y por que si |
+| `f-event-dedup-dimensiones` | fixed | La clave incluye phase+commit; regresión test_anti_rafaga_no_colapsa_fases_ni_commits_distintos. |
+| `f-event-json-leading-zero` | fixed | Normalización decimal textual antes de serializar; regresión test_evento_v2_normaliza_ceros_iniciale |
+| `f-reviewer-duration-as-count` | fixed | Emite n=1 y duración en milisegundos en el quinto argumento; regresión test_reviewer_gate_registra_u |
+| `f-event-unborn-head` | fixed | El rc fallido descarta stdout y fija unknown; regresión test_evento_v2_repo_sin_head_usa_unknown_sin |
+| `f-source-event-sin-valor` | fixed | Validación fail-closed para argumento ausente o vacío antes de escribir; regresión test_source_event |
+| `f-event-json-control-chars` | fixed | El emisor reemplaza U+0001–U+001F por espacios antes de escapar JSON; regresión test_evento_v2_reemp |

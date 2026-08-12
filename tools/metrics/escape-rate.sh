@@ -30,6 +30,23 @@ LEDGER="${FINDINGS_LEDGER:-tools/findings/ledger.jsonl}"
 DETECTIONS="${DETECTIONS_LOG:-.agents/state/metrics/detections.jsonl}"
 MODE="${1:---text}"
 
+# La transición no reescribe telemetría histórica: se normaliza a una vista
+# temporal. v1 queda con triage=unknown y event_id=null; v2 conserva ambos.
+EVENTS_VIEW="$DETECTIONS"
+EVENTS_TMP=""
+if [ -f "$DETECTIONS" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -f tools/metrics/read-events.py ]; then
+  EVENTS_TMP="$(mktemp 2>/dev/null)"
+  if [ -n "$EVENTS_TMP" ] \
+     && python3 tools/metrics/read-events.py "$DETECTIONS" > "$EVENTS_TMP"; then
+    EVENTS_VIEW="$EVENTS_TMP"
+    trap 'rm -f "$EVENTS_TMP" 2>/dev/null' EXIT
+  else
+    [ -n "$EVENTS_TMP" ] && rm -f "$EVENTS_TMP" 2>/dev/null
+    EVENTS_TMP=""
+  fi
+fi
+
 [ -f "$LEDGER" ] || [ -f "$DETECTIONS" ] || { echo "Sin ledger ni eventos — nada que medir todavía."; exit 0; }
 
 # Dos fuentes que se SUMAN:
@@ -43,14 +60,14 @@ count_source() {
   a="$(grep -c "\"source\": *\"$1\"" "$LEDGER" 2>/dev/null | head -1)"; : "${a:=0}"
   case "$a" in ''|*[!0-9]*) a=0 ;; esac
   b=0
-  if [ -f "$DETECTIONS" ]; then
+  if [ -f "$EVENTS_VIEW" ]; then
     # Suma los `n` de cada evento del source (no cuenta líneas: un evento
     # puede agrupar N hallazgos).
     b="$(awk -F'"source":"' -v s="$1" '
       index($0, "\"source\":\""s"\"") {
         n=1; if (match($0, /"n":[0-9]+/)) n=substr($0, RSTART+4, RLENGTH-4)+0
         total+=n }
-      END { print total+0 }' "$DETECTIONS" 2>/dev/null)"
+      END { print total+0 }' "$EVENTS_VIEW" 2>/dev/null)"
     case "$b" in ''|*[!0-9]*) b=0 ;; esac
   fi
   echo $((a + b))

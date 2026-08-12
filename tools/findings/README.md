@@ -28,8 +28,8 @@ tools/findings/
 docs/process/
   findings-ledger.md  ← VISTA HUMANA generada (NO editar a mano)
 .agents/state/metrics/
-  detections.jsonl    ← EVENTOS de los gates (local, gitignored — telemetría,
-                        no findings curados; los agrega tools/metrics/escape-rate.sh)
+  detections.jsonl    ← EVENTOS v1/v2 de los gates (local, gitignored — telemetría,
+                        no findings curados; read-events.py da lectura mixta)
 ```
 
 > **¿Por qué UN solo CLI?** Existió un `findings.ts` (Deno/Node) "equivalente" — y los dos
@@ -43,28 +43,34 @@ docs/process/
 
 ```bash
 bash tools/findings/findings.sh add --title "..." --area "file:line" \
-     --severity high|medium|low --tier auto-fix|owner-decision --source reviewer
+     --severity high|medium|low --tier auto-fix|owner-decision --source reviewer \
+     --source-event evt-...
 bash tools/findings/findings.sh close f-xxxx --resolution "commit abc123"
 bash tools/findings/findings.sh list --status open
 bash tools/findings/findings.sh render      # regenera la vista humana
 bash tools/metrics/escape-rate.sh           # contención por fase (ledger + eventos)
 ```
 
-Los gates escriben **eventos** solos (`hook_log_detection`); al ledger curado se añade con el
-CLI — normalmente lo hace el agente al cerrar una review o un juicio (AGENTS.md §10).
+Los gates escriben **eventos** solos (`hook_log_detection`), siempre con `triage:"unknown"`.
+Después del triage, `add/import --source-event <event_id>` guarda la relación en
+`source_event_ids[]` del finding durable. Puede repetirse el flag para unir varias detecciones;
+los IDs se deduplican sin cambiar su orden. El evento local no se reescribe: una detección no
+se disfraza retrospectivamente de true-positive (AGENTS.md §10).
 
 ## Invariante clave (auto-flow)
 
 `add`/`import` (detección) **nunca** regresan un hallazgo terminal (`fixed`/`accepted`/`wontfix`)
-a abierto; solo refrescan `updatedAt`. Cambiar estado es **explícito** (`close`/`accept`/`triage`).
-Esto evita que la re-detección nocturna infle el ledger o "des-haga" un fix.
+a abierto; solo refrescan metadatos y fusionan `source_event_ids`. Cambiar estado es
+**explícito** (`close`/`accept`/`triage`). Esto evita que la re-detección nocturna infle el
+ledger o "des-haga" un fix.
 
 ## Comandos
 
 ```bash
 F="bash tools/findings/findings.sh"
-$F add --title "Token en logs" --area "src/auth.ts:42" --severity high --tier owner-decision
-$F import /tmp/batch.json          # ingesta masiva (salida de un sub-agente)
+$F add --title "Token en logs" --area "src/auth.ts:42" --severity high \
+   --tier owner-decision --source-event evt-...
+$F import /tmp/batch.json --source-event evt-...  # aplica el vínculo a cada item del batch
 $F list --status open --tier owner-decision [--json]
 $F close <id> --resolution "commit abc"     $F accept <id> --reason "..."
 $F render                          # regenera la vista md

@@ -1269,3 +1269,43 @@ ignora entero. Decláralo explícitamente para que no se confunda con un olvido:
   — fija la decisión en las DOS direcciones (la fila está en el corpus malo y NO puede aparecer
   en el bueno), porque una decisión razonada que no se fija la "arregla" el siguiente que pase.
 - **Área:** tools/check-version-claims.sh · tools/findings/fixtures/
+
+### [2026-08-12] Un fallback añadió un segundo cero a un resultado válido
+- **Qué pasó:** al introducir lectura mixta v1/v2, el caso de stream vacío mostró que
+  `gate-value.sh` imprimía `Eventos registrados: 0` y luego otro `0` en la línea siguiente.
+  La forma `grep -c ... || echo 0` parecía un fallback normal, pero `grep -c` **ya imprime 0**
+  cuando no encuentra líneas y después devuelve exit 1; el `echo` añadía un segundo valor a la
+  misma sustitución de comando. El contador de findings tenía el mismo defecto.
+- **Causa raíz:** se confundió “el comando no produjo resultado” con “el comando produjo el
+  resultado cero y usó exit 1 para decir que no hubo matches”. En herramientas Unix, stdout y
+  exit code son contratos distintos; aplicar un fallback de texto solo por rc puede duplicar
+  una salida perfectamente válida.
+- **Regla:** para contadores, captura la salida con `|| true` y normaliza vacío después
+  (`: "${COUNT:=0}"`). No uses `grep -c ... || echo 0`. Fija también el conjunto vacío: es donde
+  se ve el salto de línea que los casos con datos ocultan.
+- **Detector:** tools/tests/test_findings_cli.sh::test_gate_value_reporta_cero_una_sola_vez_con_stream_vacio
+- **Área:** tools/metrics/gate-value.sh
+
+### [2026-08-12] Añadir campos al evento no migra a sus productores
+- **Qué pasó:** el evento v2 tenía campos correctos en el emisor y sus tests unitarios, pero el
+  review adversarial encontró roturas en las fronteras: la clave de dedup no incluía las
+  dimensiones nuevas; ceros iniciales producían números JSON inválidos; `reviewer-gate` seguía
+  pasando duración en la posición antigua de `n`; un repo sin primer commit conservaba stdout
+  residual de `git rev-parse`; `--source-event` ausente o vacío terminaba en éxito sin vínculo;
+  y caracteres de control admitidos por Bash convertían la línea JSON en inválida.
+- **Causa raíz:** se validó el nuevo objeto aislado, no el recorrido completo **caller → emisor
+  → almacenamiento → lector → promoción durable**. Un esquema compatible en el centro no
+  repara contratos posicionales viejos ni claves de identidad construidas antes de que existieran
+  los campos nuevos. Además, stdout y exit code de una dependencia son canales independientes:
+  un comando fallido puede haber impreso algo que no debe convertirse en dato.
+- **Regla:** toda migración de esquema enumera y prueba sus productores reales, dimensiones de
+  deduplicación, serialización de bordes, estado inicial vacío y flags explícitos incompletos.
+  Un flag que promete trazabilidad falla cerrado si no puede crearla; una dependencia fallida
+  descarta su stdout antes de aplicar el fallback.
+- **Detector:** tools/tests/test_findings_cli.sh::test_anti_rafaga_no_colapsa_fases_ni_commits_distintos
+  + ::test_evento_v2_normaliza_ceros_iniciales_a_json_valido
+  + ::test_reviewer_gate_registra_una_deteccion_y_duracion_en_ms
+  + ::test_evento_v2_repo_sin_head_usa_unknown_sin_stdout_residual
+  + ::test_source_event_explicito_sin_valor_falla_sin_escribir
+  + ::test_evento_v2_reemplaza_todos_los_controles_que_invalidan_json
+- **Área:** scripts/agent-hooks/lib/io.sh · scripts/agent-hooks/reviewer-gate.sh · tools/findings/findings.sh

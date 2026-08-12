@@ -14,7 +14,8 @@
 #   Cerrar es explícito (close/accept).
 #
 #   bash tools/findings/findings.sh add --title T --area A [--id I] [--severity s]
-#        [--tier t] [--source s] [--detail d] [--effort e] [--links a,b]
+#        [--tier t] [--source s] [--source-event EVENT_ID] [--detail d]
+#        [--effort e] [--links a,b]
 #   bash tools/findings/findings.sh close ID --resolution "..."
 #   bash tools/findings/findings.sh accept ID --reason "..."
 #   bash tools/findings/findings.sh import batch.json
@@ -65,6 +66,7 @@ def fhash(s):
 
 def upsert(items, f):
     fid = f.get("id") or fhash((f.get("area") or "") + (f.get("title") or ""))
+    incoming_events = unique_strings(f.get("source_event_ids") or [])
     for ex in items:
         if ex["id"] == fid:
             ex["updatedAt"] = today
@@ -75,7 +77,11 @@ def upsert(items, f):
                 # No-terminal: refresca campos informativos (y estado si viene).
                 for k in ("detail", "severity", "tier", "status", "resolution", "effort"):
                     if f.get(k) is not None: ex[k] = f[k]
-            # TERMINAL: no se resucita. Solo updatedAt/source arriba.
+            if incoming_events:
+                ex["source_event_ids"] = unique_strings(
+                    (ex.get("source_event_ids") or []) + incoming_events
+                )
+            # TERMINAL: no se resucita. Solo metadatos/source_event_ids arriba.
             return items
     items.append({
         "id": fid, "title": f.get("title") or "(sin título)", "area": f.get("area") or "?",
@@ -83,6 +89,7 @@ def upsert(items, f):
         "status": f.get("status") or "open", "source": f.get("source") or "manual",
         "detail": f.get("detail") or "", "effort": f.get("effort"),
         "resolution": f.get("resolution"), "links": f.get("links") or [],
+        "source_event_ids": incoming_events,
         "createdAt": f.get("createdAt") or today, "updatedAt": today,
     })
     return items
@@ -121,13 +128,37 @@ def flag(rest, name):
     except (ValueError, IndexError):
         return None
 
+def flags(rest, name):
+    values = []
+    needle = f"--{name}"
+    for i, value in enumerate(rest):
+        if value == needle and i + 1 < len(rest) and not rest[i + 1].startswith("--"):
+            values.append(rest[i + 1])
+    return values
+
+def require_flag_values(rest, name):
+    needle = f"--{name}"
+    for i, value in enumerate(rest):
+        if value == needle and (
+            i + 1 >= len(rest) or not rest[i + 1] or rest[i + 1].startswith("--")
+        ):
+            print(f"❌ {needle} requiere un valor.", file=sys.stderr)
+            sys.exit(2)
+
+def unique_strings(values):
+    result = []
+    for value in values:
+        if isinstance(value, str) and value and value not in result:
+            result.append(value)
+    return result
+
 USAGE = """findings.sh — CLI portable del ledger (mismo esquema que findings.ts):
   add --title T --area A [--id I] [--severity high|medium|low] [--tier auto-fix|owner-decision]
-      [--source S] [--detail D] [--effort S|M|L] [--links a,b]
+      [--source S] [--source-event EVENT_ID] [--detail D] [--effort S|M|L] [--links a,b]
   update ID [--title T] [--area A] [--severity S] [--detail D] [--tier T] [--links a,b]
   close ID --resolution "..."      accept ID --reason "..."
   drop ID --reason "..."           (retira una entrada que NUNCA fue un hallazgo)
-  import batch.json                list [--status open] [--tier T] [--json]
+  import batch.json [--source-event EVENT_ID]   list [--status open] [--tier T] [--json]
   render"""
 
 args = sys.argv[1:]
@@ -145,6 +176,7 @@ if not cmd or cmd in ("-h", "--help", "help") or "--help" in rest or "-h" in res
 items = load()
 
 if cmd == "add":
+    require_flag_values(rest, "source-event")
     # Un `add` sin lo mínimo indispensable FALLA en vez de inventar defaults.
     # Un ledger es accountability: una entrada con área "?" y sin título no
     # es un hallazgo, es ruido que alguien tendrá que limpiar a mano.
@@ -163,7 +195,8 @@ if cmd == "add":
         sys.exit(2)
     items = upsert(items, {k: flag(rest, k) for k in
         ("id","title","area","severity","tier","source","detail","effort","status")} |
-        ({"links": flag(rest,"links").split(",")} if flag(rest,"links") else {}))
+        ({"links": flag(rest,"links").split(",")} if flag(rest,"links") else {}) |
+        {"source_event_ids": flags(rest, "source-event")})
     save(items); render(items)
 elif cmd == "update":
     if not rest or rest[0].startswith("--"):
@@ -203,8 +236,17 @@ elif cmd == "drop":
     save(items); render(items)
     print(f"✅ {rest[0]} retirado del ledger — {flag(rest[1:], 'reason')}")
 elif cmd == "import":
+    if not rest or rest[0].startswith("--"):
+        print("❌ import requiere el archivo JSON del batch.", file=sys.stderr); sys.exit(2)
+    require_flag_values(rest[1:], "source-event")
     with open(rest[0], encoding="utf-8") as f: batch = json.load(f)
-    for b in batch: items = upsert(items, b)
+    cli_events = flags(rest[1:], "source-event")
+    for b in batch:
+        promoted = dict(b)
+        promoted["source_event_ids"] = unique_strings(
+            (b.get("source_event_ids") or []) + cli_events
+        )
+        items = upsert(items, promoted)
     save(items); render(items)
 elif cmd == "close":
     for i in items:

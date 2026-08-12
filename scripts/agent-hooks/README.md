@@ -72,10 +72,17 @@ adversario con shell — para eso está el Anillo 3 (ver README raíz, "Qué gar
 
 ## Telemetría (nivel 9)
 
-`hook_log_detection <source> <rule> <area> [n]` (en `lib/io.sh`) registra cada detección en
-`.agents/state/metrics/detections.jsonl` (local, gitignored). `tools/metrics/escape-rate.sh` lo
-agrega con el ledger. Contrato duro: **best-effort total — la telemetría jamás rompe al gate
-que la llama** (devuelve 0 pase lo que pase; hay test que lo fija sin python3 en el PATH).
+`hook_log_detection <source> <rule> <area> [n] [duration_ms] [phase]` (en `lib/io.sh`) registra
+cada detección en `.agents/state/metrics/detections.jsonl` (local, gitignored). Emite JSONL v2
+con `event_id`, fase, commit y `triage:"unknown"`; si el gate no midió latencia,
+`duration_ms` queda en `null`, nunca en un cero inventado. Los callers v1 conservan su fase por
+un mapeo explícito de `source`. `tools/metrics/read-events.py` permite a los reportes consumir
+mezclados eventos v1 y v2 sin reescribir el histórico: v1 queda `triage=unknown` y sin identidad.
+
+Contrato duro: **best-effort total — la telemetría jamás rompe al gate que la llama** (devuelve
+0 pase lo que pase; hay test que lo fija sin python3 en el PATH). Un evento sigue siendo
+actividad, no un finding ni un true-positive; el triage se vuelve durable únicamente cuando
+`findings.sh add/import --source-event <event_id>` lo enlaza al ledger.
 
 ## Tests
 
