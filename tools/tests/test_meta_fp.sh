@@ -52,6 +52,7 @@ tools/findings/findings.sh                   :: test_findings_cli.sh
 tools/check-finding-refs.sh                  :: test_finding_refs.sh
 tools/check-version-claims.sh                :: test_finding_refs.sh
 tools/render-capabilities.sh                 :: test_capabilities.sh
+tools/probe-capability.sh                    :: test_capability_probe.sh
 "
 
 test_todo_detector_tiene_tests_de_falso_positivo() {
