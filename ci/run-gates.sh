@@ -195,7 +195,7 @@ fi
 #     pre-commit: leen el árbol entero, no el diff staged, así que en cada
 #     commit bloquearían por algo que ni siquiera has stageado — el falso
 #     positivo que acaba con un `--no-verify` de costumbre (ley del 10%).
-for _chk in tools/check-finding-refs.sh tools/check-version-claims.sh; do
+for _chk in tools/check-finding-refs.sh tools/check-version-claims.sh tools/check-execution-map.sh; do
   [ -f "$_chk" ] || continue
   bash "$_chk"; _rc=$?
   # exit 3 = no pude mirar (sin ledger, sin python3). En CI bloquea, como el

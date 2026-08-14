@@ -11,6 +11,29 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-13] El paso del workflow que nadie ejecutaba mentía en el arranque de cada sesión
+- **Qué pasó:** en un adoptante real, `current_execution_map.md` afirmó *"adopción del harness
+  completada; sin código de producto todavía"* durante **cinco historias shipped**, con las cuatro
+  capas cableadas de punta a punta contra una API real. El paso 4.3 de `feature-workflow.md`
+  ("Update current_execution_map.md") no lo ejecutaba ningún mecanismo: grep sin resultados en
+  `tools/backlog/` y en las cinco historias.
+- **Causa raíz:** una regla escrita solo en prosa se lee como cumplida. Y aquí el daño se
+  amplificaba, porque las ÚNICAS referencias al mapa en el tooling eran los hooks que lo **leen**
+  (`session-start.sh`, `post-compact.sh`): el mecanismo existente propagaba la afirmación caducada
+  a cada arranque y a cada compactación, y ninguno la corregía. No era un doc desactualizado: era
+  desinformación inyectada a todos los agentes siguientes.
+- **Regla:** un doc que el harness IMPRIME como estado necesita un detector de frescura, no un
+  recordatorio. Y el detector mide **fechas de commit**, nunca semántica: comparar afirmaciones
+  contra el código ya se intentó aquí y dio 67% de falsos positivos contra prosa española
+  (`check-version-claims`), muy por encima del 10% de la §14.2. La única excepción admitida es una
+  aserción **literal exacta** (`grep -F` de la frase que ya mintió), que no interpreta nada.
+  Corolario general: cuando un paso de un workflow acumule N ocurrencias sin ejecutarse, el arreglo
+  no es repetirlo más alto en el doc — es que deje rastro.
+- **Detector:** tools/check-execution-map.sh (Anillo 3 vía `ci/run-gates.sh`, con tests de falso
+  positivo en `tools/tests/test_execution_map.sh`; `tools/backlog/next.sh` lo surface al cerrar una
+  historia)
+- **Área:** docs/process/current_execution_map.md · .agents/skills/process/references/feature-workflow.md §4.3
+
 ### [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás
 - **Qué pasó:** `ci/run-gates.sh` —el Anillo 3, el backstop que cubre a Codex, a los commits
   humanos y a las máquinas sin lefthook— no tenía ni un test. Cada gate del harness tenía el

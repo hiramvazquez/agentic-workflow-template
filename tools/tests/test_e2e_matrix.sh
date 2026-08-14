@@ -485,7 +485,8 @@ _case_g9_anillo3_invoca_todos_los_gates() {
                 tools/check-layers.sh tools/drift-ratchet.sh tools/verify-run.sh \
                 tools/mutation-score.sh tools/check-review-marker.sh ci/ai-review.sh \
                 tools/lesson-detector-link.sh tools/check-finding-refs.sh \
-                tools/check-version-claims.sh tools/metrics/escape-rate.sh; do
+                tools/check-version-claims.sh tools/check-execution-map.sh \
+                tools/metrics/escape-rate.sh; do
     stub "$nombre" "${recorder/NOMBRE/$nombre}"
   done
   stub bin/gitleaks '#!/usr/bin/env bash\nexit 0\n'
@@ -497,7 +498,7 @@ _case_g9_anillo3_invoca_todos_los_gates() {
                 tools/check-layers.sh tools/drift-ratchet.sh tools/verify-run.sh \
                 tools/mutation-score.sh tools/check-review-marker.sh ci/ai-review.sh \
                 tools/lesson-detector-link.sh tools/check-finding-refs.sh \
-                tools/check-version-claims.sh; do
+                tools/check-version-claims.sh tools/check-execution-map.sh; do
     grep -qxF "$nombre" "$log" || faltan="$faltan $nombre"
   done
   [ -z "$faltan" ] || { echo "    el Anillo 3 no invocó:$faltan"; return 1; }

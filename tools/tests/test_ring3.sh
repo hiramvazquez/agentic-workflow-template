@@ -24,6 +24,40 @@ _case_sin_remoto_ni_ci_falla() {
 }
 test_sin_remoto_ni_ci_es_anillo_ausente() { _r3_sandbox _case_sin_remoto_ni_ci_falla; }
 
+_case_solo_el_remote_del_template_no_cuenta() {
+  # EL VERDE FALSO QUE SE APAGÓ SOLO. `tools/upgrade.sh` registra el remote
+  # `template` en su primera pasada, y con un `[ -n "$(git remote)" ]` a secas
+  # eso bastaba para declarar el Anillo 3 cableado — o sea que el mecanismo de
+  # upgrade desactivaba este gate como efecto secundario. Cazado en un
+  # adoptante real: sin `origin`, con el workflow presente y `template` como
+  # único remote, decía ✅ mientras su CI no podía correr en ningún sitio.
+  git remote add template https://example.invalid/harness.git 2>/dev/null
+  mkdir -p .github/workflows
+  printf 'name: gates\njobs:\n  g:\n    steps:\n      - run: bash ci/run-gates.sh\n' \
+    > .github/workflows/gates.yml
+  local out rc; out="$(bash tools/check-ring3.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    el remote del template se contó como Anillo 3 (exit $rc): $out"; return 1; }
+  printf '%s' "$out" | grep -q 'remote=no' \
+    || { echo "    el resumen debería reportar remote=no con solo el remote del template: $out"; return 1; }
+  printf '%s' "$out" | grep -q "ÚNICO remote es 'template'" \
+    || { echo "    falló, pero el diagnóstico no explica que el remote es el del harness"; return 1; }
+}
+test_solo_el_remote_del_template_no_es_anillo_3() { _r3_sandbox _case_solo_el_remote_del_template_no_cuenta; }
+
+_case_template_mas_origin_si_cuenta() {
+  # La otra mitad: tener el remote del template NO debe penalizar a quien sí
+  # tiene su origin. Sin este test, "arreglar" lo de arriba ignorando todos
+  # los remotes pasaría inadvertido.
+  git remote add template https://example.invalid/harness.git 2>/dev/null
+  git remote add origin https://example.invalid/mi-proyecto.git 2>/dev/null
+  mkdir -p .github/workflows
+  printf 'name: gates\njobs:\n  g:\n    steps:\n      - run: bash ci/run-gates.sh\n' \
+    > .github/workflows/gates.yml
+  local rc; bash tools/check-ring3.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || { echo "    tener el remote del template ADEMÁS de origin tumbó el anillo (exit $rc)"; return 1; }
+}
+test_template_junto_a_origin_sigue_siendo_anillo_3() { _r3_sandbox _case_template_mas_origin_si_cuenta; }
+
 _case_remoto_sin_ci_falla() {
   # El caso más engañoso: hay remoto, así que "parece" que hay CI.
   git remote add origin https://example.invalid/x.git 2>/dev/null

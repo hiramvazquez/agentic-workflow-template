@@ -48,7 +48,7 @@
 |---|---|
 | 4.1 | `git push` **solo con aprobación explícita del owner** |
 | 4.2 | Update PRD a `Shipped` + tracking de commits |
-| 4.3 | Update `docs/process/current_execution_map.md` |
+| 4.3 | Update `docs/process/current_execution_map.md` — **en el mismo commit**. Lo verifica `tools/check-execution-map.sh` (Anillo 3) y `tools/backlog/next.sh` lo avisa al cerrar una historia. Este paso estuvo cinco historias sin ejecutarse cuando era solo prosa. |
 
 ## Fase 5 — Post-ship learning
 

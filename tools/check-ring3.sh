@@ -39,8 +39,24 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 # gates, que ahí es exactamente lo mismo.
 _RING3_ENTRYPOINTS='run-gates\.sh|tools/tests/run-tests\.sh|validate-harness\.sh'
 
+# ⚠️ El remote del TEMPLATE no cuenta. `tools/upgrade.sh` registra un remote
+# llamado `template` en su primera pasada, y con un `[ -n "$(git remote)" ]` a
+# secas eso bastaba para declarar el Anillo 3 cableado. O sea que **el propio
+# mecanismo de upgrade apagaba este gate como efecto secundario**, y en la
+# dirección que más duele: de avisar honestamente a decir "cableado".
+#
+# Cazado en un adoptante real: sin `origin`, sin upstream en su rama y con
+# `template` como único remote, este script decía ✅ mientras su workflow de
+# CI no podía ejecutarse jamás — no hay repositorio remoto del proyecto donde
+# correrlo. El síntoma llevaba meses visible en `ci/ai-review.sh` ("base
+# origin/main no es un commit evaluable") y se leía como un aviso menor.
+#
+# Un remote al que solo BAJAS no es un backstop: el Anillo 3 exige un sitio
+# donde tu código llegue y alguien más lo verifique.
 HAS_REMOTE=no
-[ -n "$(git remote 2>/dev/null)" ] && HAS_REMOTE=yes
+_REMOTE_NAME="${TEMPLATE_REMOTE_NAME:-template}"
+_REMOTES_PROPIOS="$(git remote 2>/dev/null | grep -vxF "$_REMOTE_NAME" || true)"
+[ -n "$_REMOTES_PROPIOS" ] && HAS_REMOTE=yes
 
 HAS_CI=no
 CI_FILE=""
@@ -63,7 +79,13 @@ fi
 {
   echo "❌ ANILLO 3 AUSENTE — el backstop que justifica el fail-open local NO existe."
   [ "$HAS_REMOTE" = "no" ] && {
-    echo "   · Sin REMOTO configurado: ningún CI puede ejecutarse."
+    if git remote 2>/dev/null | grep -qxF "$_REMOTE_NAME"; then
+      echo "   · El ÚNICO remote es '$_REMOTE_NAME', el del harness upstream — y ese no cuenta:"
+      echo "     es de donde BAJAS mejoras, no un sitio donde tu código llegue y se verifique."
+      echo "     Lo registró tools/upgrade.sh; no es un remoto de tu proyecto."
+    else
+      echo "   · Sin REMOTO configurado: ningún CI puede ejecutarse."
+    fi
     echo "     Remedio:  git remote add origin <url>  &&  git push -u origin HEAD"
   }
   [ "$HAS_CI" = "no" ] && {

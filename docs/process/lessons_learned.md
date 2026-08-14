@@ -241,6 +241,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-13] El paso del workflow que nadie ejecutaba mentía en el arranque de cada sesión — `tools/tests/test_execution_map.sh`
 - [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás — `tools/tests/test_e2e_matrix.sh`
 - [2026-08-12] Una capacidad declarada no es una capacidad demostrada — `tools/tests/test_e2e_matrix.sh`
 - [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa — `tools/tests/test_e2e_matrix.sh`

@@ -36,7 +36,17 @@ import json, sys, os, datetime
 LEDGER = "tools/findings/ledger.jsonl"
 VIEW   = "docs/process/findings-ledger.md"
 TERMINAL = {"fixed", "accepted", "wontfix", "duplicate"}
-today = datetime.date.today().isoformat()
+# UTC, no local. La telemetría sella sus eventos con `date -u`
+# (scripts/agent-hooks/lib/io.sh) y la ventana de las métricas se calcula con
+# `datetime.now(timezone.utc)` (tools/metrics/metrics-report.py). Con
+# `date.today()` las DOS fuentes de la misma métrica corrían con relojes
+# distintos y el mismo instante caía en días distintos: al oeste de UTC, un
+# finding creado por la tarde quedaba sellado con el día UTC anterior y
+# desaparecía de su propia ventana. CI corre en UTC, así que nunca lo veía —
+# verde en CI y rojo en la máquina del adoptante unas horas cada día.
+# Medido en un adoptante real (UTC-6, 18:09 local = 00:09Z del día siguiente):
+# `escape-rate --days 1` devolvía findings_total=0 con el finding recién creado.
+today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
 
 def load():
     if not os.path.exists(LEDGER): return []

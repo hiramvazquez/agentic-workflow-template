@@ -65,6 +65,26 @@ _estado_en_rama() { # _estado_en_rama <rama> <archivo>
 }
 _avisar() { printf '%s\n' "$1" >&2; }
 
+# ── Paso 4.3 con rastro mecánico, no con buena voluntad ─────────────
+# `feature-workflow.md` Fase 4 exige actualizar el mapa de ejecución al cerrar
+# una historia. Durante cinco historias seguidas no lo hizo nadie, y no por
+# descuido: NINGÚN mecanismo lo pedía (f-1eeba642). El selector del backlog es
+# el sitio natural para que se note, porque es lo que se corre al terminar una
+# y buscar la siguiente. Va a stderr — stdout es SOLO la ruta de la historia y
+# hay quien lo parsea.
+_avisar_mapa_stale() {
+  [ -x tools/check-execution-map.sh ] || [ -f tools/check-execution-map.sh ] || return 0
+  local out rc
+  out="$(bash tools/check-execution-map.sh 2>&1)"; rc=$?
+  # 3 = el detector no pudo mirar. Aquí no se convierte en ruido: quien
+  # bloquea por eso es el Anillo 3 (§14.3), este es un aviso de conveniencia.
+  [ "$rc" = "1" ] || return 0
+  _avisar ""
+  _avisar "⚠️  backlog: el mapa de ejecución está DESACTUALIZADO respecto al árbol."
+  printf '%s\n' "$out" | sed 's/^/   /' >&2
+}
+
+
 for story in backlog/[0-9]*.md; do
   [ -f "$story" ] || continue
   status="$(_field "$story" status)"
@@ -77,6 +97,9 @@ for story in backlog/[0-9]*.md; do
   if [ "$status" = "in-review" ] && [ -z "$rama" ]; then
     _avisar "ℹ️  backlog: ${story} está en 'in-review' y ya no existe su rama — parece MERGEADA."
     _avisar "   Ponle 'status: done' en la base o las historias que dependen de ella nunca se desbloquean."
+    _avisar "   Y con ella, el paso 4.3 de feature-workflow.md: actualiza"
+    _avisar "   docs/process/current_execution_map.md EN EL MISMO COMMIT (lo verifica"
+    _avisar "   tools/check-execution-map.sh — antes era prosa que no ejecutaba nadie)."
   fi
 
   [ "$status" = "ready" ] || continue
@@ -104,7 +127,9 @@ for story in backlog/[0-9]*.md; do
   done
   [ "$ok" = "1" ] || continue
 
+  _avisar_mapa_stale
   printf '%s\n' "$story"
   exit 0
 done
+_avisar_mapa_stale
 exit 0

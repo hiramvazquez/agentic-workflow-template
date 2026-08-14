@@ -36,6 +36,7 @@ tools/check-exec-bits.sh                     :: test_exec_bits.sh
 tools/check-diff-nature.sh                   :: test_diff_nature.sh
 tools/check-ring3.sh                         :: test_ring3.sh
 tools/check-skill-matrix-doc.sh              :: test_skill_matrix.sh
+tools/check-execution-map.sh                 :: test_execution_map.sh
 tools/check-verify-marker.sh                 :: test_verify_marker.sh
 scripts/agent-hooks/run-hook.sh              :: test_run_hook.sh
 tools/backlog/next.sh                        :: test_backlog.sh
