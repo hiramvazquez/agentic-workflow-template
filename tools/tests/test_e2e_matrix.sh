@@ -476,17 +476,53 @@ test_golden_08_cache_acelera_sin_perder_deteccion() {
 # promesa "el preset full no reduce ningún gate" vivía en prosa. Aquí cada
 # gate es un stub que firma su paso, así que el conjunto invocado es un hecho
 # observable — y un gate ausente sigue siendo fallo, no silencio.
+# ── EL INVENTARIO VIVE UNA SOLA VEZ ────────────────────────────────
+# Estaba escrito DOS veces dentro de este mismo test —una para stubear, otra
+# para verificar— y las dos listas ya habían divergido: la de stubs tenía 14
+# entradas y la de comprobación 13. La diferencia era correcta (escape-rate es
+# informativo y nunca bloquea) pero no estaba dicha en ninguna parte, así que
+# era indistinguible de un olvido. Lo cazó el adoptante al añadir un gate y
+# tener que editar las dos a mano: *una regla implementada dos veces diverge*.
+#
+# ⚠️ NO se deriva de `ci/run-gates.sh`, y la tentación es fuerte. Un test que
+# lee su expectativa del código que prueba no puede detectar que se BORRE un
+# gate de run-gates: la lista encogería y el test seguiría verde. Y "un gate
+# ausente sigue siendo fallo, no silencio" es literalmente lo único que este
+# golden existe para garantizar. La lista es la ESPECIFICACIÓN, se mantiene a
+# mano a propósito, y lo único que se arregla aquí es que viva en un sitio.
+#
+#   <ruta>              gate que el Anillo 3 DEBE invocar en preset full
+#   <ruta> informativo  se stubea para que el run llegue al final, pero su
+#                       ausencia no es fallo (métrica, nunca bloquea)
+_G9_INVENTARIO="
+tools/tests/run-tests.sh
+tools/secret-scan.sh
+tools/semgrep-scan.sh
+tools/check-layers.sh
+tools/drift-ratchet.sh
+tools/verify-run.sh
+tools/mutation-score.sh
+tools/check-review-marker.sh
+ci/ai-review.sh
+tools/lesson-detector-link.sh
+tools/check-finding-refs.sh
+tools/check-version-claims.sh
+tools/check-execution-map.sh
+tools/metrics/escape-rate.sh informativo
+"
+_g9_gates() { # _g9_gates stub|exigidos
+  printf '%s\n' "$_G9_INVENTARIO" | awk -v modo="$1" '
+    NF == 0 { next }
+    modo == "stub"     { print $1; next }
+    $2 != "informativo" { print $1 }'
+}
+
 _case_g9_anillo3_invoca_todos_los_gates() {
   mkdir -p bin
   local log="$PWD/gates.log"; : > "$log"
   local recorder='#!/usr/bin/env bash\necho NOMBRE >> "$GATE_LOG"\nexit 0\n'
   local nombre
-  for nombre in tools/tests/run-tests.sh tools/secret-scan.sh tools/semgrep-scan.sh \
-                tools/check-layers.sh tools/drift-ratchet.sh tools/verify-run.sh \
-                tools/mutation-score.sh tools/check-review-marker.sh ci/ai-review.sh \
-                tools/lesson-detector-link.sh tools/check-finding-refs.sh \
-                tools/check-version-claims.sh tools/check-execution-map.sh \
-                tools/metrics/escape-rate.sh; do
+  for nombre in $(_g9_gates stub); do
     stub "$nombre" "${recorder/NOMBRE/$nombre}"
   done
   stub bin/gitleaks '#!/usr/bin/env bash\nexit 0\n'
@@ -494,11 +530,7 @@ _case_g9_anillo3_invoca_todos_los_gates() {
   GATE_LOG="$log" PATH="$PWD/bin:/usr/bin:/bin" bash ci/run-gates.sh --backend fake >/dev/null 2>&1
   local rc=$? faltan=""
   [ "$rc" = 0 ] || { echo "    run-gates con todos los gates en verde salió $rc"; return 1; }
-  for nombre in tools/tests/run-tests.sh tools/secret-scan.sh tools/semgrep-scan.sh \
-                tools/check-layers.sh tools/drift-ratchet.sh tools/verify-run.sh \
-                tools/mutation-score.sh tools/check-review-marker.sh ci/ai-review.sh \
-                tools/lesson-detector-link.sh tools/check-finding-refs.sh \
-                tools/check-version-claims.sh tools/check-execution-map.sh; do
+  for nombre in $(_g9_gates exigidos); do
     grep -qxF "$nombre" "$log" || faltan="$faltan $nombre"
   done
   [ -z "$faltan" ] || { echo "    el Anillo 3 no invocó:$faltan"; return 1; }
