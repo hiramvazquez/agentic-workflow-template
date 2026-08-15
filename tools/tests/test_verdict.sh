@@ -213,3 +213,76 @@ SCOPE: el adapter'
     || { echo "    el override NO quedó auditado"; return 1; }
 }
 test_el_override_de_mismo_diff_queda_auditado() { _crv_sandbox _case_override_auditado; }
+
+# ════════════════════════════════════════════════════════════════════
+# EL REPORTE, no solo el veredicto (f-review-sin-reporte-persistido)
+# ════════════════════════════════════════════════════════════════════
+# El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo. Medido en un
+# adoptante: los hallazgos de un design-review y de tres pasadas del reviewer
+# solo existían en el transcript del sub-agente, y hubo que parsearlo a mano
+# cuatro veces. El propio design-reviewer, al re-revisar, tuvo que reconstruir
+# sus 15 hallazgos por inferencia y avisó de que uno absorbido borrando la
+# sección le sería invisible. El marker probaba QUE hubo review; nada probaba
+# QUÉ dijo, ni permitía comprobar en la siguiente pasada si se atendió.
+_REVIEW_RED='Encontré esto:
+1. La precondición de `cargar()` no valida el id vacío.
+2. El fake no pasa la suite de conformidad del adapter real.
+
+VERDICT: RED
+FINDINGS: 2
+SCOPE: MovieRepository y su fake'
+
+_case_el_red_guarda_su_reporte() {
+  printf '{"hook_event_name":"SubagentStop","agent_type":"reviewer","last_assistant_message":%s}' \
+    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    | bash scripts/agent-hooks/capture-review-verdict.sh >/dev/null 2>&1
+  local r; r="$(ls .agents/state/reviews/*-reviewer.md 2>/dev/null | head -1)"
+  [ -n "$r" ] || { echo "    un RED no dejó reporte en .agents/state/reviews/"; return 1; }
+  grep -q 'suite de conformidad' "$r" \
+    || { echo "    el reporte no contiene el CUERPO del review, solo la cabecera"; return 1; }
+  grep -q '^staged_sha: ' "$r" \
+    || { echo "    el reporte no liga el diff que se juzgó"; return 1; }
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    && { echo "    ¡un RED escribió marker! guardar el reporte no puede desbloquear"; return 1; }
+  return 0
+}
+test_un_red_persiste_el_cuerpo_del_review_no_solo_el_veredicto() {
+  _crv_sandbox _case_el_red_guarda_su_reporte
+}
+
+_case_la_segunda_pasada_encuentra_la_primera() {
+  # Sin esto, guardar el reporte sería telemetría: la defensa es que la
+  # siguiente pasada lo LEA y pueda decir atendido / ignorado.
+  printf '{"hook_event_name":"SubagentStop","agent_type":"design-reviewer","last_assistant_message":%s}' \
+    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    | bash scripts/agent-hooks/capture-review-verdict.sh >/dev/null 2>&1
+  local out
+  out="$(printf '{"hook_event_name":"SubagentStop","agent_type":"reviewer","last_assistant_message":%s}' \
+    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1)"
+  case "$out" in *"YA HUBO UN REVIEW SOBRE ESTE MISMO DIFF"*) : ;; *)
+    echo "    la segunda pasada no fue avisada del reporte anterior sobre el mismo diff"
+    return 1 ;; esac
+  case "$out" in *design-reviewer*) : ;; *)
+    echo "    no apuntó al reporte del OTRO agente sobre el mismo diff"; return 1 ;; esac
+}
+test_una_segunda_review_del_mismo_diff_apunta_a_la_anterior() {
+  _crv_sandbox _case_la_segunda_pasada_encuentra_la_primera
+}
+
+# ── FALSO POSITIVO: un reporte no puede anunciarse cuando no lo hay ──
+# El aviso "ya hubo un review sobre este mismo diff" tiene que aparecer SOLO
+# cuando existe. Anunciarlo siempre mandaría a leer un archivo inexistente en
+# la primera review de cada diff — ruido en el caso más común de todos.
+_case_la_primera_review_no_anuncia_un_previo() {
+  local out
+  out="$(printf '{"hook_event_name":"SubagentStop","agent_type":"reviewer","last_assistant_message":%s}' \
+    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1)"
+  case "$out" in *"YA HUBO UN REVIEW"*)
+    echo "    la PRIMERA review anunció un reporte anterior que no existe"; return 1 ;; esac
+  return 0
+}
+test_la_primera_review_de_un_diff_no_inventa_un_previo() {
+  _crv_sandbox _case_la_primera_review_no_anuncia_un_previo
+}

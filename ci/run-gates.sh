@@ -115,6 +115,14 @@ else
   echo "(tools/check-layers.sh ausente — saltado)"
 fi
 
+# 4b) El SEGUNDO eje, el que el grafo por directorio no ve: en KMP, commonMain
+#     no puede importar plataforma. Inerte y silencioso en repos sin commonMain
+#     (estado `no-aplica`, exit 0): la mitad de los adoptantes no usa KMP y un
+#     aviso permanente para ellos se aprende a ignorar.
+if [ -f tools/check-source-sets.sh ]; then
+  bash tools/check-source-sets.sh || FAIL=1
+fi
+
 # 5) Drift ratchet — el conteo no puede haber subido.
 step "5/8 drift-ratchet"
 bash tools/drift-ratchet.sh --check || FAIL=1

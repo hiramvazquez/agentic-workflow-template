@@ -122,3 +122,49 @@ _case_el_valor_del_simulacro_sigue_siendo_detectable() {
 test_el_valor_del_simulacro_nunca_se_allowlistea() {
   _case_el_valor_del_simulacro_sigue_siendo_detectable
 }
+
+# ── La caché de gates no es un secreto (f-gate-cache-falso-positivo-gitleaks) ──
+# `tools/gate-cache.sh` escribe JSON con un campo `"key"` que es un sha256 del
+# diff+HEAD+reglas. gitleaks lo lee como secreto genérico de alta entropía y
+# `--all` empezó a dar un hallazgo permanente: reproducido aquí y, de forma
+# independiente, en un adoptante. No hay riesgo de fuga —los archivos están
+# gitignored— pero un hallazgo permanente y falso es peor que ninguno: se
+# aprende a ignorar el rojo, y con él se ignora el del día que importa
+# (ley del 10%, §14.2).
+#
+# ⚠️ Este test comprueba el EFECTO, no la declaración, y esa distinción ya costó
+# un fallo en este repo: el guard de `.semgrepignore` verificaba que la línea
+# estuviera en el archivo de configuración, no que la herramienta la obedeciera
+# por el camino que usamos. Aquí se ESCRIBE una caché real y se corre gitleaks.
+_case_la_cache_de_gates_no_dispara_gitleaks() {
+  mkdir -p .agents/state/gate-cache/semgrep
+  printf '{"key":"%s","rc":0,"findings":0}\n' \
+    "$(printf 'x' | { shasum -a 256 2>/dev/null || sha256sum; } | awk '{print $1}')" \
+    > .agents/state/gate-cache/semgrep/deadbeef.json
+  cp "$PROJECT_ROOT/.gitleaks.toml" .gitleaks.toml 2>/dev/null
+  local out rc
+  out="$(gitleaks dir . --no-banner --redact 2>&1)"; rc=$?
+  [ "$rc" = "0" ] && return 0
+  echo "    gitleaks marca la caché de gates como secreto (exit $rc):"
+  printf '%s\n' "$out" | grep -i 'file\|secret' | head -6 | sed 's/^/      /'
+  echo "    Es un sha256 del diff, no una credencial. El allowlist por PATH vive"
+  echo "    en .gitleaks.toml; si has tocado ese archivo, revisa esa entrada."
+  return 1
+}
+test_la_cache_de_gates_no_se_lee_como_secreto() {
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    # Declararlo, no tragárselo: un gate que no corrió no puede parecer un gate
+    # que pasó (§14.3). En CI gitleaks SÍ está, y ahí este test corre de verdad.
+    echo "    (gitleaks ausente — EFECTO no verificado aquí; el Anillo 3 lo cubre)"
+    # Se busca la ENTRADA del allowlist, no la palabra: los comentarios de encima
+    # explican por qué existe y contienen 'gate-cache', así que un `grep` a secas
+    # pasaba aunque alguien borrara la entrada. Falso NEGATIVO del mismo patrón de
+    # siempre — el check leyendo el texto que HABLA de la cosa en vez de la cosa.
+    grep -qE "^[[:space:]]*'''[^']*gate-cache[^']*''','?[[:space:]]*$" \
+      "$PROJECT_ROOT/.gitleaks.toml" 2>/dev/null && return 0
+    echo "    ...y el allowlist por path NI SIQUIERA está declarado en .gitleaks.toml"
+    return 1
+  fi
+  _ss_sandbox _case_la_cache_de_gates_no_dispara_gitleaks 2>/dev/null \
+    || _case_la_cache_de_gates_no_dispara_gitleaks
+}

@@ -53,6 +53,7 @@ tools/semgrep-scan.sh                        :: test_fail_closed.sh
 tools/mutation-score.sh                      :: test_fail_closed.sh
 tools/lesson-detector-link.sh                :: test_lessons.sh
 tools/findings/findings.sh                   :: test_findings_cli.sh
+tools/check-source-sets.sh                   :: test_source_sets.sh
 tools/check-finding-refs.sh                  :: test_finding_refs.sh
 tools/check-version-claims.sh                :: test_finding_refs.sh
 tools/render-capabilities.sh                 :: test_capabilities.sh
@@ -95,7 +96,7 @@ test_todo_detector_tiene_tests_de_falso_positivo() {
 test_el_manifiesto_no_esta_vacio() {
   local n
   n="$(printf '%s\n' "$MANIFEST" | grep -c '::' || true)"
-  [ "${n:-0}" -ge 28 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥28) — ¿se rompió el formato?"; return 1; }
+  [ "${n:-0}" -ge 29 ] || { echo "    el manifiesto tiene $n entradas (esperaba ≥29) — ¿se rompió el formato?"; return 1; }
 }
 
 # ── El manifiesto tampoco puede quedarse ATRÁS (f-meta-fp-manifiesto) ──

@@ -30,6 +30,22 @@ useDefault = true
   paths = [
     '''(.*?)(example|sample)\.(env|json|toml|ya?ml)$''',
     '''\.gitleaks-baseline\.json$''',
+    # Caché de gates: JSON generado por `tools/gate-cache.sh`, gitignored, cuyo
+    # campo `"key"` es un sha256 del diff+HEAD+reglas. gitleaks lo marca como
+    # secreto genérico de alta entropía — un hash, no una credencial. Reproducido
+    # en el template y, de forma independiente, en un adoptante: tras una corrida
+    # de semgrep, `--all` daba 3 hallazgos y uno era esto.
+    #
+    # Se allowlistea ESTE path, no `.agents/state/` entero: ahí también vive la
+    # captura de trayectoria, y ensanchar el allowlist a todo el directorio
+    # apagaría el scanner sobre contenido que sí puede acabar teniendo un secreto.
+    #
+    # Y NO se arregla haciendo que `--all` respete .gitignore, que es la otra
+    # salida evidente: ese modo existe justamente para ver lo que NO está en git
+    # —un `.env` con una clave real es gitignored, y es el hallazgo más valioso
+    # que puede dar—. Excluir lo ignorado mataría el modo entero para tapar un
+    # archivo nuestro.
+    '''\.agents/state/gate-cache/.*''',
     # <!-- FILL: rutas de fixtures de test que contienen tokens OBVIAMENTE falsos -->
     # '''tests/fixtures/.*''',
   ]

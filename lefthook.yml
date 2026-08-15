@@ -33,6 +33,16 @@ pre-commit:
     - name: check-layers
       run: bash tools/check-layers.sh
 
+    # ── El SEGUNDO eje: en KMP, commonMain no importa plataforma ─────
+    # check-layers modela el grafo por DIRECTORIO; los source sets son otro eje
+    # que ese grafo no ve. Va aquí, al lado de su hermano, porque es la misma
+    # naturaleza de check (estático, determinista, sin falsos positivos por
+    # comentarios) y porque un `import android.*` en commonMain compila hasta
+    # que alguien añade el target iOS, semanas después y en el CI de otro.
+    # Inerte y mudo en repos sin commonMain/ (estado `no-aplica`, exit 0).
+    - name: check-source-sets
+      run: bash tools/check-source-sets.sh
+
     # ── Semgrep sobre lo STAGED (patrones AST, nivel 2) ──────────────
     # Invocado DIRECTO, no vía check-drift: el agregador descarta el exit code
     # por diseño, así que un semgrep roto o con reglas inválidas era invisible

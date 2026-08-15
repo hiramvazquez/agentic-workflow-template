@@ -135,11 +135,62 @@ _STAGED_SHA="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sh
 _HIST="$(hook_state_dir)/review-history.jsonl"
 _LAST_RED="$_DIR/last_red.txt"
 
+# ── EL REPORTE, no solo el veredicto ───────────────────────────────
+# El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo. Los hallazgos
+# solo existían en el transcript del sub-agente; en un adoptante hubo que
+# parsearlo a mano cuatro veces, y el propio `design-reviewer`, al re-revisar,
+# declaró: "no tengo el texto literal de mis 15 hallazgos... el design-review
+# no se persiste en ninguna parte" — y tuvo que RECONSTRUIRLOS por inferencia,
+# avisando de que un hallazgo absorbido borrando la sección le sería invisible.
+# La regla de oro nº1 es "detectar no basta — CERRAR", y aquí el hallazgo se
+# evaporaba al terminar el turno: el marker probaba QUE hubo review, nada
+# probaba QUÉ dijo ni permitía comprobar si se atendió.
+#
+# DÓNDE vive, que era la pregunta abierta y la resuelve la doctrina existente:
+#   · el CUERPO es artefacto de trabajo → `.agents/state/reviews/`, local y
+#     gitignored, junto al marker y con su mismo ciclo de vida.
+#   · lo que debe SOBREVIVIR al turno va al LEDGER (§10: reportar = loguear al
+#     ledger, no dejarlo en prosa). No se duplica el ledger en disco: se le
+#     quita la excusa de no tenerlo a mano.
+# Se escribe para TODOS los veredictos, RED incluido — el RED es justamente el
+# que tiene hallazgos que atender.
+_REVIEWS="$(hook_state_dir)/reviews"
+_REPORTE="$_REVIEWS/${_STAGED_SHA:0:12}-${AGENT}.md"
+_REPORTE_PREVIO=""
+mkdir -p "$_REVIEWS" 2>/dev/null || true
+# ¿Ya hubo un review sobre ESTE MISMO diff? Es lo que convierte el reporte en
+# algo comprobable: sin el anterior, "¿lo absorbió o lo ignoró?" no se puede
+# ni plantear. Se busca antes de escribir el propio, o se encontraría a sí mismo.
+for _p in "$_REVIEWS/${_STAGED_SHA:0:12}"-*.md; do
+  [ -f "$_p" ] && [ "$_p" != "$_REPORTE" ] && { _REPORTE_PREVIO="$_p"; break; }
+done
+{
+  printf -- '---\n'
+  printf 'ts: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'agent: %s\nverdict: %s\nfindings: %s\nscope: %s\nhead: %s\nstaged_sha: %s\nsource: hook\n' \
+    "$AGENT" "$VERDICT" "$FINDINGS" "$SCOPE" "$_HEAD" "$_STAGED_SHA"
+  printf -- '---\n\n'
+  printf '%s\n' "$MSG"
+} > "$_REPORTE" 2>/dev/null || true
+
 _apuntar_historia() { # _apuntar_historia <veredicto> <nota>
-  printf '{"ts":"%s","agent":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","nota":"%s"}\n' \
+  printf '{"ts":"%s","agent":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","report":"%s","nota":"%s"}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$1" "$FINDINGS" \
-    "$(printf '%s' "$SCOPE" | tr '"' "'" | tr -d '\n')" "$_HEAD" "$_STAGED_SHA" "$2" \
+    "$(printf '%s' "$SCOPE" | tr '"' "'" | tr -d '\n')" "$_HEAD" "$_STAGED_SHA" \
+    "$(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")" "$2" \
     >> "$_HIST" 2>/dev/null || true
+}
+
+# Texto que se añade al aviso cuando ya hubo un review sobre este mismo diff.
+# Es la mitad que faltaba: guardar el reporte sin que nadie lo lea sería
+# telemetría, no una defensa.
+_nota_previo() {
+  [ -n "$_REPORTE_PREVIO" ] || return 0
+  printf '\n\n📄 YA HUBO UN REVIEW SOBRE ESTE MISMO DIFF: %s\n' \
+    "$(hook_rel_path "$_REPORTE_PREVIO" 2>/dev/null || printf '%s' "$_REPORTE_PREVIO")"
+  printf 'Léelo y ve hallazgo por hallazgo: cada uno tiene que estar ATENDIDO o\n'
+  printf 'EXPLICADO. Un hallazgo que desaparece porque se borró la sección que lo\n'
+  printf 'contenía no está resuelto, y sin el reporte anterior es invisible.\n'
 }
 
 # ── RED → sin marker, PERO CON HUELLA ──────────────────────────────
@@ -163,7 +214,11 @@ NO se escribió marker de review — el commit sigue BLOQUEADO por el reviewer-g
 Queda huella del diff juzgado (${_STAGED_SHA:0:12}…): si el próximo veredicto es
 GREEN sobre ESE MISMO diff, el sistema lo rechazará — un verde sobre un código
 que no cambió no es una remediación, es un reintento.
-Atiende los hallazgos, STAGEA el arreglo, y vuelve a invocar \`$AGENT\`."
+Atiende los hallazgos, STAGEA el arreglo, y vuelve a invocar \`$AGENT\`.
+
+📄 Reporte completo guardado: $(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")
+Los hallazgos ya no viven solo en tu transcript. Lo que deba sobrevivir al
+turno va al ledger (\`bash tools/findings/findings.sh add ...\`, §10).$(_nota_previo)"
 fi
 
 # ── Un GREEN sobre el MISMO diff que acaba de ser RED no es remediación ──
@@ -193,7 +248,7 @@ una remediación: o el RED estaba mal o lo está este. Si arreglaste algo, STAG�
 y vuelve a revisar — el arreglo tiene que estar en el diff que se juzga (incluido
 el ledger, si el hallazgo pedía registrarlo).
 Si de verdad el RED se resolvió con un argumento y no con código:
-  REVIEW_SAME_DIFF_OVERRIDE=1 REVIEW_SAME_DIFF_REASON=\"...\"   (queda auditado)"
+  REVIEW_SAME_DIFF_OVERRIDE=1 REVIEW_SAME_DIFF_REASON=\"...\"   (queda auditado)$(_nota_previo)"
     fi
   fi
 fi
@@ -222,4 +277,4 @@ EOF
 done
 
 hook_context "$EV" "✅ Veredicto de \`$AGENT\` registrado por el sistema: $VERDICT (${FINDINGS} hallazgos) — «${SCOPE}».
-Marker ligado a head=$HEAD y al diff staged actual. Si cambias lo staged, el marker caduca."
+Marker ligado a head=$HEAD y al diff staged actual. Si cambias lo staged, el marker caduca.$(_nota_previo)"

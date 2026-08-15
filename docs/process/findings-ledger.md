@@ -3,14 +3,13 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **2** · Cerrados: 71 · Total: 73
+Abiertos: **1** · Cerrados: 74 · Total: 75
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
-| `f-gate-cache-falso-positivo-gitleaks` | medium | owner-decision | `tools/gate-cache.sh` | secret-scan --all queda rojo permanente por la cache de la fase 9 |
 
 ## Cerrados
 
@@ -86,4 +85,7 @@ Abiertos: **2** · Cerrados: 71 · Total: 73
 | `f-run-gates-sin-test` | fixed | test_golden_09 stubbea cada gate para que firme su paso y exige los 12 del contrato; ademas fija que |
 | `f-adapter-readonly-declarado` | fixed | test_golden_05 corre el ciclo autonomo completo contra un stub hermetico del CLI y verifica el argv  |
 | `f-golden-sin-vinculo` | fixed | test_matriz_e2e_cubre_los_diez_escenarios_golden lee los escenarios del PRD y exige un test_golden_N |
+| `f-gate-cache-falso-positivo-gitleaks` | fixed | Allowlist por PATH en .gitleaks.toml para .agents/state/gate-cache/, con la razon escrita: el campo  |
 | `f-inventario-de-gates-duplicado` | fixed | Inventario unico en _G9_INVENTARIO, con la marca informativo explicita para el unico gate que se stu |
+| `f-review-sin-reporte-persistido` | fixed | capture-review-verdict escribe .agents/state/reviews/<sha>-<agente>.md con cabecera ligada al diff y |
+| `f-eje-de-source-sets-sin-detector` | fixed | tools/check-source-sets.sh en pre-commit junto a check-layers y en el paso 4b del Anillo 3, con su e |

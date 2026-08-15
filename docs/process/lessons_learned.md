@@ -234,6 +234,10 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 
 ---
 
+---
+
+---
+
 ## Lecciones mecanizadas (índice)
 
 > Estas ya NO dependen de tu memoria: cada una tiene un test en `tools/tests/` que corre en el
@@ -241,6 +245,8 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-14] El harness modelaba un solo eje, y KMP tiene dos — `tools/tests/test_source_sets.sh`
+- [2026-08-14] El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo — `tools/tests/test_verdict.sh`
 - [2026-08-13] El paso del workflow que nadie ejecutaba mentía en el arranque de cada sesión — `tools/tests/test_execution_map.sh`
 - [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás — `tools/tests/test_e2e_matrix.sh`
 - [2026-08-12] Una capacidad declarada no es una capacidad demostrada — `tools/tests/test_e2e_matrix.sh`
