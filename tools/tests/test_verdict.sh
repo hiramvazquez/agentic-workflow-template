@@ -251,10 +251,11 @@ test_un_red_persiste_el_cuerpo_del_review_no_solo_el_veredicto() {
 }
 
 _msg() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'; }
-_stop() { # _stop <agente> <mensaje>
-  printf '{"hook_event_name":"SubagentStop","agent_type":"%s","last_assistant_message":%s}' \
-    "$1" "$(_msg "$2")" | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1
+_stop() { # _stop <agente> <mensaje> [agent_id]
+  printf '{"hook_event_name":"SubagentStop","agent_type":"%s","agent_id":"%s","last_assistant_message":%s}' \
+    "$1" "${3:-}" "$(_msg "$2")" | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1
 }
+_hist_n() { grep -c . .agents/state/review-history.jsonl 2>/dev/null || echo 0; }
 
 # ════════════════════════════════════════════════════════════════════
 # EL BUCLE (f-b3cf4f74) — un stop que reinyecta contexto se retroalimenta
@@ -383,4 +384,85 @@ _case_la_primera_review_no_anuncia_un_previo() {
 }
 test_la_primera_review_de_un_diff_no_inventa_un_previo() {
   _crv_sandbox _case_la_primera_review_no_anuncia_un_previo
+}
+
+# ════════════════════════════════════════════════════════════════════
+# EL PEAJE DE LA IDEMPOTENCIA (f-a8bcb235)
+# ════════════════════════════════════════════════════════════════════
+# Deduplicar por (agente, diff, veredicto) corta el bucle, pero también descarta
+# una segunda review DELIBERADA sobre el mismo diff. Medido en un adoptante: la
+# re-review fue genuinamente distinta —8 tool_uses, y encontró algo que la
+# primera no vio— y desapareció entera: Δ=0 en la historia, cero rastro.
+# El discriminador es la IDENTIDAD DE LA INVOCACIÓN, no el tiempo: las vueltas de
+# un bucle son el mismo sub-agente hablando y comparten `agent_id`.
+_case_dos_invocaciones_distintas_se_registran() {
+  _stop reviewer "$_REVIEW_RED" run-1 >/dev/null
+  _stop reviewer "$_REVIEW_RED" run-2 >/dev/null
+  local n; n="$(_hist_n)"
+  [ "$n" = "2" ] || {
+    echo "    dos invocaciones DELIBERADAS dejaron $n entradas (esperaba 2)"
+    echo "    Una re-review sobre el mismo diff no es una vuelta de bucle: es"
+    echo "    trabajo que alguien pidió, y descartarla la borra sin dejar rastro."
+    return 1; }
+}
+test_una_re_review_deliberada_no_se_descarta_como_bucle() {
+  _crv_sandbox _case_dos_invocaciones_distintas_se_registran
+}
+
+# ── …y dentro de UNA invocación se sigue deduplicando ───────────────
+# El guard de FP del arreglo de arriba: distinguir invocaciones no puede
+# convertirse en dejar de cortar el bucle, que era el problema caro.
+_case_una_invocacion_en_bucle_sigue_deduplicando() {
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11; do _stop reviewer "$_REVIEW_RED" run-unico >/dev/null; done
+  local n; n="$(_hist_n)"
+  [ "$n" = "1" ] || { echo "    11 vueltas de la MISMA invocación dejaron $n entradas (esperaba 1)"; return 1; }
+}
+test_las_vueltas_de_una_misma_invocacion_siguen_colapsando() {
+  _crv_sandbox _case_una_invocacion_en_bucle_sigue_deduplicando
+}
+
+# ── Sin `agent_id` se cae al criterio viejo, no al bucle ────────────
+# Los adaptadores de Cursor/Codex pueden no mandarlo. Se falla hacia el lado en
+# que el harness sigue siendo barato: se pierde el peaje, no el corte.
+_case_sin_agent_id_sigue_cortando_el_bucle() {
+  local i
+  for i in 1 2 3 4 5; do _stop reviewer "$_REVIEW_RED" >/dev/null; done
+  local n; n="$(_hist_n)"
+  [ "$n" = "1" ] || { echo "    sin agent_id, 5 disparos dejaron $n entradas (esperaba 1)"; return 1; }
+}
+test_sin_agent_id_el_bucle_se_sigue_cortando() {
+  _crv_sandbox _case_sin_agent_id_sigue_cortando_el_bucle
+}
+
+# ── Los dos casos que el adoptante no pudo verificar ────────────────
+# Pidió explícitamente cubrirlos: agente DISTINTO sobre el mismo diff, y
+# veredicto DISTINTO (GREEN tras RED, que además tiene su propio camino de
+# rechazo). Si el puntero aparece ahí, el mecanismo está bien y el caso que él
+# vio era el degenerado.
+_case_puntero_con_agente_distinto() {
+  _stop reviewer "$_REVIEW_RED" run-1 >/dev/null
+  _stop security-reviewer "$_REVIEW_RED" run-2 >/dev/null
+  grep -rq '^previo: ' .agents/state/reviews/ \
+    || { echo "    un agente DISTINTO sobre el mismo diff no recibió el puntero al previo"; return 1; }
+}
+test_el_puntero_aparece_con_otro_agente_sobre_el_mismo_diff() {
+  _crv_sandbox _case_puntero_con_agente_distinto
+}
+
+_case_puntero_con_veredicto_distinto() {
+  _stop reviewer "$_REVIEW_RED" run-1 >/dev/null
+  _stop reviewer 'Ya está.
+
+VERDICT: GREEN
+FINDINGS: 0
+SCOPE: MovieRepository y su fake' run-2 >/dev/null
+  grep -rq '^previo: ' .agents/state/reviews/ \
+    || { echo "    un GREEN tras RED sobre el mismo diff no recibió el puntero al previo"; return 1; }
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    && { echo "    ¡el GREEN sobre el mismo diff que el RED escribió marker!"; return 1; }
+  return 0
+}
+test_el_puntero_aparece_con_veredicto_distinto_y_el_rechazo_sigue_vivo() {
+  _crv_sandbox _case_puntero_con_veredicto_distinto
 }

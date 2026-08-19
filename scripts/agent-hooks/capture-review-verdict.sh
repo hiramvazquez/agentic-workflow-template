@@ -96,16 +96,44 @@ _LAST_RED="$_DIR/last_red.txt"
 # `review-history.jsonl` es el registro que SÍ acumula, así que es la fuente de
 # la idempotencia: si ya hay una entrada de este agente, sobre este HEAD y este
 # diff, el juicio ya está tomado.
+# ── EL PEAJE DE LA IDEMPOTENCIA, Y CÓMO NO PAGARLO (f-a8bcb235) ────
+# La primera versión deduplicaba por (agente, HEAD, diff, veredicto). Eso corta
+# el bucle, pero no distingue "el mismo agente dando vueltas" de "una segunda
+# review DELIBERADA". Medido en un adoptante: re-invocó al reviewer sobre el
+# mismo diff sin tocarlo, la segunda pasada fue genuinamente distinta —8
+# tool_uses, y encontró algo que la primera no vio— y se descartó entera: Δ=0 en
+# la historia, reporte intacto, cero rastro.
+#
+# El discriminador NO es el tiempo, es la IDENTIDAD DE LA INVOCACIÓN. Las
+# vueltas de un bucle son el mismo sub-agente hablando: comparten `agent_id`.
+# Una re-invocación deliberada es otro sub-agente y trae uno nuevo. Así que la
+# clave es (invocación, diff, veredicto) y no (agente, diff, veredicto): dedupe
+# dentro de una invocación, deja pasar entre invocaciones. Es exactamente
+# "consecutivos dentro de la misma llamada", pero dicho con una identidad en vez
+# de con una ventana temporal que habría que calibrar y que fallaría en los dos
+# sentidos.
+#
+# Si el cliente no manda `agent_id` (adaptadores de Cursor/Codex), se cae al
+# criterio viejo: se pierde el peaje pero NO el corte del bucle. Se falla hacia
+# el lado en que el harness sigue siendo barato, no hacia el que vuelve a costar
+# 67.000 tokens por review.
+_RUN="$(hook_agent_id)"
+
 _hist_grep() { # _hist_grep [verdicto] → 0 si ya hay entrada
   [ -f "$_HIST" ] || return 1
-  local f; f="$(grep -F "\"agent\":\"$AGENT\"" "$_HIST" 2>/dev/null \
-    | grep -F "\"head\":\"$_HEAD\"" | grep -F "\"staged_sha\":\"$_STAGED_SHA\"")"
+  local f
+  if [ -n "$_RUN" ]; then
+    f="$(grep -F "\"run\":\"$_RUN\"" "$_HIST" 2>/dev/null)"
+  else
+    f="$(grep -F "\"agent\":\"$AGENT\"" "$_HIST" 2>/dev/null)"
+  fi
+  f="$(printf '%s' "$f" | grep -F "\"head\":\"$_HEAD\"" | grep -F "\"staged_sha\":\"$_STAGED_SHA\"")"
   [ -n "$f" ] || return 1
   [ -z "${1:-}" ] && return 0
   printf '%s' "$f" | grep -qF "\"verdict\":\"$1\""
 }
-_ya_registrado()        { _hist_grep "$1"; }   # este agente, este diff, ESTE veredicto
-_hay_veredicto_previo() { _hist_grep; }        # este agente, este diff, cualquiera
+_ya_registrado()        { _hist_grep "$1"; }   # esta invocación, este diff, ESTE veredicto
+_hay_veredicto_previo() { _hist_grep; }        # esta invocación, este diff, cualquiera
 
 
 # ── MODO CONTRATO: cierre legítimo SIN veredicto y SIN marker ──────
@@ -248,8 +276,8 @@ fi
 
 
 _apuntar_historia() { # _apuntar_historia <veredicto> <nota>
-  printf '{"ts":"%s","agent":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","report":"%s","nota":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$1" "$FINDINGS" \
+  printf '{"ts":"%s","agent":"%s","run":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","report":"%s","nota":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$_RUN" "$1" "$FINDINGS" \
     "$(printf '%s' "$SCOPE" | tr '"' "'" | tr -d '\n')" "$_HEAD" "$_STAGED_SHA" \
     "$(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")" "$2" \
     >> "$_HIST" 2>/dev/null || true
