@@ -3,13 +3,22 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 80 · Total: 81
+Abiertos: **10** · Cerrados: 80 · Total: 90
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
+| `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
+| `f-wf02-mapa-cifras-podridas` | high | auto-fix | `docs/process/current_execution_map.md` | El mapa declara 477 tests (hay 518+) y 236 lineas de contexto (hay 250): autoridad canonica caducada |
+| `f-wf03-jsonl-sin-encoder` | medium | auto-fix | `scripts/agent-hooks/capture-review-verdict.sh` | review-history.jsonl se construye con printf: comillas o CR/LF en campos externos corrompen historial y dedupe |
+| `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh (664) + 3 tests + capture-review-verdict (371)` | Cinco archivos del harness sobre o rozando su propio hard limit de 400 lineas |
+| `f-wf05-project-kind-inferido` | medium | auto-fix | `tools/lib/scope.sh` | El tipo de repo se infiere por ausencia de fuentes en directorios fijos: un monorepo se clasifica mal |
+| `f-wf06-kmp-detector-textual` | medium | auto-fix | `tools/check-source-sets.sh:69` | check-source-sets casa un import dentro de /* */ o de un string triple: detector textual para propiedad sintactica |
+| `f-wf07-contexto-sin-headroom` | medium | auto-fix | `tools/lessons-rotate.sh` | Contexto vivo clavado en 250/250 y 12 separadores acumulados: la proxima leccion rompe el presupuesto |
+| `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
+| `f-wf08-git-add-A-canonico` | low | auto-fix | `docs/process/current_execution_map.md:41` | El mapa recomienda git add -A mientras AGENTS.md 7 lo prohibe con cambios fuera de scope |
 
 ## Cerrados
 
