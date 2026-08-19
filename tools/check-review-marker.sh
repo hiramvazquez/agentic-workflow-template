@@ -31,7 +31,18 @@ MARKER=".agents/state/markers/reviewer_run.txt"
 # commit de solo-reglas exigía marker de review — falso positivo real cazado en
 # vivo (un marker viejo de otra sesión lo convertía en EXPIRADO). Fijado por
 # test_review_marker_preset.sh::test_meta_doc_no_exige_marker.
-NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|\.gitattributes|lefthook|\.gitleaks|\.semgrepignore|muter\.conf|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
+# La lista vive en `tools/lib/scope.sh`, que además decide si ESTE repo es un
+# proyecto de app (donde tools/ y scripts/ son andamio) o el repo del propio
+# harness (donde son el producto, y donde este gate no había bloqueado un commit
+# en su vida). Fallback si la lib no llegó todavía por sync: el criterio de app,
+# que es el que no rompe a nadie.
+if [ -f tools/lib/scope.sh ]; then
+  # shellcheck source=lib/scope.sh
+  . tools/lib/scope.sh
+  NON_PRODUCT="$(scope_non_product)"
+else
+  NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|\.gitattributes|lefthook|\.gitleaks|\.semgrepignore|muter\.conf|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
+fi
 
 fail() { echo "$1"; exit 1; }
 

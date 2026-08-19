@@ -528,3 +528,106 @@ _case_el_informe_no_miente_sobre_lo_traido() {
 test_el_informe_de_no_sincronizado_dice_la_verdad() {
   _upg_sandbox_copia _case_el_informe_no_miente_sobre_lo_traido
 }
+
+# ════════════════════════════════════════════════════════════════════
+# La regla FILL vale en LOS DOS caminos, no solo en la primera sync
+# ════════════════════════════════════════════════════════════════════
+# Vivido por un adoptante: rellenó el FILL de un script de maquinaria —que es
+# literalmente lo que el marcador pide— y a partir de ahí CADA delta chocaba en
+# esa línea, para siempre. Tuvo que resolver a mano y avanzar `.template-sync`
+# él mismo, un archivo que dice "no editar a mano".
+# Es la peor forma del problema: **castiga exactamente la conducta correcta.**
+_case_el_delta_no_choca_con_un_fill_relleno() {
+  # El template trae un script de maquinaria CON marcador FILL...
+  ( cd "$TPL_DIR" \
+    && printf '#!/usr/bin/env bash\n# <!-- FILL: tus rutas -->\nPROD_DIRS="ios app"\necho v1\n' > tools/con-fill.sh \
+    && git add -A && git commit -qm "template: script con FILL" ) >/dev/null 2>&1
+  bash tools/upgrade.sh >/dev/null 2>&1          # primera sync: lo trae
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  # ...el adoptante lo RELLENA, que es lo que el FILL le pide...
+  printf '#!/usr/bin/env bash\n# <!-- FILL: tus rutas -->\nPROD_DIRS="Pelis PelisTests"\necho v1\n' > tools/con-fill.sh
+  git add -A; git commit -qm "relleno mi FILL" >/dev/null 2>&1
+  # ...y el template cambia ESE MISMO archivo.
+  ( cd "$TPL_DIR" \
+    && printf '#!/usr/bin/env bash\n# <!-- FILL: tus rutas -->\nPROD_DIRS="ios app"\necho v2\n' > tools/con-fill.sh \
+    && git add -A && git commit -qm "template: v2" ) >/dev/null 2>&1
+
+  local out; out="$(bash tools/upgrade.sh 2>&1)"
+  git diff --name-only --diff-filter=U | grep -q 'con-fill' \
+    && { echo "    el delta CHOCÓ contra el FILL relleno: castiga rellenar el FILL"; return 1; }
+  grep -q 'PelisTests' tools/con-fill.sh \
+    || { echo "    el delta PISÓ el relleno del adoptante"; return 1; }
+  case "$out" in *con-fill.sh*) : ;; *)
+    echo "    lo excluyó del delta y NO lo dijo: se queda sin el arreglo y sin saberlo"
+    return 1 ;; esac
+}
+test_el_delta_respeta_un_fill_ya_relleno_y_lo_reporta() {
+  _upg_sandbox_copia _case_el_delta_no_choca_con_un_fill_relleno
+}
+
+# ── FALSO POSITIVO: la maquinaria SIN FILL sigue viajando en el delta ──
+# Guard del arreglo de arriba: excluir por FILL no puede convertirse en excluir
+# de más. Si el delta deja de traer maquinaria normal, el sync deja de servir.
+_case_el_delta_sigue_trayendo_maquinaria_normal() {
+  bash tools/upgrade.sh >/dev/null 2>&1
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  ( cd "$TPL_DIR" && stub scripts/gate.sh 'v3 arreglo del template\n' \
+    && git add -A && git commit -qm "template: v3" ) >/dev/null 2>&1
+  bash tools/upgrade.sh >/dev/null 2>&1
+  grep -q 'v3 arreglo del template' scripts/gate.sh \
+    || { echo "    el delta dejó de traer maquinaria SIN FILL: el sync ya no sirve"; return 1; }
+}
+test_el_delta_sigue_trayendo_la_maquinaria_sin_fill() {
+  _upg_sandbox_copia _case_el_delta_sigue_trayendo_maquinaria_normal
+}
+
+# ── El sync nombra los findings ABIERTOS que acaba de tocar ─────────
+# §1.1 dice "detectar no basta — CERRAR", y el canal por el que llega la mitad
+# de los arreglos —este script— no tocaba el ledger. Vivido en un adoptante: dos
+# findings seguían `open` diciendo "el fix no ha llegado" y el fix ya estaba en
+# el árbol. Lo cazó el juez nocturno, no la persona.
+_case_el_sync_nombra_findings_abiertos() {
+  mkdir -p tools/findings
+  printf '%s\n' \
+    '{"id":"f-abierto","title":"gate.sh se cuelga","area":"scripts/gate.sh:12","severity":"high","tier":"auto-fix","status":"open","links":[]}' \
+    '{"id":"f-cerrado","title":"otro de gate.sh","area":"scripts/gate.sh:99","severity":"low","tier":"auto-fix","status":"fixed","links":[]}' \
+    '{"id":"f-de-otro-lado","title":"nada que ver","area":"app/Vista.swift","severity":"low","tier":"auto-fix","status":"open","links":[]}' \
+    > tools/findings/ledger.jsonl
+  git add -A; git commit -qm "ledger" >/dev/null 2>&1
+  bash tools/upgrade.sh >/dev/null 2>&1
+  git add -A; git commit -qm "sync inicial" >/dev/null 2>&1
+  ( cd "$TPL_DIR" && stub scripts/gate.sh 'v3 arreglado\n' \
+    && git add -A && git commit -qm "template: arregla gate" ) >/dev/null 2>&1
+  local out; out="$(bash tools/upgrade.sh 2>&1)"
+  case "$out" in *f-abierto*) : ;; *)
+    echo "    el sync trajo un arreglo de scripts/gate.sh y NO nombró el finding abierto sobre él"
+    return 1 ;; esac
+  case "$out" in *f-cerrado*)
+    echo "    nombró un finding YA CERRADO: eso es ruido en cada upgrade"; return 1 ;; esac
+  case "$out" in *f-de-otro-lado*)
+    echo "    nombró un finding de un área que el delta no tocó"; return 1 ;; esac
+  case "$out" in *close*) : ;; *)
+    echo "    los nombra pero no dice que cerrar sigue siendo explícito"; return 1 ;; esac
+}
+test_el_sync_nombra_los_findings_abiertos_que_toca() {
+  _upg_sandbox_copia _case_el_sync_nombra_findings_abiertos
+}
+
+# ── FALSO POSITIVO: sin ledger, o sin coincidencias, no dice nada ───
+# Un aviso que sale siempre se aprende a ignorar. Y un adoptante recién llegado
+# no tiene ledger todavía: reventar ahí sería estrenar el harness con un error.
+_case_sin_ledger_el_sync_calla() {
+  rm -f tools/findings/ledger.jsonl
+  bash tools/upgrade.sh >/dev/null 2>&1
+  git add -A; git commit -qm "sync" >/dev/null 2>&1
+  ( cd "$TPL_DIR" && stub scripts/gate.sh 'v3\n' && git add -A \
+    && git commit -qm t ) >/dev/null 2>&1
+  local out; out="$(bash tools/upgrade.sh 2>&1)"
+  case "$out" in *"findings ABIERTOS"*)
+    echo "    sin ledger, el sync habló de findings igualmente"; return 1 ;; esac
+  case "$out" in *Traceback*|*"No such file"*)
+    echo "    sin ledger, el sync petó:"; printf '%s\n' "$out" | tail -3 | sed 's/^/      /'; return 1 ;; esac
+}
+test_sin_ledger_el_sync_no_habla_de_findings() {
+  _upg_sandbox_copia _case_sin_ledger_el_sync_calla
+}

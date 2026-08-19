@@ -11,6 +11,271 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-14] El repo del harness eximía de review el 100% de su propio contenido
+- **Qué pasó:** `NON_PRODUCT` exime `tools/ scripts/ ci/ docs/ AGENTS.md`… para que tocar el
+  andamio no pida review en un proyecto de app. Correcto allí. Pero **en el repo del propio
+  harness eso es todo lo que hay**. Un adoptante auditó nuestro historial con el `process-judge`:
+  **15 commits seguidos sin que el reviewer-gate disparara ni una vez**, incluidos el que
+  invirtió la política de seguridad de `AGENTS.md §6` y el que metió un gate bloqueante nuevo al
+  Anillo 3. Salió bien por disciplina del agente —12 invocaciones voluntarias del reviewer—, no
+  por el mecanismo. Dicho del modo más incómodo: **nuestro propio reviewer-gate no había
+  bloqueado un commit en su vida.**
+- **Causa raíz:** la lista describía "qué NO es producto" con las categorías de un proyecto de
+  app, y se aplicaba también donde esas categorías **son** el producto. Es `f-harness-no-autogate`
+  otra vez, en el gate más central de todos: la herramienta eximiéndose de la regla que reparte.
+- **La distinción ya existía en el repo, en otro gate:** `check-ring3.sh` dice, con estas
+  palabras, *"los gates completos de un proyecto, o —en el repo del propio harness— la suite que
+  verifica los gates, que ahí es exactamente lo mismo"*. Uno lo reconocía y el otro no. Cuando una
+  distinción vive en un solo gate, no es una regla del harness: es un detalle de ese archivo.
+- **Regla:** el alcance se decide en `tools/lib/scope.sh`, fuente única de los dos markers. Si el
+  repo **no tiene fuentes de aplicación**, su producto es el harness: `tools/`, `scripts/`, `ci/`,
+  `lefthook.yml` y `AGENTS.md` exigen review. Si las tiene, nada cambia. El discriminador es el
+  mismo que usa `verify-run.sh` para detectar un `verify.conf` heredado — no depende de un nombre,
+  de un remote ni de un flag que alguien pueda poner mal.
+- **Y la mitad que evita el desastre contrario:** en el repo del harness siguen exentos `docs/`,
+  `backlog/`, `README` y los ledgers. Si apuntar una lección exigiera invocar al reviewer, el
+  bucle de aprendizaje —el mecanismo por el que la review humana DECRECE— pasaría a ser el paso
+  más caro del día, y eso acaba en un `REVIEWER_OVERRIDE` de costumbre que apaga el gate entero
+  (ley del 10%). Endurecer donde ejecuta, no donde se anota.
+- **De propina, un acoplamiento retirado:** `check-verify-marker.sh` obtenía la lista
+  **grepeando la línea `NON_PRODUCT=`** de `check-review-marker.sh`. Funcionaba, pero bastaba
+  reformatear esa línea para que se quedara con su fallback en silencio. Ahora los dos sourcean
+  la misma lib.
+- **Detector:** tools/tests/test_review_marker_preset.sh::test_en_el_repo_del_harness_su_maquinaria_exige_review
+  + ::test_en_un_proyecto_de_app_el_andamio_sigue_exento (el guard de FP que sostiene todo el
+  diseño: aplicar esto siempre sería el ruido que mata el gate)
+  + ::test_en_el_harness_la_prosa_y_los_ledgers_siguen_exentos. Los dos primeros verificados
+  contra las dos versiones equivocadas: la que exime siempre y la que endurece siempre.
+- **Área:** tools/lib/scope.sh · tools/check-review-marker.sh · tools/check-verify-marker.sh
+
+## Lecciones mecanizadas (índice)
+
+> Estas ya NO dependen de tu memoria: cada una tiene un test en `tools/tests/` que corre en el
+> Anillo 3, así que violarlas hace fallar la suite. Se listan para que sepas que existen; el
+> relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
+> Si necesitas el detalle de una, búscala ahí — no la reescribas.
+
+- [2026-08-14] La regla que protege el FILL vivía en uno de los dos caminos — `tools/tests/test_upgrade.sh`
+- [2026-08-14] El canal por el que llegan la mitad de los arreglos no tocaba el ledger — `tools/tests/test_upgrade.sh`
+- [2026-08-14] Lo que no se puede inyectar en runtime se escribe en el prompt del rol — `tools/tests/test_verdict.sh`
+- [2026-08-14] La idempotencia que corta un bucle también borra el trabajo deliberado — `tools/tests/test_verdict.sh`
+- [2026-08-14] Un hook de *Stop* que reinyecta contexto se retroalimenta — `tools/tests/test_verdict.sh`
+- [2026-08-14] El harness modelaba un solo eje, y KMP tiene dos — `tools/tests/test_source_sets.sh`
+- [2026-08-14] El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo — `tools/tests/test_verdict.sh`
+- [2026-08-13] El paso del workflow que nadie ejecutaba mentía en el arranque de cada sesión — `tools/tests/test_execution_map.sh`
+- [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] Una capacidad declarada no es una capacidad demostrada — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] `stat -f` de GNU no falla, y el orden del fallback ERA el bug — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-12] El programa embebido consumía el mismo stdin reservado para el payload — `tools/tests/test_gate_cache.sh`
+- [2026-08-12] Reconciliar un archivo exige identidad no ambigua y clasificación bidireccional — `tools/tests/test_lessons.sh`
+- [2026-08-05] Un gate bloqueó editar la documentación de su propia área — `tools/tests/test_skill_reminder.sh`
+- [2026-08-05] La ausencia de una herramienta se contaba como deuda técnica — `tools/tests/test_drift_aggregation.sh`
+- [2026-08-05] El escape hatch de emergencia relajaba más de lo declarado — `tools/tests/test_ratchets.sh`
+- [2026-08-05] Un detector heurístico era trivial de gamear — `tools/tests/test_drift_aggregation.sh`
+- [2026-08-06] Las reglas de semgrep nunca habían cargado, y `--validate` decía que sí — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-05] Escribir el harness en español rompió tres scripts en silencio — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-05] Un gate no distinguía "tu código falla" de "yo no pude mirar" — `tools/tests/test_fail_closed.sh`
+- [2026-08-05] Una regla implementada en dos sitios divergió en cuanto un tercero la llamó — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-05] El detector de secretos se bloqueó a sí mismo — `tools/tests/test_canon_enforce.sh`
+- [2026-08-07] Hooks registrados sobre eventos que NO existen — `tools/tests/test_hook_events.sh`
+- [2026-08-07] Dos emisores del "mismo" JSON con espaciado distinto — `tools/tests/test_findings_cli.sh`
+- [2026-08-07] El fallback de `stat` que nunca corría (y solo rompía en CI) — `tools/tests/test_ratchets.sh`
+- [2026-08-09] Anillo 0: dos sintaxis inertes, delatadas por la voz del propio cliente en los logs — `tools/tests/test_hook_events.sh`
+- [2026-08-09] El gate del marker no conocía los commits de MERGE (el owner atascado en su propio flujo) — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-09] La matriz exigía leer un archivo que el tracker no sabía registrar (bucle infinito) — `tools/tests/test_skill_matrix.sh`
+- [2026-08-08] El clasificador producto/meta-doc no conocía AGENTS.md (y el marker stale lo empeoró) — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-07] Un trinquete cuyo propio script podía aflojarlo — `tools/tests/test_ratchets.sh`
+- [2026-08-09] Un merge "concluido" commiteó los marcadores de conflicto y ningún gate lo vio — `tools/tests/test_conflict_markers.sh`
+- [2026-08-09] Tres gates parecían sanos y ninguno había demostrado jamás que VE — `tools/tests/test_ratchets.sh`
+- [2026-08-09] Un archivo llegado por fuera de upgrade.sh revirtió un arreglo en silencio — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-09] El fail-open local estaba justificado por un backstop que nadie comprobaba — `tools/tests/test_ring3.sh`
+- [2026-08-09] La métrica que probaba que el harness sirve no la invocaba nadie — `tools/tests/test_harness_report.sh`
+- [2026-08-09] Avisar cinco veces no impidió que el problema entrara en la historia — `tools/tests/test_exec_bits.sh`
+- [2026-08-09] La review llegaba a ciegas al final, y por eso cada vuelta costaba lo mismo — `tools/tests/test_verdict.sh`
+- [2026-08-09] El camino de upgrade estaba roto justo para la ruta de adopción que la doc recomienda — `tools/tests/test_upgrade.sh`
+- [2026-08-09] Escribí el detector de "falla a medias y dice OK" y cometí ese error dos veces seguidas — `tools/tests/test_upgrade.sh`
+- [2026-08-09] Maquinaria con secciones que el template espera que personalices — `tools/tests/test_upgrade.sh`
+- [2026-08-09] Pedirle ayuda al CLI del ledger corrompía el ledger — `tools/tests/test_findings_cli.sh`
+- [2026-08-09] La matriz de skills solo vigilaba las tools de edición, no Bash — `tools/tests/test_bash_matrix.sh`
+- [2026-08-09] El template arrastraba un secreto que disparaba su propio detector — `tools/tests/test_canon_enforce.sh`
+- [2026-08-09] Sin `.semgrepignore`, el nivel 2 escaneaba copias del propio proyecto — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-09] Denegar la herramienta segura no impide la escritura: la empuja al camino inseguro — `tools/tests/test_hook_events.sh`
+- [2026-08-10] La herramienta que reparte los arreglos no puede parchearse a sí misma — `tools/tests/test_upgrade.sh`
+- [2026-08-10] Un marcador es una FORMA, no una palabra: `grep FILL` congeló media maquinaria — `tools/tests/test_upgrade.sh`
+- [2026-08-10] Un literal partido a propósito lleva escrito POR QUÉ, o el siguiente lo junta — `tools/tests/test_secret_scan.sh`
+- [2026-08-10] El filtro del propio verificador de lecciones se tragó una lección — `tools/tests/test_lessons.sh`
+- [2026-08-10] `.claude/settings.json` es maquinaria viviendo en una carpeta de contenido — `tools/tests/test_settings_merge.sh`
+- [2026-08-10] "Esto lo caza el test X" — y el test X no lo cazaba — `tools/tests/test_skill_matrix.sh`
+- [2026-08-10] Un manifiesto mantenido a mano no puede vigilarse a sí mismo — `tools/tests/test_meta_fp.sh`
+- [2026-08-10] Una regla de adopción que solo vive en un doc se descubre tarde — `tools/tests/test_layers.sh`
+- [2026-08-10] El estado real de una historia no vive donde el selector miraba — `tools/tests/test_backlog.sh`
+- [2026-08-10] Un `||` que no distingue "no pude mirar" de "encontré algo" — `tools/tests/test_secret_scan.sh`
+- [2026-08-10] Un gate en rojo perpetuo es peor que un gate ausente — `tools/tests/test_secret_scan.sh`
+- [2026-08-10] El guard colgaba del exit code de jq, y jq cambió de opinión entre versiones — `tools/tests/test_fail_closed.sh`
+- [2026-08-10] Un run puede salir con 0 y no haber terminado — `tools/tests/test_backlog.sh`
+- [2026-08-10] Se arregló un caso del parser y no se buscó el hermano — `tools/tests/test_semgrep_rules.sh`
+- [2026-08-10] Un criterio de aceptación «verificado con un grep» es decoración — `tools/tests/test_backlog.sh`
+- [2026-08-11] El informe de "no lo he traído" mentía, y empujaba justo al flujo que prohíbe — `tools/tests/test_upgrade.sh`
+- [2026-08-11] El invariante nº1 estaba aplicado al reviewer y no a los tests — `tools/tests/test_verify_marker.sh`
+- [2026-08-11] Un gate que lee TEXTO como si fuera sintaxis enseña a evadirlo — `tools/tests/test_bash_matrix.sh`
+- [2026-08-11] Un hook roto dejó al agente sin poder ni diagnosticarlo — `tools/tests/test_run_hook.sh`
+- [2026-08-11] Un piso de 0 no es un suelo: es una medición que nunca ocurrió — `tools/tests/test_ratchets.sh`
+- [2026-08-12] "Sin cablear" y "cableado, pero el runner no termina" no son el mismo estado — `tools/tests/test_ratchets.sh`
+- [2026-08-12] El archivo de tests existía; el test citado no — `tools/tests/test_lessons.sh`
+- [2026-08-12] El gestor de paquetes contesta a otra pregunta — `tools/tests/test_finding_refs.sh`
+- [2026-08-12] Un id de finding que no existe LEE COMO CERRADO — `tools/tests/test_finding_refs.sh`
+- [2026-08-12] La cuarta vez del mismo falso positivo no pide otra lección — `tools/tests/test_bash_matrix.sh`
+- [2026-08-11] Cambiar de lanzador habría duplicado todos los hooks de todos los proyectos — `tools/tests/test_settings_merge.sh`
+- [2026-08-11] La suite corría DESPUÉS del push, así que `main` se publicó en rojo — `tools/tests/test_run_hook.sh`
+- [2026-08-11] Un test con fixture inventado prueba la invención, no la herramienta — `tools/tests/test_settings_merge.sh`
+- [2026-08-11] Un RED sin huella hace indistinguible la remediación del reintento — `tools/tests/test_verdict.sh`
+- [2026-08-11] La cola del juez premiaba dejar basura — `tools/tests/test_judge_queue.sh`
+- [2026-08-12] El repo que escribe el gate era el único sin cablearlo — `tools/tests/test_verify_marker.sh`
+- [2026-08-12] El detector se validó contra el único ledger que no lo iba a romper — `tools/tests/test_finding_refs.sh`
+- [2026-08-12] Un fallback añadió un segundo cero a un resultado válido — `tools/tests/test_metrics.sh`
+- [2026-08-12] Añadir campos al evento no migra a sus productores — `tools/tests/test_findings_cli.sh`
+- [2026-08-12] Omitir una línea corrupta convirtió “no pude medir” en cero — `tools/tests/test_metrics.sh`
+- [2026-08-12] Validar el prefijo de un timestamp no valida el instante — `tools/tests/test_metrics.sh`
+- [2026-08-12] Normalizar los datos a UTC no basta si la ventana sigue siendo local — `tools/tests/test_metrics.sh`
+- [2026-08-12] Cuantificar un descarte no reemplaza la señal de su causa — `tools/tests/test_metrics.sh`
+- [2026-08-12] Una vista generada no puede convertirse en entrada de su propio generador — `tools/tests/test_lessons.sh`
+
+### [2026-08-14] La regla que protege el FILL vivía en uno de los dos caminos
+- **Qué pasó:** `upgrade.sh` tiene dos caminos —primera sincronización y delta— y la regla "si el
+  template trae un marcador FILL y el archivo ya existe aquí, no se toca" solo se comprobaba en el
+  primero. Un adoptante rellenó el FILL de un script de maquinaria —que es **literalmente lo que
+  el marcador pide**— y desde entonces CADA delta chocaba en esa línea, para siempre. Tuvo que
+  resolver a mano y avanzar `tools/.template-sync` él mismo, un archivo que dice "no editar a mano".
+- **Causa raíz:** *una regla implementada en un camino de dos no está implementada.* Y el mensaje
+  de conflicto empeoraba el diagnóstico: decía "si tenías un arreglo local, MERGEA ambos", cuando
+  no era un arreglo local — era configuración que el propio template había pedido.
+- **Por qué es la peor forma del problema:** el harness **castigaba exactamente la conducta
+  correcta**. Rellenar el FILL es lo que hay que hacer, y hacerlo condenaba al adoptante a un
+  conflicto en cada upgrade. Un gate que cobra un peaje por obedecerlo enseña a no obedecerlo.
+- **Regla:** la comprobación vive en **una** función (`_propiedad_compartida`) que usan los dos
+  caminos. Y excluir no basta: se **reporta**, con el `git diff` concreto para fundir a mano lo
+  que interese — excluir en silencio deja al adoptante sin el arreglo y sin saberlo. El informe
+  sale por TODAS las salidas del delta, incluida la de "sin cambios": si lo único que cambió el
+  template fue un archivo con FILL, el delta queda vacío y sin el aviso la pasada diría "sin
+  cambios" mientras hay un arreglo esperando.
+- **Detector:** tools/tests/test_upgrade.sh::test_el_delta_respeta_un_fill_ya_relleno_y_lo_reporta
+  (reproduce el caso del adoptante: rellenar el FILL, que el template cambie ese archivo, y exigir
+  que NO haya conflicto, que el relleno siga y que se reporte)
+  + ::test_el_delta_sigue_trayendo_la_maquinaria_sin_fill (el guard de FP: excluir por FILL no
+  puede convertirse en excluir de más, o el sync deja de servir)
+- **Área:** tools/upgrade.sh
+
+### [2026-08-14] El canal por el que llegan la mitad de los arreglos no tocaba el ledger
+- **Qué pasó:** dos findings seguían `open`, con el `detail` diciendo "el fix no ha llegado", y el
+  fix ya estaba en el árbol: lo había traído `upgrade.sh`. Lo cazó el juez nocturno, no la persona.
+- **Causa raíz:** §1.1 exige que todo hallazgo llegue a estado terminal, y el ledger se alimentaba
+  solo de lo que alguien escribía a mano. El **sync** —por donde entra la mitad de los arreglos de
+  un adoptante— no lo miraba. Es la regla de oro nº1 al revés: tanto cuidado con cerrar, y el
+  canal más frecuente no sabía que existía el registro.
+- **Regla:** al terminar el delta, cruzar las rutas traídas contra el `area`/`links`/`title` de los
+  findings abiertos y **nombrar** los que coinciden. Dos decisiones deliberadas: no se cierran
+  solos —cerrar es un acto explícito con `--resolution`, y un cierre por coincidencia de ruta
+  afirmaría que algo se resolvió sin que nadie lo haya comprobado—, y el filtro es **generoso** a
+  propósito, porque el coste de equivocarse es asimétrico: nombrar uno de más cuesta una mirada,
+  callarse uno deja el ledger afirmando algo falso.
+- **Detector:** tools/tests/test_upgrade.sh::test_el_sync_nombra_los_findings_abiertos_que_toca
+  (y comprueba las dos direcciones: no nombra los ya cerrados ni los de áreas que el delta no tocó)
+  + ::test_sin_ledger_el_sync_no_habla_de_findings (un adoptante recién llegado no tiene ledger:
+  estrenar el harness con un error sería la peor primera impresión posible)
+- **Área:** tools/upgrade.sh · tools/findings/ledger.jsonl
+
+## Lecciones mecanizadas (índice)
+
+> Estas ya NO dependen de tu memoria: cada una tiene un test en `tools/tests/` que corre en el
+> Anillo 3, así que violarlas hace fallar la suite. Se listan para que sepas que existen; el
+> relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
+> Si necesitas el detalle de una, búscala ahí — no la reescribas.
+
+- [2026-08-14] Lo que no se puede inyectar en runtime se escribe en el prompt del rol — `tools/tests/test_verdict.sh`
+- [2026-08-14] La idempotencia que corta un bucle también borra el trabajo deliberado — `tools/tests/test_verdict.sh`
+- [2026-08-14] Un hook de *Stop* que reinyecta contexto se retroalimenta — `tools/tests/test_verdict.sh`
+- [2026-08-14] El harness modelaba un solo eje, y KMP tiene dos — `tools/tests/test_source_sets.sh`
+- [2026-08-14] El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo — `tools/tests/test_verdict.sh`
+- [2026-08-13] El paso del workflow que nadie ejecutaba mentía en el arranque de cada sesión — `tools/tests/test_execution_map.sh`
+- [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] Una capacidad declarada no es una capacidad demostrada — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] `stat -f` de GNU no falla, y el orden del fallback ERA el bug — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-12] El programa embebido consumía el mismo stdin reservado para el payload — `tools/tests/test_gate_cache.sh`
+- [2026-08-12] Reconciliar un archivo exige identidad no ambigua y clasificación bidireccional — `tools/tests/test_lessons.sh`
+- [2026-08-05] Un gate bloqueó editar la documentación de su propia área — `tools/tests/test_skill_reminder.sh`
+- [2026-08-05] La ausencia de una herramienta se contaba como deuda técnica — `tools/tests/test_drift_aggregation.sh`
+- [2026-08-05] El escape hatch de emergencia relajaba más de lo declarado — `tools/tests/test_ratchets.sh`
+- [2026-08-05] Un detector heurístico era trivial de gamear — `tools/tests/test_drift_aggregation.sh`
+- [2026-08-06] Las reglas de semgrep nunca habían cargado, y `--validate` decía que sí — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-05] Escribir el harness en español rompió tres scripts en silencio — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-05] Un gate no distinguía "tu código falla" de "yo no pude mirar" — `tools/tests/test_fail_closed.sh`
+- [2026-08-05] Una regla implementada en dos sitios divergió en cuanto un tercero la llamó — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-05] El detector de secretos se bloqueó a sí mismo — `tools/tests/test_canon_enforce.sh`
+- [2026-08-07] Hooks registrados sobre eventos que NO existen — `tools/tests/test_hook_events.sh`
+- [2026-08-07] Dos emisores del "mismo" JSON con espaciado distinto — `tools/tests/test_findings_cli.sh`
+- [2026-08-07] El fallback de `stat` que nunca corría (y solo rompía en CI) — `tools/tests/test_ratchets.sh`
+- [2026-08-09] Anillo 0: dos sintaxis inertes, delatadas por la voz del propio cliente en los logs — `tools/tests/test_hook_events.sh`
+- [2026-08-09] El gate del marker no conocía los commits de MERGE (el owner atascado en su propio flujo) — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-09] La matriz exigía leer un archivo que el tracker no sabía registrar (bucle infinito) — `tools/tests/test_skill_matrix.sh`
+- [2026-08-08] El clasificador producto/meta-doc no conocía AGENTS.md (y el marker stale lo empeoró) — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-07] Un trinquete cuyo propio script podía aflojarlo — `tools/tests/test_ratchets.sh`
+- [2026-08-09] Un merge "concluido" commiteó los marcadores de conflicto y ningún gate lo vio — `tools/tests/test_conflict_markers.sh`
+- [2026-08-09] Tres gates parecían sanos y ninguno había demostrado jamás que VE — `tools/tests/test_ratchets.sh`
+- [2026-08-09] Un archivo llegado por fuera de upgrade.sh revirtió un arreglo en silencio — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-09] El fail-open local estaba justificado por un backstop que nadie comprobaba — `tools/tests/test_ring3.sh`
+- [2026-08-09] La métrica que probaba que el harness sirve no la invocaba nadie — `tools/tests/test_harness_report.sh`
+- [2026-08-09] Avisar cinco veces no impidió que el problema entrara en la historia — `tools/tests/test_exec_bits.sh`
+- [2026-08-09] La review llegaba a ciegas al final, y por eso cada vuelta costaba lo mismo — `tools/tests/test_verdict.sh`
+- [2026-08-09] El camino de upgrade estaba roto justo para la ruta de adopción que la doc recomienda — `tools/tests/test_upgrade.sh`
+- [2026-08-09] Escribí el detector de "falla a medias y dice OK" y cometí ese error dos veces seguidas — `tools/tests/test_upgrade.sh`
+- [2026-08-09] Maquinaria con secciones que el template espera que personalices — `tools/tests/test_upgrade.sh`
+- [2026-08-09] Pedirle ayuda al CLI del ledger corrompía el ledger — `tools/tests/test_findings_cli.sh`
+- [2026-08-09] La matriz de skills solo vigilaba las tools de edición, no Bash — `tools/tests/test_bash_matrix.sh`
+- [2026-08-09] El template arrastraba un secreto que disparaba su propio detector — `tools/tests/test_canon_enforce.sh`
+- [2026-08-09] Sin `.semgrepignore`, el nivel 2 escaneaba copias del propio proyecto — `tools/tests/test_shell_hygiene.sh`
+- [2026-08-09] Denegar la herramienta segura no impide la escritura: la empuja al camino inseguro — `tools/tests/test_hook_events.sh`
+- [2026-08-10] La herramienta que reparte los arreglos no puede parchearse a sí misma — `tools/tests/test_upgrade.sh`
+- [2026-08-10] Un marcador es una FORMA, no una palabra: `grep FILL` congeló media maquinaria — `tools/tests/test_upgrade.sh`
+- [2026-08-10] Un literal partido a propósito lleva escrito POR QUÉ, o el siguiente lo junta — `tools/tests/test_secret_scan.sh`
+- [2026-08-10] El filtro del propio verificador de lecciones se tragó una lección — `tools/tests/test_lessons.sh`
+- [2026-08-10] `.claude/settings.json` es maquinaria viviendo en una carpeta de contenido — `tools/tests/test_settings_merge.sh`
+- [2026-08-10] "Esto lo caza el test X" — y el test X no lo cazaba — `tools/tests/test_skill_matrix.sh`
+- [2026-08-10] Un manifiesto mantenido a mano no puede vigilarse a sí mismo — `tools/tests/test_meta_fp.sh`
+- [2026-08-10] Una regla de adopción que solo vive en un doc se descubre tarde — `tools/tests/test_layers.sh`
+- [2026-08-10] El estado real de una historia no vive donde el selector miraba — `tools/tests/test_backlog.sh`
+- [2026-08-10] Un `||` que no distingue "no pude mirar" de "encontré algo" — `tools/tests/test_secret_scan.sh`
+- [2026-08-10] Un gate en rojo perpetuo es peor que un gate ausente — `tools/tests/test_secret_scan.sh`
+- [2026-08-10] El guard colgaba del exit code de jq, y jq cambió de opinión entre versiones — `tools/tests/test_fail_closed.sh`
+- [2026-08-10] Un run puede salir con 0 y no haber terminado — `tools/tests/test_backlog.sh`
+- [2026-08-10] Se arregló un caso del parser y no se buscó el hermano — `tools/tests/test_semgrep_rules.sh`
+- [2026-08-10] Un criterio de aceptación «verificado con un grep» es decoración — `tools/tests/test_backlog.sh`
+- [2026-08-11] El informe de "no lo he traído" mentía, y empujaba justo al flujo que prohíbe — `tools/tests/test_upgrade.sh`
+- [2026-08-11] El invariante nº1 estaba aplicado al reviewer y no a los tests — `tools/tests/test_verify_marker.sh`
+- [2026-08-11] Un gate que lee TEXTO como si fuera sintaxis enseña a evadirlo — `tools/tests/test_bash_matrix.sh`
+- [2026-08-11] Un hook roto dejó al agente sin poder ni diagnosticarlo — `tools/tests/test_run_hook.sh`
+- [2026-08-11] Un piso de 0 no es un suelo: es una medición que nunca ocurrió — `tools/tests/test_ratchets.sh`
+- [2026-08-12] "Sin cablear" y "cableado, pero el runner no termina" no son el mismo estado — `tools/tests/test_ratchets.sh`
+- [2026-08-12] El archivo de tests existía; el test citado no — `tools/tests/test_lessons.sh`
+- [2026-08-12] El gestor de paquetes contesta a otra pregunta — `tools/tests/test_finding_refs.sh`
+- [2026-08-12] Un id de finding que no existe LEE COMO CERRADO — `tools/tests/test_finding_refs.sh`
+- [2026-08-12] La cuarta vez del mismo falso positivo no pide otra lección — `tools/tests/test_bash_matrix.sh`
+- [2026-08-11] Cambiar de lanzador habría duplicado todos los hooks de todos los proyectos — `tools/tests/test_settings_merge.sh`
+- [2026-08-11] La suite corría DESPUÉS del push, así que `main` se publicó en rojo — `tools/tests/test_run_hook.sh`
+- [2026-08-11] Un test con fixture inventado prueba la invención, no la herramienta — `tools/tests/test_settings_merge.sh`
+- [2026-08-11] Un RED sin huella hace indistinguible la remediación del reintento — `tools/tests/test_verdict.sh`
+- [2026-08-11] La cola del juez premiaba dejar basura — `tools/tests/test_judge_queue.sh`
+- [2026-08-12] El repo que escribe el gate era el único sin cablearlo — `tools/tests/test_verify_marker.sh`
+- [2026-08-12] El detector se validó contra el único ledger que no lo iba a romper — `tools/tests/test_finding_refs.sh`
+- [2026-08-12] Un fallback añadió un segundo cero a un resultado válido — `tools/tests/test_metrics.sh`
+- [2026-08-12] Añadir campos al evento no migra a sus productores — `tools/tests/test_findings_cli.sh`
+- [2026-08-12] Omitir una línea corrupta convirtió “no pude medir” en cero — `tools/tests/test_metrics.sh`
+- [2026-08-12] Validar el prefijo de un timestamp no valida el instante — `tools/tests/test_metrics.sh`
+- [2026-08-12] Normalizar los datos a UTC no basta si la ventana sigue siendo local — `tools/tests/test_metrics.sh`
+- [2026-08-12] Cuantificar un descarte no reemplaza la señal de su causa — `tools/tests/test_metrics.sh`
+- [2026-08-12] Una vista generada no puede convertirse en entrada de su propio generador — `tools/tests/test_lessons.sh`
+
 ### [2026-08-14] Lo que no se puede inyectar en runtime se escribe en el prompt del rol
 - **Qué pasó:** al cortar el bucle del hook de review quedó un tramo abierto, y lo dijo el propio
   reviewer al buscarlo: *"No recibí ningún warning inyectado automáticamente en mi contexto al

@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 77 · Total: 78
+Abiertos: **1** · Cerrados: 80 · Total: 81
 
 ## Abiertos
 
@@ -92,3 +92,6 @@ Abiertos: **1** · Cerrados: 77 · Total: 78
 | `f-b3cf4f74` | fixed | Idempotencia por (agente, HEAD, diff, veredicto) contra review-history.jsonl; el camino de exito y e |
 | `f-a8bcb235` | fixed | El discriminador es la identidad de la INVOCACION, no el contenido ni el tiempo: las vueltas de un b |
 | `f-reporte-previo-sin-lector` | fixed | La instruccion va estatica en el prompt del rol (tools/agent-prompts/review.md) con el comando exact |
+| `f-fill-sin-proteccion-en-el-delta` | fixed | La comprobacion vive en una sola funcion _propiedad_compartida que usan los dos caminos. En el delta |
+| `f-sync-no-avisa-al-ledger` | fixed | Al terminar el delta se cruzan las rutas traidas contra area/links/title de los findings abiertos y  |
+| `f-non-product-ciego-al-harness` | fixed | tools/lib/scope.sh como fuente unica de los dos markers: si el repo no tiene fuentes de aplicacion s |

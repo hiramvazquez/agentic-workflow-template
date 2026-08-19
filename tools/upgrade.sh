@@ -208,7 +208,7 @@ git log --oneline HEAD.."$REMOTE/$BRANCH" | sed 's/^/   /'
 # del proyecto (sus historias), pero la PLANTILLA es harness — y desde que
 # `run.sh` exige la sección de verificación de criterios, mandar el gate sin
 # mandar la plantilla sería mandar la exigencia sin las instrucciones.
-SYNC_PATHS="scripts ci lefthook.yml .semgrepignore tools/capabilities.json tools/tests tools/semgrep/rules tools/semgrep/fixtures tools/findings/fixtures tools/metrics tools/agent-backends tools/agent-prompts tools/architecture.conf.example .github/workflows backlog/_template.md"
+SYNC_PATHS="scripts ci tools/lib lefthook.yml .semgrepignore tools/capabilities.json tools/tests tools/semgrep/rules tools/semgrep/fixtures tools/findings/fixtures tools/metrics tools/agent-backends tools/agent-prompts tools/architecture.conf.example .github/workflows backlog/_template.md"
 SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
 
 # ── Qué cuenta como marcador FILL (y qué NO) ────────────────────────
@@ -231,6 +231,39 @@ SYNC_GLOBS="tools/*.sh tools/findings/*.sh tools/findings/*.ts"
 # que nadie había personalizado nunca. Y la ironía: quien más lo sufría era el
 # VERIFICADOR (validate-harness) y el propio upgrade.
 FILL_MARKER='^[[:space:]]*([#;]|//|--)?[[:space:]]*<!--[[:space:]]*FILL'
+
+# ── La regla FILL, en UN solo sitio y usada por LOS DOS caminos ─────
+# Vivía dentro del camino de PRIMERA sincronización y el del DELTA no la
+# consultaba nunca. Consecuencia, vivida por un adoptante: rellenó el FILL de
+# `check-execution-map.sh` —que es literalmente lo que el marcador pide— y a
+# partir de ahí CADA delta chocaba en esa línea, para siempre. Tuvo que resolver
+# a mano y avanzar `tools/.template-sync` él mismo, un archivo que dice "no
+# editar a mano".
+#
+# Es la peor forma del problema: **castiga exactamente la conducta correcta**.
+# Y el mensaje de conflicto ("si tenías un arreglo local, MERGEA ambos") empuja
+# al sitio equivocado, porque no es un arreglo local — es configuración que el
+# propio template pidió.
+#
+# La regla es la de siempre: si la versión del TEMPLATE trae un marcador FILL y
+# el archivo YA existe aquí, es de propiedad compartida y no se toca — ni se
+# pisa ni se parchea. Se reporta.
+_propiedad_compartida() { # _propiedad_compartida <path> → 0 si NO debe tocarse
+  [ -f "$1" ] || return 1
+  git show "$REMOTE/$BRANCH:$1" 2>/dev/null | grep -qE "$FILL_MARKER"
+}
+
+# Excluir sin decirlo dejaría al adoptante sin el arreglo Y sin saberlo, que es
+# la clase de silencio que este harness persigue en todo lo demás.
+_reportar_delta_fill() {
+  [ -n "${_DELTA_FILL:-}" ] || return 0
+  echo ""
+  echo "   🔒 Fuera del delta (traen FILL y ya los personalizaste — tuyos):"
+  printf '%s\n' "$_DELTA_FILL" | sed 's/^/      · /'
+  echo "      Si el template cambió su maquinaria, esos cambios NO han llegado."
+  echo "      Míralos y funde a mano lo que te sirva:"
+  printf '%s\n' "$_DELTA_FILL" | head -3 | sed "s|^|         git diff HEAD $REMOTE/$BRANCH -- |"
+}
 
 # ⚠️  NO se delega el matching en git. Dos capas de fallo silencioso vividas
 # aquí, una debajo de la otra:
@@ -258,6 +291,59 @@ _es_maquinaria() { # _es_maquinaria <ruta-en-el-template>
 }
 
 _REPORTADO=0
+# ── Un arreglo que llega por sync no cierra el finding que lo pedía ──
+# §1.1 dice "detectar no basta — CERRAR", y el canal por el que llega la mitad
+# de los arreglos —este script— no tocaba el ledger. Vivido: dos findings
+# seguían `open` con el detail diciendo "el fix no ha llegado" y el fix ya
+# estaba en el árbol. Lo cazó el juez nocturno, no la persona.
+#
+# No los cierra automáticamente, y eso es deliberado: cerrar es un acto
+# explícito (`findings.sh close --resolution`), y un cierre automático por
+# coincidencia de ruta afirmaría que un problema se resolvió sin que nadie lo
+# haya comprobado — justo la clase de verde sin evidencia que este harness
+# persigue. Solo NOMBRA los que toca, que es lo que faltaba.
+# El coste de equivocarse es asimétrico y por eso el filtro es generoso: nombrar
+# uno de más cuesta una mirada; callarse uno deja un hallazgo abierto sobre algo
+# ya arreglado, que es como el ledger pierde credibilidad.
+_findings_tocados() { # _findings_tocados <rutas-del-delta...>
+  [ -f tools/findings/ledger.jsonl ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  local rutas="$1"
+  [ -n "$rutas" ] || return 0
+  UPG_RUTAS="$rutas" python3 - <<'PYEOF' 2>/dev/null || true
+import json, os
+rutas = [r.strip() for r in os.environ.get("UPG_RUTAS", "").splitlines() if r.strip()]
+if not rutas:
+    raise SystemExit(0)
+tocados = []
+for linea in open("tools/findings/ledger.jsonl", encoding="utf-8"):
+    linea = linea.strip()
+    if not linea:
+        continue
+    try:
+        d = json.loads(linea)
+    except json.JSONDecodeError:
+        continue
+    if d.get("status") not in ("open", "in-progress", None):
+        continue
+    campos = " ".join(str(d.get(k) or "") for k in ("area", "title")) + " " + \
+             " ".join(str(x) for x in (d.get("links") or []))
+    for r in rutas:
+        # Coincide por ruta completa o por nombre de archivo: un `area` suele
+        # decir `tools/x.sh:42`, y a veces solo `x.sh`.
+        if r in campos or os.path.basename(r) in campos:
+            tocados.append((d.get("id", "?"), (d.get("title") or "")[:70]))
+            break
+if tocados:
+    print("")
+    print("   📌 Lo que acabas de traer toca findings ABIERTOS:")
+    for fid, t in tocados:
+        print(f"      · {fid} — {t}")
+    print("   Revísalos: puede que este sync ya los resuelva. Cerrar sigue siendo")
+    print("   explícito — `bash tools/findings/findings.sh close <id> --resolution \"...\"`.")
+PYEOF
+}
+
 _report_no_sincronizado() {
   # Honestidad: lo que el template cambió y NO se ha tocado aquí. Sin esta
   # lista, "upgrade OK" leería como "traído todo", que es justo la clase de
@@ -410,10 +496,20 @@ else
   if [ -n "$BASE_REC" ] && git cat-file -e "$BASE_REC^{commit}" 2>/dev/null; then
     echo "   Base registrada: $BASE_REC — aplico solo el DELTA de maquinaria."
     # shellcheck disable=SC2086  # los globs DEBEN expandirse aquí
-    if git diff "$BASE_REC" "$REMOTE/$BRANCH" -- $(git ls-tree -r --name-only "$REMOTE/$BRANCH" 2>/dev/null | while IFS= read -r _f; do _es_maquinaria "$_f" && printf '%s ' "$_f"; done) > /tmp/upgrade.patch.$$ 2>/dev/null \
+    # Los de propiedad compartida se quedan FUERA del parche. Antes entraban y
+    # chocaban en cada delta contra el relleno del adoptante.
+    _DELTA_FILL=""
+    _DELTA_PATHS="$(git ls-tree -r --name-only "$REMOTE/$BRANCH" 2>/dev/null | while IFS= read -r _f; do
+        _es_maquinaria "$_f" || continue
+        if _propiedad_compartida "$_f"; then printf 'FILL\t%s\n' "$_f"; else printf 'OK\t%s\n' "$_f"; fi
+      done)"
+    _DELTA_FILL="$(printf '%s\n' "$_DELTA_PATHS" | awk -F'\t' '$1=="FILL"{print $2}')"
+    # shellcheck disable=SC2086  # los paths DEBEN expandirse como argumentos
+    if git diff "$BASE_REC" "$REMOTE/$BRANCH" -- $(printf '%s\n' "$_DELTA_PATHS" | awk -F'\t' '$1=="OK"{printf "%s ", $2}') > /tmp/upgrade.patch.$$ 2>/dev/null \
        && [ -s /tmp/upgrade.patch.$$ ]; then
       if git apply --3way --whitespace=nowarn /tmp/upgrade.patch.$$ 2>/tmp/upgrade-apply-err.$$; then
         echo "   ✓ delta aplicado limpio."
+        _findings_tocados "$(git diff --name-only "$BASE_REC" "$REMOTE/$BRANCH" -- $(printf '%s\n' "$_DELTA_PATHS" | awk -F'\t' '$1=="OK"{printf "%s ", $2}') 2>/dev/null)"
       else
         CONFLICTS="$(git diff --name-only --diff-filter=U)"
         if [ -n "$CONFLICTS" ]; then
@@ -429,18 +525,26 @@ else
           # porque la pasada termina antes de tiempo y sin él te quedas sin
           # saber qué más te espera.
           _avisar_harness_inoperante
+          _reportar_delta_fill
           _report_no_sincronizado "$BASE_REC"
           exit 2
         fi
         echo "❌ upgrade: no pude aplicar el delta de maquinaria:" >&2
         sed 's/^/   /' /tmp/upgrade-apply-err.$$ >&2 2>/dev/null
         rm -f /tmp/upgrade.patch.$$ /tmp/upgrade-apply-err.$$
+        _reportar_delta_fill
         _report_no_sincronizado "$BASE_REC"
         exit 1
       fi
     else
       echo "   (sin cambios de maquinaria desde la base registrada)"
     fi
+    # En TODAS las salidas del delta, no solo en la limpia — misma lección que
+    # obligó a `_report_no_sincronizado` a imprimir siempre. Y aquí es peor: si
+    # lo único que cambió el template fue un archivo con FILL, el delta queda
+    # VACÍO y sin este aviso la pasada dice "sin cambios" mientras hay un
+    # arreglo esperando. Silencio con cara de éxito.
+    _reportar_delta_fill
     rm -f /tmp/upgrade.patch.$$ /tmp/upgrade-apply-err.$$
   else
     # PRIMERA VEZ sin registro: no hay forma de saber qué cambió cada lado,
@@ -475,10 +579,8 @@ else
     #    propiedad compartida y no se pisa jamás — se reporta.**
     while IFS= read -r f; do
       [ -z "$f" ] && continue
-      if git show "$REMOTE/$BRANCH:$f" 2>/dev/null | grep -qE "$FILL_MARKER"; then
-        if [ -f "$f" ]; then
-          _FILL_LIST="${_FILL_LIST}${f}"$'\n'; _SYNC_FILL=$((_SYNC_FILL+1)); continue
-        fi
+      if _propiedad_compartida "$f"; then
+        _FILL_LIST="${_FILL_LIST}${f}"$'\n'; _SYNC_FILL=$((_SYNC_FILL+1)); continue
       fi
       if git checkout "$REMOTE/$BRANCH" -- "$f" 2>/dev/null; then
         _SYNC_OK=$((_SYNC_OK+1))

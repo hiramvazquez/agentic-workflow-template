@@ -25,9 +25,17 @@ CONF="${VERIFY_CONF:-tools/verify.conf}"
 # tooling no exige recompilar la app. Se lee de allí para no tener dos copias
 # de la regla — la lección de las reglas implementadas dos veces ya salió cara
 # tres veces (README §"Una fuente de verdad").
-NON_PRODUCT="$(grep -E "^NON_PRODUCT=" tools/check-review-marker.sh 2>/dev/null \
-  | head -1 | sed -E "s/^NON_PRODUCT='//; s/'$//")"
-[ -n "$NON_PRODUCT" ] || NON_PRODUCT='^(docs/|ci/|tools/|scripts/|\.agents/|\.claude/|README)'
+# Misma fuente que el marker de review: `tools/lib/scope.sh`. Antes esto
+# GREPEABA la línea `NON_PRODUCT=` del otro script — funcionaba, pero acoplaba
+# dos gates por el texto de una línea, y bastaba reformatearla para que este se
+# quedara con su fallback en silencio.
+if [ -f tools/lib/scope.sh ]; then
+  # shellcheck source=lib/scope.sh
+  . tools/lib/scope.sh
+  NON_PRODUCT="$(scope_non_product)"
+else
+  NON_PRODUCT='^(docs/|ci/|tools/|scripts/|\.agents/|\.claude/|README)'
+fi
 
 fail() { echo "$1" >&2; exit 1; }
 

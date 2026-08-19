@@ -128,3 +128,61 @@ EOF
   [ "$a2" = "0" ] || { echo "    Anillo 2 rechazó un marker válido (exit=$a2)"; return 1; }
 }
 test_marker_valido_pasa_en_ambos_anillos() { _rm_sandbox _case_marker_valido_ambos; }
+
+# ════════════════════════════════════════════════════════════════════
+# En el repo del HARNESS, tools/ y scripts/ son el PRODUCTO
+# ════════════════════════════════════════════════════════════════════
+# `NON_PRODUCT` exime el andamio para que tocar un script no pida review en un
+# proyecto de app — correcto allí. Pero en el repo del propio harness eximía el
+# 100% de su contenido. Un adoptante auditó nuestro historial: 15 commits
+# seguidos sin que el gate disparara ni una vez, incluidos el que invirtió la
+# política de seguridad de AGENTS.md §6 y el que metió un gate bloqueante al
+# Anillo 3. Salió bien por disciplina, no por el mecanismo.
+_scope_repo() { # _scope_repo <función> — repo temporal con la lib
+  local d; d="$(mktemp -d)"
+  mkdir -p "$d/tools/lib"
+  cp "$PROJECT_ROOT/tools/lib/scope.sh" "$d/tools/lib/"
+  ( cd "$d" || exit 1; git init -q . 2>/dev/null; "$1" )
+  local rc=$?; rm -rf "$d"; return $rc
+}
+_es_producto() { printf '%s\n' "$1" | grep -qvE "$(. tools/lib/scope.sh; scope_non_product)"; }
+
+_case_harness_trata_su_maquinaria_como_producto() {
+  # Sin fuentes de app: este repo ES el harness.
+  _es_producto tools/upgrade.sh || { echo "    tools/ sigue exento en el repo del harness: su producto"; return 1; }
+  _es_producto scripts/agent-hooks/reviewer-gate.sh || { echo "    scripts/ sigue exento"; return 1; }
+  _es_producto AGENTS.md || { echo "    AGENTS.md sigue exento: es la fuente normativa que viaja a los adoptantes"; return 1; }
+}
+test_en_el_repo_del_harness_su_maquinaria_exige_review() {
+  _scope_repo _case_harness_trata_su_maquinaria_como_producto
+}
+
+# ── FALSO POSITIVO nº1: en un proyecto de APP nada de esto cambia ───
+# Exigir review por tocar un doc o un script del andamio en un proyecto real
+# sería ruido, y el ruido acaba en un REVIEWER_OVERRIDE de costumbre que apaga
+# el gate de verdad. Esta es la mitad del arreglo que evita la ley del 10%.
+_case_app_conserva_la_exencion() {
+  mkdir -p ios/App; printf 'let x = 1\n' > ios/App/A.swift
+  _es_producto tools/upgrade.sh && { echo "    FALSO POSITIVO: en un proyecto de app, tocar tools/ exige review"; return 1; }
+  _es_producto AGENTS.md && { echo "    FALSO POSITIVO: en un proyecto de app, tocar AGENTS.md exige review"; return 1; }
+  _es_producto ios/App/A.swift || { echo "    dejó de considerar producto el código de la app"; return 1; }
+  return 0
+}
+test_en_un_proyecto_de_app_el_andamio_sigue_exento() {
+  _scope_repo _case_app_conserva_la_exencion
+}
+
+# ── FALSO POSITIVO nº2: apuntar una lección no puede pedir un reviewer ──
+# Los ledgers y la prosa siguen exentos incluso aquí. Si cada entrada de
+# lecciones exigiera invocar al reviewer, el bucle de aprendizaje —que es el
+# mecanismo por el que la review humana DECRECE— se volvería el más caro.
+_case_los_registros_siguen_exentos_en_el_harness() {
+  _es_producto docs/process/lessons_learned.md \
+    && { echo "    apuntar una lección exige review: el bucle de aprendizaje se vuelve el paso más caro"; return 1; }
+  _es_producto tools/findings/ledger.jsonl \
+    && { echo "    registrar un finding exige review"; return 1; }
+  return 0
+}
+test_en_el_harness_la_prosa_y_los_ledgers_siguen_exentos() {
+  _scope_repo _case_los_registros_siguen_exentos_en_el_harness
+}

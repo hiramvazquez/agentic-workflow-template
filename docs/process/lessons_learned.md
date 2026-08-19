@@ -244,6 +244,10 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 
 ---
 
+---
+
+---
+
 ## Lecciones mecanizadas (índice)
 
 > Estas ya NO dependen de tu memoria: cada una tiene un test en `tools/tests/` que corre en el
@@ -251,6 +255,9 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-14] El repo del harness eximía de review el 100% de su propio contenido — `tools/tests/test_review_marker_preset.sh`
+- [2026-08-14] La regla que protege el FILL vivía en uno de los dos caminos — `tools/tests/test_upgrade.sh`
+- [2026-08-14] El canal por el que llegan la mitad de los arreglos no tocaba el ledger — `tools/tests/test_upgrade.sh`
 - [2026-08-14] Lo que no se puede inyectar en runtime se escribe en el prompt del rol — `tools/tests/test_verdict.sh`
 - [2026-08-14] La idempotencia que corta un bucle también borra el trabajo deliberado — `tools/tests/test_verdict.sh`
 - [2026-08-14] Un hook de *Stop* que reinyecta contexto se retroalimenta — `tools/tests/test_verdict.sh`
