@@ -43,6 +43,12 @@ _run_test() { # _run_test <nombre-de-función> → imprime salida, devuelve rc (
   ( "$fn" >"$tmp" 2>&1 ) >/dev/null 2>&1 & pid=$!
   ( sleep "$TEST_TIMEOUT_SECS"; kill -9 "$pid" 2>/dev/null ) >/dev/null 2>&1 & wd=$!
   wait "$pid" 2>/dev/null; rc=$?
+  # ⚠️ `kill "$wd"` mata la SUBSHELL del perro guardián, no a su hijo `sleep`:
+  # cada test filtraba un `sleep 120` huérfano (medido: 23 tras 23 tests). En
+  # una máquina de desarrollo es basura; en un runner macOS de 3 cores son
+  # cientos de slots de proceso ocupados — la presión bajo la que nació el
+  # flaky de WF-01. Se mata primero a los HIJOS del guardián y luego a él.
+  pkill -P "$wd" -x sleep 2>/dev/null   # -x sleep: si el pid de wd se reciclo, no matamos a un inocente
   kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
   if [ "$rc" -ge 128 ]; then
     printf '    ⏱  el test se COLGÓ (>%ss) — no falló, se quedó esperando.\n' "$TEST_TIMEOUT_SECS"

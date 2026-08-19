@@ -1,6 +1,6 @@
 # PRD — Estabilización del harness: señal determinista, verdad única, menos complejidad
 
-- **Status:** Draft v3 — RED (10) atendido y re-review AMBER (6) atendido; **listo para Approved del owner**, que además ratifica las fases 0b/0c ya entregadas
+- **Status:** **Approved** (owner, 2026-08-19) — ratifica las fases 0b/0c entregadas. RED (10) y AMBER (6) del design-review atendidos; ver change log.
 - **Origen:** evaluación externa sobre `cab2f4c` (docs/process/reviews/2026-08-18-*.md),
   re-verificada por el adoptante (11/12 cifras)
 - **Owner:** Hiram · **Implementadores:** agentes del template, una fase por sesión/subagente
@@ -43,9 +43,9 @@ este párrafo lo dice en vez de negar el hecho (hallazgo 10 del review).
 
 | Fase | Archivos |
 |---|---|
-| 0a | `tools/tests/test_agent_runner.sh` (+ runner si la causa vive ahí) |
+| 0a | `tools/tests/test_agent_runner.sh` · `tools/agent-runner.sh` · `tools/tests/run-tests.sh` (el guardián filtraba un sleep/test — parte de la causa) · `.github/workflows/gate-0a-macos.yml` (el gate de cierre) |
 | 0b/0c | entregadas pendientes de ratificación: mapa, check-execution-map, lessons-rotate + tests |
-| 1a | `capture-review-verdict.sh` + emisor JSON en `scripts/agent-hooks/lib/json.sh` |
+| 1a | `capture-review-verdict.sh` + emisor JSON en `scripts/agent-hooks/lib/json.sh` + `tools/tests/test_review_history.sh` (nuevo — test_verdict está sobre el hard limit y su división es 2a) |
 | 1b | `tools/lib/scope.sh` · `tools/project.conf` (NUEVO) · **`tools/check-review-marker.sh` · `tools/check-verify-marker.sh`** (consumidores; hallazgo 7) · `scripts/agent-hooks/session-start.sh` (diagnóstico) · `tools/upgrade.sh` (crear el conf si falta, jamás pisarlo) |
 | 1c | `tools/check-source-sets.sh` · regla semgrep kotlin · `ci/run-gates.sh` (toggle) |
 | 2a | `tools/upgrade.sh` → orquestador + `tools/lib/upgrade-*.sh` · los tres tests divididos |
@@ -184,7 +184,7 @@ cerrar el programa (hallazgo 8).
 
 - [x] ¿Ola 0 arranca ya? SÍ — ejecutada (0b/0c) por la excepción del freeze; 0a entregable ya, su gate asíncrono.
 - [x] ¿Dónde vive project_kind? `tools/project.conf`, fuera del sync (§6).
-- [ ] WF-01: ¿el bucle de 30 runs lo corre el owner en su Mac o una matriz CI programada?
+- [x] WF-01: matriz CI programada (`workflow_dispatch`, 30 runs macOS, falla al primer rojo) — decisión del owner 2026-08-19.
 
 ## 15. Definition of Done
 
@@ -202,3 +202,4 @@ cerrar el programa (hallazgo 8).
 | 2026-08-19 | v2: los 10 atendidos — evidencia de WF-05 definida + tabla de exits; restricción de bootstrap en 2a; tabla de fallback 1c; NO-TOUCH enumerado (exit 2, schema); rectificación del conteo (8, no 12); doctrina del check con 2 excepciones; project.conf fuera del sync + consumidores en ola 1; criterios caídos restaurados + §10; entrega≠cierre con responsables y ventana post-ola-2; §3 invoca la excepción del freeze. Fases 0b/0c entregadas y cerradas. | agente del template |
 | 2026-08-19 | Re-review: AMBER, 6 hallazgos (2 bloqueantes del RED resueltos) | design-reviewer |
 | 2026-08-19 | v3: los 6 atendidos — 0b/0c "pendientes de ratificación" (no "cerradas" en un Draft); bootstrap con extracción en el proceso re-lanzado + trigger sobre el conjunto + golden con el script viejo; estado de la auto-escalada en project.conf commiteado; archivos saltados por semgrep pasan por el grep; semántica de `other` y flip en adopción por copia; manifiesto mutante→test | agente del template |
+| 2026-08-19 | Fases 0a y 1a entregadas (subagentes) + code-review AMBER (7) atendido: gate de corrupción exime al process-judge; pkill -x sleep; jq abortado ⇒ corrupción, no limpio; clamp 2000c en scope/nota; reparación in-place documentada; §5 enmendada; env: en el workflow; la causa de WF-01 se declara hipótesis coherente hasta el 30/30 | agente del template |

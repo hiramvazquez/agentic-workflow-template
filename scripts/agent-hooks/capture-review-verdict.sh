@@ -45,6 +45,8 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$PROJECT_ROOT/scripts/agent-hooks/lib/io.sh"
 # shellcheck source=lib/verdict.sh
 . "$PROJECT_ROOT/scripts/agent-hooks/lib/verdict.sh"
+# shellcheck source=lib/json.sh
+. "$PROJECT_ROOT/scripts/agent-hooks/lib/json.sh"
 cd "$PROJECT_ROOT" || exit 0
 
 hook_read_input
@@ -119,18 +121,34 @@ _LAST_RED="$_DIR/last_red.txt"
 # 67.000 tokens por review.
 _RUN="$(hook_agent_id)"
 
+# ── Corrupción PREEXISTENTE del historial ⇒ estado explícito, jamás verde ──
+# Una línea que no parsea puede estar ocultando un RED o un RECHAZADO; leerla
+# "como se pueda" con grep era el falso verde de WF-03. Failure-open mecánico:
+# sin marker (el commit sigue bloqueado por el gate), la línea CITADA en
+# markers/history_corrupt.txt, y exit 0 — el hook jamás revienta por datos.
+# El process-judge NO pasa por este gate (AMBER-1 del code-review): su camino
+# escribe process-judge_run.txt y vacia judge-queue sin tocar el historial de
+# reviews jamas — una linea corrupta ahi no puede ocultar nada que afecte a su
+# marker, y tragarselo significaba juicios descartados en silencio y la cola
+# re-encolandose para siempre.
+if [ "$AGENT" != "process-judge" ] && _CORRUPTA="$(json_hist_first_corrupt "$_HIST")"; then
+  {
+    printf 'ts: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'file: %s\n' "$(hook_rel_path "$_HIST")"
+    printf 'linea %s: %s\n' "$(grep -nF -- "$_CORRUPTA" "$_HIST" 2>/dev/null | head -1 | cut -d: -f1)" "$_CORRUPTA"
+    printf 'accion: sin marker (failure-open) hasta reparar IN-PLACE (unlink esta\n'
+    printf '  prohibido en este FS; NO borres el archivo): filtra la linea citada y\n'
+    printf '  reescribe sobre el mismo fichero:  grep -vxF <linea> hist > tmp; cat tmp > hist\n'
+  } > "$_DIR/history_corrupt.txt" 2>/dev/null || true
+  printf 'review-history.jsonl corrupto (linea citada en %s) - sin marker\n' "$_DIR/history_corrupt.txt" >&2
+  hook_allow
+fi
+
 _hist_grep() { # _hist_grep [verdicto] → 0 si ya hay entrada
-  [ -f "$_HIST" ] || return 1
-  local f
-  if [ -n "$_RUN" ]; then
-    f="$(grep -F "\"run\":\"$_RUN\"" "$_HIST" 2>/dev/null)"
-  else
-    f="$(grep -F "\"agent\":\"$AGENT\"" "$_HIST" 2>/dev/null)"
-  fi
-  f="$(printf '%s' "$f" | grep -F "\"head\":\"$_HEAD\"" | grep -F "\"staged_sha\":\"$_STAGED_SHA\"")"
-  [ -n "$f" ] || return 1
-  [ -z "${1:-}" ] && return 0
-  printf '%s' "$f" | grep -qF "\"verdict\":\"$1\""
+  # Campos PARSEADOS, no grep sobre texto (WF-03). La semántica —run si hay,
+  # agent si no; siempre head+staged_sha; veredicto opcional— la fijan
+  # test_verdict.sh y test_review_history.sh. Las líneas v1 casan igual.
+  json_hist_match "$_HIST" "$AGENT" "$_RUN" "$_HEAD" "$_STAGED_SHA" "${1:-}"
 }
 _ya_registrado()        { _hist_grep "$1"; }   # esta invocación, este diff, ESTE veredicto
 _hay_veredicto_previo() { _hist_grep; }        # esta invocación, este diff, cualquiera
@@ -248,9 +266,8 @@ mkdir -p "$_REVIEWS" 2>/dev/null || true
 # diff lo había juzgado un agente DISTINTO. Medido en un adoptante: re-invocó al
 # reviewer sobre el mismo diff sin tocarlo y no llegó ningún aviso.
 if [ -f "$_HIST" ]; then
-  _REPORTE_PREVIO="$(grep -F "\"staged_sha\":\"$_STAGED_SHA\"" "$_HIST" 2>/dev/null \
-    | grep -F "\"head\":\"$_HEAD\"" | tail -1 \
-    | sed -nE 's/.*"report":"([^"]*)".*/\1/p')"
+  # Campos parseados, no sed sobre el texto de la línea (WF-03).
+  _REPORTE_PREVIO="$(json_hist_last_report "$_HIST" "$_HEAD" "$_STAGED_SHA")"
 fi
 
 {
@@ -276,11 +293,15 @@ fi
 
 
 _apuntar_historia() { # _apuntar_historia <veredicto> <nota>
-  printf '{"ts":"%s","agent":"%s","run":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","report":"%s","nota":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$_RUN" "$1" "$FINDINGS" \
-    "$(printf '%s' "$SCOPE" | tr '"' "'" | tr -d '\n')" "$_HEAD" "$_STAGED_SHA" \
-    "$(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")" "$2" \
-    >> "$_HIST" 2>/dev/null || true
+  # TODO el historial sale por el emisor único (lib/json.sh): codifica de
+  # verdad (nada de tr sobre comillas) y añade "v":2 sin renombrar campos.
+  # Best-effort como siempre: la historia jamás rompe el flujo del hook.
+  local _linea
+  _linea="$(json_hist_line "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$_RUN" \
+    "$1" "$FINDINGS" "$SCOPE" "$_HEAD" "$_STAGED_SHA" \
+    "$(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")" "$2")" \
+    && json_append_line "$_HIST" "$_linea" 2>/dev/null
+  return 0
 }
 
 

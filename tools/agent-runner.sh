@@ -39,10 +39,17 @@ print(path)
 PY
 }
 if [ "$MODE" != capabilities ]; then
-  PROMPT_ABS="$(resolve_inside "$PROMPT_FILE" 2>/dev/null)" \
-    || { echo "agent-runner: prompt ausente/fuera del repo" >&2; exit 3; }
-  CWD_ABS="$(resolve_inside "$CWD" 2>/dev/null)" \
-    || { echo "agent-runner: cwd ausente/fuera del repo" >&2; exit 3; }
+  # rc=1 es contrato (ausente/fuera del repo); cualquier otro rc es
+  # INFRAESTRUCTURA (python3 no pudo ni correr) y el diagnostico lo dice:
+  # un exit 3 mudo o ambiguo se disfraza de flake del watchdog (WF-01).
+  PROMPT_ABS="$(resolve_inside "$PROMPT_FILE" 2>/dev/null)"; RES_RC=$?
+  [ "$RES_RC" -eq 0 ] || { if [ "$RES_RC" -eq 1 ]; then
+      echo "agent-runner: prompt ausente/fuera del repo" >&2; else
+      echo "agent-runner: no pude resolver el prompt (python3 rc=$RES_RC)" >&2; fi; exit 3; }
+  CWD_ABS="$(resolve_inside "$CWD" 2>/dev/null)"; RES_RC=$?
+  [ "$RES_RC" -eq 0 ] || { if [ "$RES_RC" -eq 1 ]; then
+      echo "agent-runner: cwd ausente/fuera del repo" >&2; else
+      echo "agent-runner: no pude resolver el cwd (python3 rc=$RES_RC)" >&2; fi; exit 3; }
   [ -d "$CWD_ABS" ] || { echo "agent-runner: cwd no es directorio" >&2; exit 3; }
 fi
 
@@ -82,10 +89,31 @@ import subprocess
 import sys
 import time
 
+# El watchdog NO hereda la politica de SIGCHLD del entorno: SIG_IGN
+# sobrevive fork+exec (incluso a traves de bash), el kernel auto-reapea y
+# waitpid da ECHILD — CPython lo traduce a returncode 0 (subprocess.
+# _try_wait): timeout y fallos del backend se volverian "exito". Visto en
+# rojo en test_sigchld_ignorado_no_apaga_el_gate. SIG_DFL lo restaura.
+signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+
 timeout = int(sys.argv[1])
 command = sys.argv[2:]
+setsid_delay = os.environ.get("AR_TEST_SETSID_DELAY", "")
 try:
-    process = subprocess.Popen(command, start_new_session=True)
+    if setsid_delay:
+        # SOLO tests: retrasa setsid+exec para simular un backend LENTO EN
+        # INSTALARSE (saturacion de CI) sin depender de carga real. Popen
+        # espera al exec (errpipe), asi que el reloj del timeout arranca
+        # con el backend ya vivo — lo que fija el test de separacion
+        # arranque/ejecucion. La carrera "killpg antes de setsid" quedo
+        # DESCARTADA por esto mismo: killpg tras Popen siempre ve al grupo.
+        delay_seconds = float(setsid_delay)
+        def _slow_setsid():
+            time.sleep(delay_seconds)
+            os.setsid()
+        process = subprocess.Popen(command, preexec_fn=_slow_setsid)
+    else:
+        process = subprocess.Popen(command, start_new_session=True)
 except OSError as exc:
     print("agent-runner: no pude iniciar backend: " + str(exc), file=sys.stderr)
     raise SystemExit(3)
@@ -94,6 +122,20 @@ cancelled = None
 
 class Cancelled(Exception):
     pass
+
+def sweep_group():
+    # El grupo del backend se barre SIEMPRE — exito, fallo, timeout o
+    # cancelacion: el lider muerto no arrastra a sus nietos y un runner
+    # sincrono no deja procesos detras (visto en rojo en
+    # test_run_exitoso_no_deja_nietos_vivos). El pgid persiste mientras el
+    # grupo tenga miembros aunque el lider ya este reapeado; vacio, da
+    # ProcessLookupError y no hay nada que barrer. killpg es seguro aqui:
+    # Popen no devuelve hasta el exec del hijo (errpipe), asi que el grupo
+    # ya existia — la carrera "killpg antes de setsid" no es posible.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
 
 def on_signal(signum, _frame):
     global cancelled
@@ -119,9 +161,10 @@ def stop_group(first_signal):
     except ProcessLookupError:
         pass
     try:
-        process.wait(timeout=1)
+        process.wait(timeout=2)
     except subprocess.TimeoutExpired:
-        pass
+        print("agent-runner: el backend sobrevivio a KILL (no reapeado)", file=sys.stderr)
+    sweep_group()
 
 for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
     signal.signal(sig, on_signal)
@@ -131,11 +174,13 @@ try:
 except subprocess.TimeoutExpired:
     stop_group(signal.SIGTERM)
     print("agent-runner: timeout tras " + str(timeout) + "s", file=sys.stderr)
+    # 124 SIEMPRE: pase lo que pase en la limpieza, el timeout ES el contrato
     raise SystemExit(124)
 except Cancelled:
     stop_group(cancelled)
     raise SystemExit(128 + cancelled)
 
+sweep_group()
 if returncode < 0:
     raise SystemExit(128 - returncode)
 raise SystemExit(returncode)
@@ -146,7 +191,15 @@ if [ "$MODE" = run ]; then
     "$ADAPTER" run "$PROMPT_ABS" "$CWD_ABS"
 fi
 
-OUT="$(mktemp)"; ERR="$(mktemp)"; trap 'rm -f "$OUT" "$ERR"' EXIT
+# Fallos de INFRAESTRUCTURA previos a armar el watchdog salen por 3 y con
+# diagnostico: un exit mudo aqui se disfrazaba en CI de "el timeout de
+# review no propago 124" (WF-01, run 32214253577 — el run path no tiene
+# mktemp y por eso solo flaqueaba review).
+OUT="$(mktemp)" && [ -n "$OUT" ] \
+  || { echo "agent-runner: mktemp fallo (TMPDIR=${TMPDIR:-/tmp})" >&2; exit 3; }
+ERR="$(mktemp)" && [ -n "$ERR" ] \
+  || { rm -f "$OUT"; echo "agent-runner: mktemp fallo (TMPDIR=${TMPDIR:-/tmp})" >&2; exit 3; }
+trap 'rm -f "$OUT" "$ERR"' EXIT
 WATCHDOG_PID=""; FORWARDED_SIGNAL=0
 forward_watchdog() { # forward_watchdog <nombre-señal> <número>
   FORWARDED_SIGNAL="$2"
