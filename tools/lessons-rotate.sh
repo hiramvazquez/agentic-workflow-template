@@ -51,6 +51,24 @@ INDEX_BLOCK = re.compile(
     r"(?=^### \[\d{4}-\d{2}-\d{2}\]|\Z)"
 )
 
+# ── Forma canónica (PRD 0005, fase 0c) ──────────────────────────────
+# Un `---` al FINAL de una entrada es un separador visual generado, no
+# contenido. El ciclo real «insertar lección antes del índice → rotar»
+# sedimentaba uno huérfano por tanda archivada: la entrada superviviente
+# conservaba su cola de separadores y INDEX_HEAD añadía el suyo, hasta clavar
+# el contexto vivo exactamente en su cap de 250 líneas. El recorte va desde el
+# final y SOLO desde el final: un `---` interior — p. ej. front-matter dentro
+# de un bloque de código ``` — es CONTENIDO y sobrevive, porque el recorte se
+# detiene en la primera línea real desde la cola (un fence cerrado termina en
+# ```, no en ---). El único separador que el lector ve antes del índice lo
+# pone INDEX_HEAD al escribir: así N pasadas convergen a los mismos bytes,
+# venga el input con sedimento o limpio.
+def canonical(entry):
+    lines = entry.strip().splitlines()
+    while lines and lines[-1].strip() in ("", "---"):
+        lines.pop()
+    return "\n".join(lines)
+
 def without_indexes(text):
     # Las lecciones nuevas se agregan al final del doc, que puede quedar
     # DESPUÉS de un índice de una rotación anterior. El índice es una vista
@@ -74,9 +92,16 @@ if os.path.isfile(archive):
     archive_raw = open(archive, encoding="utf-8").read()
     _, archive_entries = split_document(archive_raw)
 
+# El veto KEEP-VISIBLE es un MARCADOR (comentario HTML que abre su línea), no
+# una palabra: la lección que documenta el mecanismo menciona
+# `<!-- KEEP-VISIBLE -->` en prosa y con `in text` se auto-vetaba — el
+# clasificador disparaba con el texto que HABLA de la cosa, no con la cosa
+# (el mismo falso positivo que lesson-detector-link.sh ya caza con `<!-- FILL`).
+KEEP_VISIBLE = re.compile(r"(?m)^[ \t]*<!--[ \t]*KEEP-VISIBLE")
+
 def classify(text):
     title = text.splitlines()[0].strip().lstrip("# ").strip()
-    if "KEEP-VISIBLE" in text:
+    if KEEP_VISIBLE.search(text):
         return "viva", title, "veto explícito del owner (KEEP-VISIBLE)"
     det = ""
     for line in text.splitlines():
@@ -105,7 +130,7 @@ corpus = []
 by_heading = {}
 for origin, origin_entries in (("live", live_entries), ("archive", archive_entries)):
     for entry in origin_entries:
-        normalized = entry.strip()
+        normalized = canonical(entry)
         heading = normalized.splitlines()[0].strip()
         previous = by_heading.get(heading)
         if previous is not None:

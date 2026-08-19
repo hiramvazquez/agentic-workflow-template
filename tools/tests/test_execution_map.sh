@@ -337,6 +337,107 @@ test_en_curso_no_exime_de_la_afirmacion_desmentida() {
 }
 
 # ════════════════════════════════════════════════════════════════════
+# CIFRAS DERIVABLES — "N tests" / "N líneas" literales en el mapa
+# ════════════════════════════════════════════════════════════════════
+# Pasó de verdad (`f-wf02-mapa-cifras-podridas`): el mapa declaró "477 tests"
+# con 522 funciones test_* en el árbol y "236 líneas" de contexto con 250
+# medidas. Un literal no se recalcula solo, y este doc se inyecta con
+# autoridad en cada arranque. La regla (PRD 0005 fase 0b): cifra derivable en
+# doc vivo = mentira futura garantizada — se cita el comando que la imprime,
+# no su salida de un día concreto.
+
+_case_cifra_de_tests_dispara() {
+  _em_mapa '# Mapa
+## Estado actual
+- Salud: suite verde (hay 999 tests).'
+  git add -A && _em_commit "docs: mapa con conteo copiado" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    'hay 999 tests' en el mapa debía disparar (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  printf '%s' "$out" | grep -q 'DERIVABLE' \
+    || { echo "    disparó, pero el mensaje no nombra la clase del problema"; return 1; }
+  printf '%s' "$out" | grep -q 'línea 3:' \
+    || { echo "    el contrato pide NOMBRAR LA LÍNEA del claim (esperaba 'línea 3:')"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_cifra_derivable_de_tests_dispara_nombrando_la_linea() {
+  _em_repo _case_cifra_de_tests_dispara
+}
+
+_case_cifra_de_lineas_dispara() {
+  _em_mapa '# Mapa
+## Estado actual
+- Contexto: la rotación lo dejó en 236 líneas.'
+  git add -A && _em_commit "docs: mapa con líneas copiadas" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    '236 líneas' en el mapa debía disparar (exit $rc)"; return 1; }
+  printf '%s' "$out" | grep -q 'EXECUTION_MAP_SUMMARY stale=1' \
+    || { echo "    falta el contrato de stdout con stale=1"; return 1; }
+}
+test_cifra_derivable_de_lineas_dispara() {
+  _em_repo _case_cifra_de_lineas_dispara
+}
+
+_case_cifra_de_pruebas_dispara() {
+  # El sinónimo con el que el propio PRD 0004 escribió sus conteos ("347
+  # pruebas de regresión"): un detector de conteos podridos que no cubre la
+  # palabra con la que YA se escribieron es evasión servida, no prudencia.
+  _em_mapa '# Mapa
+## Estado actual
+- Salud: 522 pruebas en verde.'
+  git add -A && _em_commit "docs: mapa" 100
+
+  local rc; _em_run >/dev/null; rc=$?
+  [ "$rc" = "1" ] || { echo "    '522 pruebas' debía disparar (exit $rc)"; return 1; }
+}
+test_cifra_derivable_de_pruebas_dispara() {
+  _em_repo _case_cifra_de_pruebas_dispara
+}
+
+_case_en_curso_no_exime_cifra() {
+  # La escapatoria "lo estoy editando" vale para la FRESCURA, no para esto:
+  # si el commit que estás preparando deja dentro un conteo copiado, ese
+  # commit es exactamente el que el detector existe para parar — misma
+  # doctrina que test_en_curso_no_exime_de_la_afirmacion_desmentida.
+  _em_mapa '# Mapa
+## Estado actual
+- Fase: en marcha.'
+  git add -A && _em_commit "docs: mapa limpio" 100
+
+  _em_mapa '# Mapa
+## Estado actual
+- Salud: verde (hay 999 tests).'
+  local rc; _em_run >/dev/null; rc=$?
+  [ "$rc" = "1" ] || { echo "    la escapatoria de 'en curso' silenció la cifra derivable (exit $rc)"; return 1; }
+}
+test_en_curso_no_exime_de_la_cifra_derivable() {
+  _em_repo _case_en_curso_no_exime_cifra
+}
+
+_case_numeros_no_derivables_no_disparan() {
+  # FALSO POSITIVO — la mina que este repo ya pisó varias veces y tiene
+  # lección propia: el detector que se dispara con el texto que HABLA de la
+  # cosa. Un mapa real está lleno de números que NO son conteos derivables:
+  # fechas, ids de PRD, §, shas, mutantes de una verificación histórica, el
+  # NOMBRE del test que fija el límite (contiene "250_lineas" con guion bajo)
+  # y verbos que empiezan por "test" ("testea"). Ninguno puede disparar.
+  _em_mapa '# Mapa
+## Estado actual
+- Fase: PRD 0004 §16 en ventana (2–4 semanas desde 2026-08-19).
+- Verificación de fase 10: 11 mutantes sobre 61e3d06, cada uno rojo solo en su test.
+- El límite lo fija test_contexto_vivo_obligatorio_cabe_en_250_lineas.
+- La cifra real la imprime `bash tools/tests/run-tests.sh`; el escenario 10 testea el smoke.
+- 30 runs macOS consecutivos sin rerun (gate de salida de la fase 0a).'
+  git add -A && _em_commit "docs: mapa con números legítimos" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "0" ] || { echo "    FALSO POSITIVO: un número que no es conteo derivable disparó (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_numeros_no_derivables_no_disparan() {
+  _em_repo _case_numeros_no_derivables_no_disparan
+}
+
+# ════════════════════════════════════════════════════════════════════
 # CONTRATO §14.3 — "no pude mirar" nunca es "no encontré nada"
 # ════════════════════════════════════════════════════════════════════
 

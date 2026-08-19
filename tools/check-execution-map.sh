@@ -35,10 +35,20 @@
 # desactiva entero, y con él se pierde la señal buena. Frescura es aburrida y
 # se cumple; semántica es ruido.
 #
-# Excepción ÚNICA a esa regla — aserciones LITERALES, no un comparador: si hay
-# archivos bajo los directorios de producto, el mapa no puede contener ciertas
-# frases exactas. Es un `grep -F` de cadenas fijas, no análisis de prosa: su
-# tasa de FP es cero por construcción.
+# DOS excepciones a esa regla, y solo estas dos — el design-review del PRD 0005
+# cazó que la segunda contradecía este comentario tal como estaba escrito, así
+# que se declara con su justificación en vez de fingirse la primera:
+#   1. Aserciones LITERALES: si hay archivos bajo los directorios de producto,
+#      el mapa no puede contener ciertas frases exactas. `grep -F` de cadenas
+#      fijas — FP cero por construcción. Caza reincidencias CONOCIDAS, no la
+#      clase; esa honestidad es parte del contrato.
+#   2. Cifras DERIVABLES: `[0-9]+ (tests|pruebas|líneas)` en el mapa. Sí es un
+#      patrón sobre prosa, pero de FORMA cerrada (un número pegado a tres
+#      sustantivos concretos), no un comparador semántico como el que murió al
+#      67% de FP. Sus falsos positivos están fijados por
+#      test_fp_numeros_no_derivables_no_disparan (fechas, ids de PRD, §,
+#      shas, "11 mutantes", nombres *_250_lineas): si esa tasa sube, cae la
+#      excepción, no el test.
 #
 # Contrato de stdout:  EXECUTION_MAP_SUMMARY stale=<0|1>
 # Exit: 0 al día · 1 stale · 3 no pude mirar (sin git, sin el doc)
@@ -180,6 +190,26 @@ if [ "$_HAY_PRODUCTO" = "1" ]; then
   done <<< "$DEAD_CLAIMS"
 fi
 
+# ── Cifras DERIVABLES: lo que un comando recalcula no se copia ──────
+# Pasó (`f-wf02-mapa-cifras-podridas`): el mapa declaró "477 tests" con 522
+# funciones test_* en el árbol y "236 líneas" de contexto con 250 medidas.
+# Nadie recalcula un literal, y este doc se INYECTA con autoridad en cada
+# arranque — la cifra podrida viaja como estado verificado (PRD 0005 fase 0b).
+#
+# El patrón es deliberadamente ESTRECHO: número + espacio + tests/pruebas/
+# líneas — las dos familias que ya se pudrieron, en singular/plural y con o
+# sin acento. Fechas (2026-08-19), ids de PRD (0004), §14, "11 mutantes",
+# nombres tipo `..._250_lineas` (guion bajo, no espacio) o "el escenario 10
+# testea" (sigue letra) NO matchean: la ley del 10% (§14.2) dice que un
+# detector ruidoso se desactiva entero y se pierde la señal buena. Los casos
+# están fijados en test_execution_map.sh, falsos positivos incluidos.
+#
+# Se evalúa SIEMPRE, también con el mapa en curso (como las frases muertas):
+# dejar el conteo copiado en el commit que estás preparando ES el bug.
+DERIVABLE_ERE="${EXECUTION_MAP_DERIVABLE_ERE:-[0-9]+[[:space:]]+(tests?|pruebas?|líneas|lineas)([^[:alpha:]]|$)}"
+DERIVABLES="$(grep -nE "$DERIVABLE_ERE" "$MAP" 2>/dev/null)"
+[ -n "$DERIVABLES" ] && STALE=1
+
 echo "EXECUTION_MAP_SUMMARY stale=$STALE"
 [ "$STALE" = "0" ] && exit 0
 
@@ -192,6 +222,16 @@ echo "EXECUTION_MAP_SUMMARY stale=$STALE"
     printf '%s' "$MUERTAS"
     echo "   session-start.sh imprime este bloque en CADA arranque: no es un doc"
     echo "   desactualizado, es desinformación inyectada a todos los agentes siguientes."
+  fi
+  if [ -n "$DERIVABLES" ]; then
+    echo ""
+    echo "   CIFRAS DERIVABLES COPIADAS — estas líneas fijan como literal un conteo"
+    echo "   que un comando recalcula (y que ya se pudrió una vez: 477→522, 236→250):"
+    printf '%s\n' "$DERIVABLES" | sed 's/^/     línea /'
+    echo "   Sustituye el número por el comando que lo imprime (la suite:"
+    echo "   \`bash tools/tests/run-tests.sh\` da el total al final; el contexto lo mide"
+    echo "   test_lessons.sh) o por evidencia commit+fecha SIN la forma 'N tests /"
+    echo "   N líneas'. Ver \`f-wf02-mapa-cifras-podridas\` en el ledger."
   fi
   if [ -n "$DETALLE" ]; then
     echo ""

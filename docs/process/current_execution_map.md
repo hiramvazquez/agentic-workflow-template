@@ -17,13 +17,17 @@
   distinguen ausente / roto / operativo; scope mecánico del backlog antes de `in-review`;
   estados explícitos de las capacidades arquitectónicas; boundary portable `agent-runner` con
   backends intercambiables; eventos v2 y findings con lifecycle separado (detectar ≠ defecto);
-  rotación de lecciones que dejó el contexto obligatorio en 236 líneas; caché de Semgrep staged
-  solo para verde. **Fase 10 cerró el ciclo con la matriz E2E** (`tools/tests/test_e2e_matrix.sh`):
+  rotación de lecciones que dejó el contexto obligatorio dentro del límite que fija y mide
+  `test_contexto_vivo_obligatorio_cabe_en_250_lineas` (`tools/tests/test_lessons.sh`) — la
+  cifra real la imprime ese test, no este doc; caché de Semgrep staged solo para verde.
+  **Fase 10 cerró el ciclo con la matriz E2E** (`tools/tests/test_e2e_matrix.sh`):
   un test por escenario golden, atado al PRD por un test que falla si la lista y su demostración
   divergen. Al construirla salieron tres huecos que ninguna fase anterior podía ver —el Anillo 3
   no tenía test propio, `claude.sh` declaraba `read_only` sin demostrarlo y la promesa de ≥30% de
   la caché no se medía— y los tres quedaron cubiertos (PRD 0004 §18).
-- **Salud:** suite del harness verde en macOS (477 tests). El estado por gate NO se apunta aquí
+- **Salud:** el total de la suite lo imprime `bash tools/tests/run-tests.sh` en cada corrida;
+  no se copia aquí porque un conteo literal caduca solo y este doc se inyecta con autoridad en
+  cada arranque (`f-wf02-mapa-cifras-podridas`). El estado por gate NO se apunta aquí
   a propósito —caduca y se lee como garantía permanente—: lo dice `session-start` en cada
   arranque y `bash tools/validate-harness.sh --selftest` cuando lo preguntes. El único hecho de
   entorno que conviene recordar porque confunde: **la capacidad runtime de Semgrep en esta
@@ -50,11 +54,15 @@
   iniciativa nueva, mira `bash tools/metrics/escape-rate.sh` y el ledger: PRD 0004 §16 pide 2–4
   semanas de datos del adoptante antes de retirar o endurecer cualquier defensa, y endurecer sin
   ese dato es añadir ceremonia.
-- **Base verificada de fase 10:** `bash tools/tests/run-tests.sh e2e_matrix` da 11/11 y la suite
-  completa 477/477 en macOS. Cada test de la matriz se comprobó contra un mutante del script que
-  dice cubrir (11 mutantes, cada uno rojo en su test y solo en el suyo). **Linux no se verificó
-  en esa corrida**: lo dice el job `ubuntu-latest` de `harness-ci`, y hasta que ese job esté
-  verde la mitad Linux de la promesa es una expectativa, no evidencia.
+- **Base verificada de fase 10:** sobre `61e3d06` (2026-08-12) la matriz E2E y la suite completa
+  salieron verdes en macOS — las cifras exactas las imprimen `bash tools/tests/run-tests.sh
+  e2e_matrix` y la suite completa; no se copian aquí porque caducan. Cada test de la matriz se
+  comprobó contra un mutante del script que dice cubrir (11 mutantes, cada uno rojo en su test y
+  solo en el suyo). **Linux quedó verificado DESPUÉS de esa corrida:** el push de fase 10 dejó
+  `ubuntu-latest` en rojo (`f-stat-f-orden-invertido`, arreglado en `4a6a775` el 2026-08-12) y la
+  suite Ubuntu está verde en descendientes — run 32217407840 de `harness-ci` sobre `cab2f4c`,
+  consultado read-only el 2026-08-18
+  (`docs/process/reviews/2026-08-18-workflow-improvement-assessment.md` §2).
 - El informe del adoptante sigue siendo la verificación independiente: quien escribe el arreglo
   no es quien lo aprueba.
 - Pendientes del lado del adoptante, no bloqueantes: las macros de Swift en semgrep (vive en

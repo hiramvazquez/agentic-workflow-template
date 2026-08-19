@@ -1,9 +1,10 @@
 # PRD — Reconciliar y simplificar el workflow agéntico
 
-> **Tipo:** Forward · **Status:** Shipped — fases 1a–10 mergeadas, **sujeto a dos cosas que no
-> se pueden cerrar desde dentro de este cambio y siguen abiertas en §15**: (1) el job
-> `ubuntu-latest` de `harness-ci` en verde sobre este commit (Linux no se verificó en local),
-> (2) el `VERDICT` del reviewer de la fase 10. Si alguna falla, esto vuelve a In progress.
+> **Tipo:** Forward · **Status:** Shipped — fases 1a–10 mergeadas. Las dos condiciones que este
+> status dejaba abiertas en §15 quedaron cerradas con evidencia posterior al push, y sus casillas
+> de la DoD la citan (reconciliado el 2026-08-19, PRD 0005 fase 0b): (1) suite Ubuntu de
+> `harness-ci` verde tras el fix `4a6a775`, (2) `VERDICT: GREEN` del reviewer de fase 10 ligado
+> al diff staged que se commiteó como `61e3d06`.
 > **Autor:** Codex + owner · **Fecha:** 2026-08-11 · **Tracking:** commits de las fases 1a–10
 > **Design-review:** OK (2026-08-11) — AMBER final atendido antes de aprobación
 
@@ -393,15 +394,21 @@ historia ──► agent-runner ──► diff ──► scope-check ──► g
   `semgrep-scan.sh`, `findings.sh`, `render-capabilities.sh`, `probe-capability.sh`,
   `architecture-check.sh`, `lessons-rotate.sh`, la matriz de OS del workflow y la propia matriz.
   Cada uno dejó en rojo exactamente su test y ninguno más.
-- [ ] **Herméticas en macOS/Linux; smoke real sin falsos verdes.** macOS: verde en local
-  (477/477, Darwin arm64). **Linux no está verificado desde esta máquina** y no se da por bueno:
-  lo decide el job `ubuntu-latest` de `harness-ci` en este push. La matriz E2E es hermética por
+- [x] **Herméticas en macOS/Linux; smoke real sin falsos verdes.** macOS: verde en local
+  (477/477, Darwin arm64, 2026-08-12). Linux se resolvió DESPUÉS de este push, como la casilla
+  exigía: `ubuntu-latest` salió ROJO sobre `61e3d06` (`stat -f` de GNU no falla —
+  `f-stat-f-orden-invertido`, fixed), el arreglo es `4a6a775` (2026-08-12) y la suite Ubuntu
+  quedó verde en descendientes — run 32217407840 de `harness-ci` sobre `cab2f4c`, consultado
+  read-only el 2026-08-18 (`docs/process/reviews/2026-08-18-workflow-improvement-assessment.md`
+  §2). La matriz E2E es hermética por
   construcción (stubs de `claude`/`semgrep`, PATH fijado), y su único smoke real —escenario 10—
   no exige un estado concreto sino que estado y exit code sean el mismo hecho.
 - [x] `bash tools/check-drift.sh` sin errores nuevos (`DRIFT_SUMMARY errors=0 warns=0`).
-- [ ] **Design-review y reviews de cada fase atendidos.** Fases 1a–9: sí. La de fase 10 es el
-  propio gate pre-commit de este cambio (`reviewer` → `VERDICT` → marker ligado al diff staged):
-  hasta que ese veredicto exista, esta casilla no se marca desde dentro del cambio que revisa.
+- [x] **Design-review y reviews de cada fase atendidos.** Fases 1a–9: sí. La de fase 10 existió
+  y es verificable desde FUERA del cambio que revisaba: `VERDICT: GREEN` (0 findings) ligado al
+  diff staged que se commiteó como `61e3d06` (2026-08-12) — lo declara el mensaje de ese commit y
+  lo registra el historial de reviews (`.agents/state/review-history.jsonl`, marker escrito por
+  hook, `source: hook`).
 - [x] **Tooling transportado** — `tools/tests` ya está en `SYNC_PATHS` de `tools/upgrade.sh`, así
   que la matriz viaja al adoptante sin tocar el transportador. Fase 10 no añade familias nuevas
   a la matriz de propiedad.
@@ -428,6 +435,7 @@ y defectos escapados antes de retirar o endurecer cualquier defensa.
 | 2026-08-11 | Exige evidencia pre-commit portable y cierra selección/prompts del runner | Codex |
 | 2026-08-11 | Atiende AMBER final: flujo literal y único de prompts run/review | Codex |
 | 2026-08-12 | Fase 10: matriz E2E ligada al PRD + cutover documental. Status → Shipped | Claude |
+| 2026-08-19 | Reconciliación (PRD 0005 fase 0b): las dos casillas pendientes de §15 se marcan con su evidencia (suite Ubuntu verde tras `4a6a775`; reviewer GREEN de fase 10 sobre `61e3d06`) y el status deja de estar condicionado | agente del template |
 
 ## 18. Gaps detectados
 

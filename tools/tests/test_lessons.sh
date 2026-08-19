@@ -417,6 +417,227 @@ test_rotacion_reclasifica_archivada_si_su_test_desaparece() {
 }
 
 # ════════════════════════════════════════════════════════════════════
+# FASE 0c (PRD 0005, WF-07) — el rotador es CANÓNICO, no solo estable
+# ════════════════════════════════════════════════════════════════════
+# El ciclo real «insertar lección antes del índice → rotar» dejaba un `---`
+# huérfano más por tanda archivada: la entrada superviviente conservaba su
+# cola de separadores y INDEX_HEAD añadía el suyo. Cada pasada era estable
+# en bytes, pero ARRASTRABA el sedimento del input para siempre — hasta
+# clavar el contexto vivo exactamente en su cap de 250 líneas.
+
+_case_dos_pasadas_bytes_identicos_y_forma_canonica() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Viva manual
+- **Regla:** r.
+- **Detector:** n/a-manual — juicio
+- **Área:** x
+
+---
+
+---
+
+---
+
+### [2026-01-02] Mecanizada
+- **Regla:** r.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  cp docs/process/lessons_learned.md live.1
+  cp docs/process/lessons_archive.md archive.1
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  cmp -s live.1 docs/process/lessons_learned.md \
+    || { echo "    dos pasadas seguidas → bytes DISTINTOS en el doc vivo"; return 1; }
+  cmp -s archive.1 docs/process/lessons_archive.md \
+    || { echo "    dos pasadas seguidas → bytes DISTINTOS en el archivo"; return 1; }
+  # Canónico de verdad: el MISMO corpus sin sedimento converge a los MISMOS
+  # bytes. Si difieren, la salida depende de la basura acumulada en el input.
+  rm -f docs/process/lessons_archive.md
+  _doc '# Lecciones
+
+### [2026-01-01] Viva manual
+- **Regla:** r.
+- **Detector:** n/a-manual — juicio
+- **Área:** x
+
+### [2026-01-02] Mecanizada
+- **Regla:** r.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  cmp -s live.1 docs/process/lessons_learned.md \
+    || { echo "    la forma final depende del sedimento del input: no es canónica"; return 1; }
+}
+test_rotacion_dos_pasadas_bytes_identicos_y_forma_canonica() {
+  _rot_sandbox _case_dos_pasadas_bytes_identicos_y_forma_canonica
+}
+
+_case_colapsa_separadores_huerfanos_a_uno() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Viva manual
+- **Regla:** r.
+- **Detector:** n/a-manual — juicio
+- **Área:** x
+
+---
+
+---
+
+---
+
+### [2026-01-02] Mecanizada
+- **Regla:** r.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  local n
+  n="$(awk '
+    /^## Lecciones mecanizadas \(índice\)$/ { exit }
+    /^```/ { fence = !fence }
+    !fence && /^---$/ { c++ }
+    END { print c + 0 }
+  ' docs/process/lessons_learned.md)"
+  [ "$n" = "1" ] \
+    || { echo "    tras rotar quedan $n separadores --- antes del índice (canónico: exactamente 1)"; return 1; }
+}
+test_rotar_colapsa_separadores_huerfanos_a_uno_antes_del_indice() {
+  _rot_sandbox _case_colapsa_separadores_huerfanos_a_uno
+}
+
+# ── FALSO POSITIVO guard: el colapso no puede tragarse CONTENIDO ────
+# Un `---` dentro de un bloque de código ``` (front-matter YAML, un diff, la
+# doc del propio separador) es parte del CUERPO de la lección, no un
+# separador; y la lección que viene después de un tramo de sedimento tampoco
+# puede desaparecer. Tragarse cualquiera de los dos sería perder la lección
+# de verdad — el riesgo exacto por el que el criterio de archivo es
+# conservador.
+_case_colapso_respeta_contenido_de_leccion() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Con front-matter en el cuerpo
+- **Regla:** el front-matter YAML se delimita con `---`.
+- **Detector:** n/a-manual — juicio
+- **Área:** x
+
+```yaml
+---
+clave: valor
+---
+```
+
+### [2026-01-02] El cuerpo termina en un fence cuya última línea es un separador
+- **Regla:** r.
+- **Detector:** n/a-manual — juicio
+- **Área:** x
+
+```text
+---
+```
+
+---
+
+---
+
+### [2026-01-03] Mecanizada al final
+- **Regla:** r.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  grep -q '^### .*Con front-matter en el cuerpo' docs/process/lessons_learned.md \
+    || { echo "    FALSO POSITIVO: el colapso se tragó una lección viva entera"; return 1; }
+  grep -q '^### .*El cuerpo termina en un fence' docs/process/lessons_learned.md \
+    || { echo "    FALSO POSITIVO: desapareció la lección pegada al sedimento"; return 1; }
+  grep -q '^clave: valor$' docs/process/lessons_learned.md \
+    || { echo "    FALSO POSITIVO: el colapso mutiló el interior de un bloque de código"; return 1; }
+  # 3 `---` de contenido (2 del YAML + 1 del fence final) + 1 del índice = 4.
+  local n; n="$(grep -c '^---$' docs/process/lessons_learned.md)"
+  [ "$n" = "4" ] \
+    || { echo "    FALSO POSITIVO: un --- de CONTENIDO fue colapsado, o quedó sedimento (hay $n, esperaba 4)"; return 1; }
+}
+test_colapso_no_se_traga_contenido_ni_lecciones() {
+  _rot_sandbox _case_colapso_respeta_contenido_de_leccion
+}
+
+# ── FALSO POSITIVO guard: MENCIONAR el marcador no es LLEVARLO ──────
+# El veto KEEP-VISIBLE es un comentario HTML que abre su línea, no una
+# palabra. Con `in text` a secas, la lección que DOCUMENTA el mecanismo
+# ("…ni las marcadas `<!-- KEEP-VISIBLE -->`…") se auto-vetaba por nombrarlo
+# y quedó clavada en el contexto vivo: el clasificador disparó con el texto
+# que HABLA de la cosa, no con la cosa — el mismo falso positivo que
+# lesson-detector-link.sh ya caza con la mención de `<!-- FILL`.
+_case_mencionar_keep_visible_no_veta() {
+  printf '#!/usr/bin/env bash\n' > tools/tests/test_ejemplo.sh
+  _doc '# Lecciones
+
+### [2026-01-01] Habla del marcador sin llevarlo
+- **Regla:** nunca se archivan las marcadas `<!-- KEEP-VISIBLE -->` por el owner.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x
+
+### [2026-01-02] Lleva el marcador de verdad
+<!-- KEEP-VISIBLE: el owner quiere verla siempre -->
+- **Regla:** r.
+- **Detector:** tools/tests/test_ejemplo.sh
+- **Área:** x'
+  bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 || return 1
+  grep -q '^### .*Habla del marcador sin llevarlo' docs/process/lessons_learned.md \
+    && { echo "    FALSO POSITIVO: mencionar el marcador en prosa vetó el archivado"; return 1; }
+  grep -q '^### .*Habla del marcador sin llevarlo' docs/process/lessons_archive.md \
+    || { echo "    la lección que solo MENCIONA el marcador no llegó al archivo"; return 1; }
+  grep -q '^### .*Lleva el marcador de verdad' docs/process/lessons_learned.md \
+    || { echo "    el marcador REAL dejó de vetar el archivado"; return 1; }
+  return 0
+}
+test_mencionar_keep_visible_en_prosa_no_veta_el_archivado() {
+  _rot_sandbox _case_mencionar_keep_visible_no_veta
+}
+
+# El repositorio REAL entrega su doc ya canónico (fase 0c). Sin fijarlo, el
+# sedimento vuelve a acumularse en silencio hasta clavar el cap otra vez.
+test_documento_vivo_real_sin_separadores_huerfanos() {
+  local n
+  n="$(awk '
+    /^```/ { fence = !fence; next }
+    fence { next }
+    /^### \[/ { body = 1 }
+    /^## Lecciones mecanizadas \(índice\)$/ { exit }
+    body && /^---$/ { c++ }
+    END { print c + 0 }
+  ' "$PROJECT_ROOT/docs/process/lessons_learned.md")"
+  [ "$n" = "1" ] || {
+    echo "    el doc vivo real tiene $n separadores --- entre lecciones (canónico: 1, justo antes del índice)"
+    return 1
+  }
+}
+
+# El gate de salida de la fase 0c del PRD 0005, literal: dos ejecuciones
+# seguidas sobre el corpus REAL → diff de bytes vacío. Corre sobre COPIAS
+# (LESSONS_DOC/LESSONS_ARCHIVE) desde la raíz del repo, para que classify
+# vea los tests reales de tools/tests/ sin tocar los docs canónicos.
+test_rotador_real_dos_pasadas_bytes_identicos() {
+  local d ok=1
+  d="$(mktemp -d)"
+  cp "$PROJECT_ROOT/docs/process/lessons_learned.md" "$d/live.md" || { rm -rf "$d"; return 1; }
+  cp "$PROJECT_ROOT/docs/process/lessons_archive.md" "$d/arch.md" || { rm -rf "$d"; return 1; }
+  ( cd "$PROJECT_ROOT" && LESSONS_DOC="$d/live.md" LESSONS_ARCHIVE="$d/arch.md" \
+      bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 ) || ok=0
+  cp "$d/live.md" "$d/live.1"; cp "$d/arch.md" "$d/arch.1"
+  ( cd "$PROJECT_ROOT" && LESSONS_DOC="$d/live.md" LESSONS_ARCHIVE="$d/arch.md" \
+      bash tools/lessons-rotate.sh --apply >/dev/null 2>&1 ) || ok=0
+  [ "$ok" = "1" ] || { rm -rf "$d"; echo "    el rotador falló sobre el corpus real"; return 1; }
+  cmp -s "$d/live.1" "$d/live.md" \
+    || { rm -rf "$d"; echo "    dos pasadas sobre el corpus REAL → bytes distintos en el doc vivo"; return 1; }
+  cmp -s "$d/arch.1" "$d/arch.md" \
+    || { rm -rf "$d"; echo "    dos pasadas sobre el corpus REAL → bytes distintos en el archivo"; return 1; }
+  rm -rf "$d"
+}
+
+# ════════════════════════════════════════════════════════════════════
 # El ARCHIVO existiendo no basta: el TEST citado también tiene que existir
 # ════════════════════════════════════════════════════════════════════
 # Cazado escribiendo las lecciones de este mismo día: una citaba

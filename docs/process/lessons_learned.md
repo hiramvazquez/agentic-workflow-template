@@ -101,8 +101,6 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
   owner y quedó fuera del scope del PRD 0001 (§8). Registrado en §18 G6.
 - **Área:** scripts/agent-hooks/session-start.sh
 
----
-
 ### [2026-08-08] "Puro" era ambiguo: el agente revirtió el default de concurrencia del target entero
 - **Qué pasó:** en el primer proyecto real, el agente detectó `SWIFT_DEFAULT_ACTOR_ISOLATION
   = MainActor` (default Xcode 26) y, leyendo "Logic puro" en la skill de arquitectura, cambió
@@ -118,8 +116,6 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
   operativa añadida a `swift-estado-del-arte.md` y `platforms/ios.md`, y el ítem del
   design-reviewer sobre decisiones de build settings.
 - **Área:** .agents/skills/architecture/ · settings del target
-
----
 
 ### [2026-08-08] El doc que enseña el simulacro de secretos CONTENÍA el secreto del simulacro
 - **Qué pasó:** primer commit del harness sobre un proyecto real → gitleaks bloqueó: 1 leak.
@@ -138,26 +134,6 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 - **Detector:** .gitleaks.toml — el propio scan del Anillo 1 sobre el staging completo (así
   se cazó); el drill de ADOPTION §7 verifica que sigue vivo.
 - **Área:** docs/ADOPTION.md · flujo de adopción
-
----
-
-### [2026-08-09] Las lecciones no caducaban, y eso contradecía su propio mecanismo
-- **Qué pasó:** `lessons_learned.md` llegó a 26 entradas y ~4.800 palabras, creciendo cada día
-  y **heredándose entero** por cada proyecto nuevo nacido del template. El propio `AGENTS.md`
-  advierte contra el monolito mientras este archivo caminaba a serlo, y cada sesión de cada
-  agente pagaba el peaje de contexto.
-- **Causa raíz:** el bucle estaba implementado a medias. Se aceptó "lección → detector", pero
-  no su corolario: si el detector es un test que corre en el Anillo 3, la regla está garantizada
-  por una máquina y **ya no depende de que nadie la lea**. Seguir exigiendo leerla es cobrar dos
-  veces el mismo seguro.
-- **Regla:** una lección cuyo `Detector:` es un `tools/tests/test_*.sh` existente se archiva en
-  `lessons_archive.md` dejando **una línea de índice** en el doc vivo (la señal se conserva, el
-  volumen no). Nunca se archivan las `n/a-manual` (ahí la prosa ES el mecanismo), ni las de
-  garantía parcial, ni las marcadas `<!-- KEEP-VISIBLE -->`. El archivo se verifica igual que el
-  doc vivo: si borras el test, la lección VUELVE al doc vivo.
-- **Detector:** tools/tests/test_lessons.sh (`test_rotacion_archiva_mecanizadas_y_respeta_manuales`,
-  `test_rotacion_deja_indice_de_una_linea`, `test_lecciones_archivadas_siguen_verificadas`)
-- **Área:** tools/lessons-rotate.sh · tools/lesson-detector-link.sh · docs/process/
 
 ### [2026-08-09] El harness solo sabía crecer: ningún mecanismo preguntaba si algo ya sobraba
 - **Qué pasó:** auditando el template salió que todos sus mecanismos son monótonos crecientes.
@@ -234,20 +210,6 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 
 ---
 
----
-
----
-
----
-
----
-
----
-
----
-
----
-
 ## Lecciones mecanizadas (índice)
 
 > Estas ya NO dependen de tu memoria: cada una tiene un test en `tools/tests/` que corre en el
@@ -255,6 +217,9 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-19] El mapa canónico declaró conteos que un comando recalcula, y se pudrieron — `tools/tests/test_execution_map.sh`
+- [2026-08-19] Un generador de vista estable pero no canónico sedimenta formato hasta reventar su presupuesto — `tools/tests/test_lessons.sh`
+- [2026-08-09] Las lecciones no caducaban, y eso contradecía su propio mecanismo — `tools/tests/test_lessons.sh`
 - [2026-08-14] El repo del harness eximía de review el 100% de su propio contenido — `tools/tests/test_review_marker_preset.sh`
 - [2026-08-14] La regla que protege el FILL vivía en uno de los dos caminos — `tools/tests/test_upgrade.sh`
 - [2026-08-14] El canal por el que llegan la mitad de los arreglos no tocaba el ledger — `tools/tests/test_upgrade.sh`
