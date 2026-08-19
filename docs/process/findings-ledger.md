@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **1** · Cerrados: 74 · Total: 75
+Abiertos: **1** · Cerrados: 75 · Total: 76
 
 ## Abiertos
 
@@ -89,3 +89,4 @@ Abiertos: **1** · Cerrados: 74 · Total: 75
 | `f-inventario-de-gates-duplicado` | fixed | Inventario unico en _G9_INVENTARIO, con la marca informativo explicita para el unico gate que se stu |
 | `f-review-sin-reporte-persistido` | fixed | capture-review-verdict escribe .agents/state/reviews/<sha>-<agente>.md con cabecera ligada al diff y |
 | `f-eje-de-source-sets-sin-detector` | fixed | tools/check-source-sets.sh en pre-commit junto a check-layers y en el paso 4b del Anillo 3, con su e |
+| `f-b3cf4f74` | fixed | Idempotencia por (agente, HEAD, diff, veredicto) contra review-history.jsonl; el camino de exito y e |

@@ -250,24 +250,125 @@ test_un_red_persiste_el_cuerpo_del_review_no_solo_el_veredicto() {
   _crv_sandbox _case_el_red_guarda_su_reporte
 }
 
-_case_la_segunda_pasada_encuentra_la_primera() {
-  # Sin esto, guardar el reporte sería telemetría: la defensa es que la
-  # siguiente pasada lo LEA y pueda decir atendido / ignorado.
-  printf '{"hook_event_name":"SubagentStop","agent_type":"design-reviewer","last_assistant_message":%s}' \
-    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
-    | bash scripts/agent-hooks/capture-review-verdict.sh >/dev/null 2>&1
-  local out
-  out="$(printf '{"hook_event_name":"SubagentStop","agent_type":"reviewer","last_assistant_message":%s}' \
-    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
-    | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1)"
-  case "$out" in *"YA HUBO UN REVIEW SOBRE ESTE MISMO DIFF"*) : ;; *)
-    echo "    la segunda pasada no fue avisada del reporte anterior sobre el mismo diff"
-    return 1 ;; esac
-  case "$out" in *design-reviewer*) : ;; *)
-    echo "    no apuntó al reporte del OTRO agente sobre el mismo diff"; return 1 ;; esac
+_msg() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'; }
+_stop() { # _stop <agente> <mensaje>
+  printf '{"hook_event_name":"SubagentStop","agent_type":"%s","last_assistant_message":%s}' \
+    "$1" "$(_msg "$2")" | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1
 }
-test_una_segunda_review_del_mismo_diff_apunta_a_la_anterior() {
-  _crv_sandbox _case_la_segunda_pasada_encuentra_la_primera
+
+# ════════════════════════════════════════════════════════════════════
+# EL BUCLE (f-b3cf4f74) — un stop que reinyecta contexto se retroalimenta
+# ════════════════════════════════════════════════════════════════════
+# Este hook corre en SubagentStop y lo que emite VUELVE AL SUB-AGENTE, que
+# responde; esa respuesta es otro SubagentStop. Medido en un adoptante sobre un
+# diff de UNA línea: 11 disparos en una corrida y 12 en la siguiente, 35.256 y
+# 67.427 tokens. Y el daño caro no era el coste: lo que recibe quien invoca al
+# sub-agente es su ÚLTIMO mensaje, o sea la cola del bucle, nunca el review.
+#
+# ⚠️ El arreglo NO puede ser "escribe solo en el stop final": el hook no puede
+# distinguir el final del intermedio, porque todos son SubagentStop. Es
+# IDEMPOTENCIA. Este test es la prueba de bolsillo del §5: si se rompe el fix,
+# vuelve a once.
+_case_once_disparos_una_entrada() {
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11; do _stop reviewer "$_REVIEW_RED" >/dev/null; done
+  local n; n="$(grep -c . .agents/state/review-history.jsonl 2>/dev/null || echo 0)"
+  [ "$n" = "1" ] || {
+    echo "    11 disparos del hook dejaron $n entradas en review-history.jsonl (esperaba 1)"
+    echo "    Cada entrada de más es una vuelta de bucle: coste, y el retorno al"
+    echo "    llamador sustituido por la cola del bucle en vez del review."
+    return 1; }
+}
+test_once_disparos_del_mismo_veredicto_dejan_una_sola_entrada() {
+  _crv_sandbox _case_once_disparos_una_entrada
+}
+
+_case_el_exito_no_reinyecta_contexto() {
+  # La causa raíz: cualquier salida en el camino de éxito vuelve al sub-agente y
+  # le hace responder. Sin `additionalContext` no hay a qué responder.
+  local out; out="$(_stop reviewer 'Todo correcto.
+
+VERDICT: GREEN
+FINDINGS: 0
+SCOPE: nada que objetar')"
+  case "$out" in *additionalContext*)
+    echo "    el camino de éxito reinyecta contexto: el sub-agente responderá y volverá a disparar"
+    printf '%s\n' "$out" | head -3 | sed 's/^/      /'; return 1 ;; esac
+  [ -f .agents/state/markers/reviewer_run.txt ] \
+    || { echo "    dejó de reinyectar contexto pero también dejó de escribir el marker"; return 1; }
+}
+test_el_camino_de_exito_no_reinyecta_contexto_al_subagente() {
+  _crv_sandbox _case_el_exito_no_reinyecta_contexto
+}
+
+_case_stop_sin_veredicto_tras_uno_con_veredicto_no_bloquea() {
+  # Los mensajes [1]-[6] de la secuencia medida: el agente contestando al
+  # recordatorio ("Confirmado", "No hay nada nuevo que revisar") y el hook
+  # exigiéndole el contrato otra vez. Si ya emitió veredicto sobre este diff,
+  # un stop posterior sin veredicto es el agente terminando de hablar.
+  _stop reviewer "$_REVIEW_RED" >/dev/null
+  local out; out="$(_stop reviewer 'Confirmado, sin cambios.')"
+  case "$out" in *'"decision":"block"'*)
+    echo "    volvió a exigir el contrato a un agente que YA emitió su veredicto"
+    return 1 ;; esac
+}
+test_un_stop_sin_veredicto_no_reabre_la_jaula() {
+  _crv_sandbox _case_stop_sin_veredicto_tras_uno_con_veredicto_no_bloquea
+}
+
+# ── El primer stop SIN veredicto sí tiene que exigir el contrato ────
+# Guard de FP del arreglo de arriba: acotar la jaula no puede convertirse en
+# borrarla. Un review que termina sin veredicto y nunca lo emitió sigue teniendo
+# que oírlo — es el único mecanismo que hace que el contrato exista.
+_case_el_primer_stop_sin_veredicto_si_bloquea() {
+  local out; out="$(_stop reviewer 'He mirado el diff y me parece bien.')"
+  case "$out" in *'"decision":"block"'*) return 0 ;; esac
+  echo "    un review sin veredicto NO recibió la exigencia del contrato"
+  return 1
+}
+test_el_primer_review_sin_veredicto_sigue_recibiendo_el_contrato() {
+  _crv_sandbox _case_el_primer_stop_sin_veredicto_si_bloquea
+}
+
+# ── El reporte ANEXA: la última vuelta no puede pisar a la primera ──
+# Medido: 3184 chars el primer mensaje, 165 los que quedaban en disco, y
+# coincidían con el ÚLTIMO. El nombre del archivo no varía entre vueltas, así
+# que `>` truncaba y los hallazgos se perdían enteros.
+_case_el_reporte_no_pierde_el_primer_cuerpo() {
+  # MISMO agente sobre el MISMO diff: es el único caso que comparte nombre de
+  # archivo, y por tanto el único donde `>` destruye. Con dos agentes distintos
+  # el truncado no se reproduce —cada uno escribe el suyo— y el test pasaría
+  # contra la versión rota, que es un test que no prueba nada.
+  _stop reviewer "$_REVIEW_RED" >/dev/null
+  _stop reviewer 'Ya está atendido.
+
+VERDICT: GREEN
+FINDINGS: 0
+SCOPE: MovieRepository y su fake' >/dev/null
+  local r; r="$(ls .agents/state/reviews/*-reviewer.md 2>/dev/null | head -1)"
+  [ -n "$r" ] || { echo "    no hay reporte"; return 1; }
+  grep -q 'suite de conformidad' "$r" \
+    || { echo "    el cuerpo del PRIMER review desapareció: la segunda vuelta lo pisó"; return 1; }
+  grep -q 'Ya está atendido' "$r" \
+    || { echo "    la segunda vuelta no quedó registrada"; return 1; }
+}
+test_una_segunda_vuelta_no_borra_los_hallazgos_de_la_primera() {
+  _crv_sandbox _case_el_reporte_no_pierde_el_primer_cuerpo
+}
+
+_case_el_previo_se_encuentra_via_historia() {
+  # El glob de `reviews/` NUNCA encontraba nada: el nombre del reporte no varía
+  # entre vueltas del mismo agente sobre el mismo diff, y se excluía a sí mismo
+  # por nombre exacto. La historia SÍ acumula, así que es la fuente correcta.
+  _stop design-reviewer "$_REVIEW_RED" >/dev/null
+  _stop reviewer "$_REVIEW_RED" >/dev/null
+  grep -rq '^previo: ' .agents/state/reviews/ \
+    || { echo "    el segundo review no apuntó al anterior sobre el mismo diff"; return 1; }
+  grep -rq '^comparar: ' .agents/state/reviews/ \
+    || { echo "    apuntó al previo pero no dijo qué hacer con él"; return 1; }
+}
+test_el_segundo_review_del_mismo_diff_apunta_al_anterior() {
+  _crv_sandbox _case_el_previo_se_encuentra_via_historia
 }
 
 # ── FALSO POSITIVO: un reporte no puede anunciarse cuando no lo hay ──
@@ -275,12 +376,9 @@ test_una_segunda_review_del_mismo_diff_apunta_a_la_anterior() {
 # cuando existe. Anunciarlo siempre mandaría a leer un archivo inexistente en
 # la primera review de cada diff — ruido en el caso más común de todos.
 _case_la_primera_review_no_anuncia_un_previo() {
-  local out
-  out="$(printf '{"hook_event_name":"SubagentStop","agent_type":"reviewer","last_assistant_message":%s}' \
-    "$(printf '%s' "$_REVIEW_RED" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
-    | bash scripts/agent-hooks/capture-review-verdict.sh 2>&1)"
-  case "$out" in *"YA HUBO UN REVIEW"*)
-    echo "    la PRIMERA review anunció un reporte anterior que no existe"; return 1 ;; esac
+  _stop reviewer "$_REVIEW_RED" >/dev/null
+  grep -rq '^previo: ' .agents/state/reviews/ 2>/dev/null \
+    && { echo "    la PRIMERA review anunció un reporte anterior que no existe"; return 1; }
   return 0
 }
 test_la_primera_review_de_un_diff_no_inventa_un_previo() {

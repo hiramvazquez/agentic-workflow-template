@@ -67,6 +67,47 @@ VERDICT="$(verdict_parse "$MSG")"
 SCOPE="$(verdict_scope "$MSG")";     : "${SCOPE:=(sin scope declarado)}"
 FINDINGS="$(verdict_findings "$MSG")"; : "${FINDINGS:=?}"
 
+# ════════════════════════════════════════════════════════════════════
+# IDENTIDAD DEL JUICIO + ANTIBUCLE  (se calcula ANTES de cualquier salida)
+# ════════════════════════════════════════════════════════════════════
+# Este hook corre en SubagentStop, y todo lo que emite —`additionalContext` o
+# un `decision: block`— VUELVE AL SUB-AGENTE, que responde; esa respuesta es
+# otro SubagentStop, y el hook dispara otra vez. Medido en un adoptante sobre
+# un diff de UNA línea: **11 disparos** en una corrida y 12 en la siguiente,
+# 35.256 y 67.427 tokens de sub-agente. El propio reviewer diagnosticó su jaula
+# en su sexto mensaje: *"Cierro este hilo. El sistema seguirá reenviando el
+# mismo recordatorio automático mientras..."*.
+#
+# Y el daño caro no era el coste: **lo que recibe quien invoca al sub-agente es
+# su ÚLTIMO mensaje**, o sea la cola del bucle ("VERDICT: RED" pelado), nunca el
+# review. Durante toda una sesión hubo que abrir el `.jsonl` del sub-agente para
+# leer cualquier review — design-reviews de 15 hallazgos incluidos.
+#
+# La vía NO es "escribe solo en el stop final": el hook no puede distinguir el
+# final del intermedio, porque todos son SubagentStop. La vía es IDEMPOTENCIA —
+# registrar una vez y callar después— y no reinyectar contexto cuando el
+# veredicto ya se capturó, que es cuando no hace falta pedirle nada a nadie.
+_DIR="$(hook_state_dir)/markers"; mkdir -p "$_DIR"
+_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo no-repo)"
+_STAGED_SHA="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
+_HIST="$(hook_state_dir)/review-history.jsonl"
+_LAST_RED="$_DIR/last_red.txt"
+
+# `review-history.jsonl` es el registro que SÍ acumula, así que es la fuente de
+# la idempotencia: si ya hay una entrada de este agente, sobre este HEAD y este
+# diff, el juicio ya está tomado.
+_hist_grep() { # _hist_grep [verdicto] → 0 si ya hay entrada
+  [ -f "$_HIST" ] || return 1
+  local f; f="$(grep -F "\"agent\":\"$AGENT\"" "$_HIST" 2>/dev/null \
+    | grep -F "\"head\":\"$_HEAD\"" | grep -F "\"staged_sha\":\"$_STAGED_SHA\"")"
+  [ -n "$f" ] || return 1
+  [ -z "${1:-}" ] && return 0
+  printf '%s' "$f" | grep -qF "\"verdict\":\"$1\""
+}
+_ya_registrado()        { _hist_grep "$1"; }   # este agente, este diff, ESTE veredicto
+_hay_veredicto_previo() { _hist_grep; }        # este agente, este diff, cualquiera
+
+
 # ── MODO CONTRATO: cierre legítimo SIN veredicto y SIN marker ──────
 # El reviewer invocado antes de que exista el código no puede emitir un
 # veredicto (no hay nada que juzgar) y NO debe escribir marker: si lo
@@ -83,6 +124,14 @@ explorar desde cero, que es lo que hace cara cada vuelta."
 fi
 
 # ── Sin contrato → bloquear el cierre y reinyectar el formato ───────
+# ...PERO UNA SOLA VEZ. Si este agente ya emitió su veredicto sobre este mismo
+# diff, un stop posterior sin veredicto es el agente terminando de hablar, no un
+# review sin contrato: exigírselo otra vez fue lo que produjo los mensajes
+# [7]-[10] de la secuencia medida, cuatro "VERDICT: RED" pelados generados solo
+# para callar al hook. El juicio ya está registrado; aquí no hay nada que pedir.
+if [ -z "$VERDICT" ] && _hay_veredicto_previo; then
+  hook_allow
+fi
 if [ -z "$VERDICT" ]; then
   hook_json_block "$EV" "🛑 \`$AGENT\` terminó SIN emitir el contrato de veredicto.
 
@@ -121,20 +170,26 @@ if [ "$AGENT" = "process-judge" ]; then
     printf 'session: %s\n' "$(hook_session_id)"
   } > "$DIR/process-judge_run.txt"
   : > "$(hook_state_dir)/judge-queue.txt" 2>/dev/null || true
-  hook_context "$EV" "⚖️  Juicio de proceso registrado: $VERDICT (${FINDINGS} hallazgos) — «${SCOPE}».
-Cola de juicio vaciada. Si el juez reportó hallazgos, van al ledger
-(\`bash tools/findings/findings.sh add ...\`), no solo a la prosa (AGENTS.md §10)."
+  # Sin `hook_context`: mismo bucle por la misma puerta. El juicio queda en su
+  # marker y la cola vaciada, que es lo que consume `session-end`.
+  #
+  # ⚠️ EL `exit` ES OBLIGATORIO Y ERA IMPLÍCITO: `hook_context` terminaba con
+  # `exit 0`, así que quitarlo dejó este camino CAYENDO al de abajo — el
+  # process-judge escribiendo el marker canónico del reviewer, o sea juzgar el
+  # proceso desbloqueando commits. Lo cazó `test_verdict.sh` en la primera
+  # pasada. Regla que deja: al retirar una llamada que salía del script, la
+  # salida se repone EXPLÍCITA en el mismo cambio.
+  hook_allow
 fi
 
-# El sha del diff que se está juzgando AHORA. Se calcula antes de bifurcar
-# porque lo necesitan los dos caminos: el RED para dejar huella, y el
-# GREEN/AMBER para comprobar contra ella.
-_DIR="$(hook_state_dir)/markers"; mkdir -p "$_DIR"
-_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo no-repo)"
-_STAGED_SHA="$(git diff --cached 2>/dev/null | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | awk '{print $1}')"
-_HIST="$(hook_state_dir)/review-history.jsonl"
-_LAST_RED="$_DIR/last_red.txt"
 
+# Mismo agente, mismo diff, mismo veredicto: ya está todo hecho —marker,
+# reporte, historia—. Repetirlo no añade un dato; reescribe el reporte y da otra
+# vuelta de bucle. Un veredicto DISTINTO sobre el mismo diff sí sigue adelante:
+# ahí abajo vive el rechazo del GREEN-tras-RED, que no se puede saltar.
+if _ya_registrado "$VERDICT"; then
+  hook_allow
+fi
 # ── EL REPORTE, no solo el veredicto ───────────────────────────────
 # El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo. Los hallazgos
 # solo existían en el transcript del sub-agente; en un adoptante hubo que
@@ -158,20 +213,39 @@ _REVIEWS="$(hook_state_dir)/reviews"
 _REPORTE="$_REVIEWS/${_STAGED_SHA:0:12}-${AGENT}.md"
 _REPORTE_PREVIO=""
 mkdir -p "$_REVIEWS" 2>/dev/null || true
-# ¿Ya hubo un review sobre ESTE MISMO diff? Es lo que convierte el reporte en
-# algo comprobable: sin el anterior, "¿lo absorbió o lo ignoró?" no se puede
-# ni plantear. Se busca antes de escribir el propio, o se encontraría a sí mismo.
-for _p in "$_REVIEWS/${_STAGED_SHA:0:12}"-*.md; do
-  [ -f "$_p" ] && [ "$_p" != "$_REPORTE" ] && { _REPORTE_PREVIO="$_p"; break; }
-done
+# ¿Ya hubo un review sobre ESTE MISMO diff? Se pregunta a `review-history.jsonl`,
+# que ACUMULA, y no al glob de `reviews/`: el nombre del reporte no varía entre
+# vueltas del mismo agente sobre el mismo diff, así que el glob —que se excluía a
+# sí mismo por nombre exacto— nunca encontraba nada y el aviso solo saltaba si el
+# diff lo había juzgado un agente DISTINTO. Medido en un adoptante: re-invocó al
+# reviewer sobre el mismo diff sin tocarlo y no llegó ningún aviso.
+if [ -f "$_HIST" ]; then
+  _REPORTE_PREVIO="$(grep -F "\"staged_sha\":\"$_STAGED_SHA\"" "$_HIST" 2>/dev/null \
+    | grep -F "\"head\":\"$_HEAD\"" | tail -1 \
+    | sed -nE 's/.*"report":"([^"]*)".*/\1/p')"
+fi
+
 {
   printf -- '---\n'
   printf 'ts: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'agent: %s\nverdict: %s\nfindings: %s\nscope: %s\nhead: %s\nstaged_sha: %s\nsource: hook\n' \
     "$AGENT" "$VERDICT" "$FINDINGS" "$SCOPE" "$_HEAD" "$_STAGED_SHA"
+  # El puntero al review anterior va DENTRO del reporte, no en un contexto
+  # reinyectado: cualquier cosa que este hook emita vuelve al sub-agente y da
+  # otra vuelta de bucle. Quien tiene que comparar hallazgo por hallazgo es
+  # quien lea este archivo, y aquí lo encuentra.
+  if [ -n "$_REPORTE_PREVIO" ]; then
+    if [ "$_REPORTE_PREVIO" = "$(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")" ]; then
+      printf 'previo: (más arriba, en este mismo archivo)\n'
+    else
+      printf 'previo: %s\n' "$_REPORTE_PREVIO"
+    fi
+    printf 'comparar: cada hallazgo del previo tiene que estar ATENDIDO o EXPLICADO\n'
+  fi
   printf -- '---\n\n'
   printf '%s\n' "$MSG"
-} > "$_REPORTE" 2>/dev/null || true
+} >> "$_REPORTE" 2>/dev/null || true
+
 
 _apuntar_historia() { # _apuntar_historia <veredicto> <nota>
   printf '{"ts":"%s","agent":"%s","verdict":"%s","findings":"%s","scope":"%s","head":"%s","staged_sha":"%s","report":"%s","nota":"%s"}\n' \
@@ -181,17 +255,6 @@ _apuntar_historia() { # _apuntar_historia <veredicto> <nota>
     >> "$_HIST" 2>/dev/null || true
 }
 
-# Texto que se añade al aviso cuando ya hubo un review sobre este mismo diff.
-# Es la mitad que faltaba: guardar el reporte sin que nadie lo lea sería
-# telemetría, no una defensa.
-_nota_previo() {
-  [ -n "$_REPORTE_PREVIO" ] || return 0
-  printf '\n\n📄 YA HUBO UN REVIEW SOBRE ESTE MISMO DIFF: %s\n' \
-    "$(hook_rel_path "$_REPORTE_PREVIO" 2>/dev/null || printf '%s' "$_REPORTE_PREVIO")"
-  printf 'Léelo y ve hallazgo por hallazgo: cada uno tiene que estar ATENDIDO o\n'
-  printf 'EXPLICADO. Un hallazgo que desaparece porque se borró la sección que lo\n'
-  printf 'contenía no está resuelto, y sin el reporte anterior es invisible.\n'
-}
 
 # ── RED → sin marker, PERO CON HUELLA ──────────────────────────────
 # Un RED no dejaba rastro: ni el diff ni sus hallazgos. Consecuencia medida en
@@ -208,17 +271,13 @@ if ! verdict_is_markable "$VERDICT"; then
     printf 'agent: %s\nverdict: %s\nfindings: %s\nscope: %s\nhead: %s\nstaged_sha: %s\nsource: hook\n' \
       "$AGENT" "$VERDICT" "$FINDINGS" "$SCOPE" "$_HEAD" "$_STAGED_SHA"
   } > "$_LAST_RED"
-  hook_context "$EV" "🔴 \`$AGENT\` emitió VERDICT: $VERDICT ($FINDINGS hallazgos) sobre «${SCOPE}».
-
-NO se escribió marker de review — el commit sigue BLOQUEADO por el reviewer-gate.
-Queda huella del diff juzgado (${_STAGED_SHA:0:12}…): si el próximo veredicto es
-GREEN sobre ESE MISMO diff, el sistema lo rechazará — un verde sobre un código
-que no cambió no es una remediación, es un reintento.
-Atiende los hallazgos, STAGEA el arreglo, y vuelve a invocar \`$AGENT\`.
-
-📄 Reporte completo guardado: $(hook_rel_path "$_REPORTE" 2>/dev/null || printf '%s' "$_REPORTE")
-Los hallazgos ya no viven solo en tu transcript. Lo que deba sobrevivir al
-turno va al ledger (\`bash tools/findings/findings.sh add ...\`, §10).$(_nota_previo)"
+  # Sin `hook_context`, por lo mismo: este texto iba al sub-agente, que ya sabe
+  # lo que acaba de escribir. Quien tiene que leer los hallazgos es el agente
+  # principal, y los lee en el mensaje final del sub-agente — ahora que ese
+  # mensaje vuelve a ser el review y no la cola de un bucle.
+  # El `exit` explícito no es cosmético: sin él, un RED cae al camino de abajo y
+  # ESCRIBE EL MARKER — un veredicto que bloquea desbloqueando el commit.
+  hook_allow
 fi
 
 # ── Un GREEN sobre el MISMO diff que acaba de ser RED no es remediación ──
@@ -240,15 +299,12 @@ if [ -f "$_LAST_RED" ] && [ -n "$_STAGED_SHA" ]; then
       _apuntar_historia "$VERDICT" "override same-diff"
     else
       _apuntar_historia "$VERDICT" "RECHAZADO: mismo diff que el RED anterior"
-      hook_context "$EV" "🛑 \`$AGENT\` emitió $VERDICT sobre EXACTAMENTE el mismo diff que acaba de
-recibir un RED (${_STAGED_SHA:0:12}…, head=$_HEAD). NO se ha escrito marker.
-
-Entre los dos veredictos no cambió ni un byte de lo staged, así que esto no es
-una remediación: o el RED estaba mal o lo está este. Si arreglaste algo, STAGÉALO
-y vuelve a revisar — el arreglo tiene que estar en el diff que se juzga (incluido
-el ledger, si el hallazgo pedía registrarlo).
-Si de verdad el RED se resolvió con un argumento y no con código:
-  REVIEW_SAME_DIFF_OVERRIDE=1 REVIEW_SAME_DIFF_REASON=\"...\"   (queda auditado)$(_nota_previo)"
+      # Sin `hook_context`: el rechazo queda en `review-history.jsonl` con su
+      # nota y, sobre todo, en que NO hay marker — el `reviewer-gate` bloquea el
+      # commit y ahí sí se lo explica al agente principal, que puede hacer algo.
+      # Y el `exit` otra vez: sin él, el GREEN rechazado seguía y escribía el
+      # marker, que es exactamente lo que este bloque existe para impedir.
+      hook_allow
     fi
   fi
 fi
@@ -276,5 +332,12 @@ source: hook
 EOF
 done
 
-hook_context "$EV" "✅ Veredicto de \`$AGENT\` registrado por el sistema: $VERDICT (${FINDINGS} hallazgos) — «${SCOPE}».
-Marker ligado a head=$HEAD y al diff staged actual. Si cambias lo staged, el marker caduca.$(_nota_previo)"
+# SIN `hook_context`. Aquí ya no hay nada que pedirle al sub-agente: el
+# veredicto está capturado, el marker escrito y el reporte en disco. Cualquier
+# cosa que se emita aquí vuelve a ÉL —no al que lo invocó—, le hace responder, y
+# esa respuesta se convierte en el último mensaje del sub-agente, que es
+# justamente lo que recibe quien lo llamó. Es decir: reinyectar aquí no solo
+# costaba una vuelta, SUSTITUÍA el review por el eco del recordatorio.
+# Lo que el agente principal necesita saber lo tiene por dos canales que no
+# rebotan: el mensaje final REAL del sub-agente y, si intenta commitear sin
+# marker válido, el `reviewer-gate`.
