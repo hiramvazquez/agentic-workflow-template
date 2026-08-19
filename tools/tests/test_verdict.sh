@@ -466,3 +466,19 @@ SCOPE: MovieRepository y su fake' run-2 >/dev/null
 test_el_puntero_aparece_con_veredicto_distinto_y_el_rechazo_sigue_vivo() {
   _crv_sandbox _case_puntero_con_veredicto_distinto
 }
+
+# ── El último tramo: que alguien MIRE el reporte previo ─────────────
+# El puntero al review anterior vive dentro del reporte, y a un sub-agente nuevo
+# nadie se lo inyecta: el hook actúa al TERMINAR una ejecución, no al arrancar la
+# siguiente. Inyectarlo al arrancar es justo lo que produjo el bucle de 11
+# vueltas, así que la instrucción va donde no puede rebotar: el prompt del rol.
+# Estático, no runtime. Este test existe porque una instrucción que se borra sin
+# que nada falle vuelve a dejar el reporte escribiéndose para nadie.
+test_el_prompt_del_reviewer_manda_leer_el_reporte_previo() {
+  local f="$PROJECT_ROOT/tools/agent-prompts/review.md"
+  [ -f "$f" ] || { echo "    falta tools/agent-prompts/review.md"; return 1; }
+  grep -q '\.agents/state/reviews/' "$f" \
+    || { echo "    el prompt del reviewer no le dice que mire .agents/state/reviews/"; return 1; }
+  grep -qi 'hallazgo por hallazgo' "$f" \
+    || { echo "    le dice dónde mirar pero no qué hacer con lo que encuentre"; return 1; }
+}
