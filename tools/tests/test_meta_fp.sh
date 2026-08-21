@@ -47,6 +47,7 @@ tools/agent-runner.sh                        :: test_agent_runner.sh
 tools/semgrep/rules/swift.yaml               :: test_semgrep_rules.sh
 tools/check-drift.sh                         :: test_drift_aggregation.sh
 tools/check-review-marker.sh                 :: test_review_marker_preset.sh
+tools/lib/scope.sh                           :: test_scope_kind.sh
 tools/drift-ratchet.sh                       :: test_ratchets.sh
 tools/secret-scan.sh                         :: test_secret_scan.sh
 tools/semgrep-scan.sh                        :: test_fail_closed.sh

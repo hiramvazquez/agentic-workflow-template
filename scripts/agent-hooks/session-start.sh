@@ -128,6 +128,14 @@ if [ -f tools/skill-matrix.conf ]; then
 else
   echo "⚠️  tools/skill-matrix.conf ausente — skill-reminder usa solo sus globs de fábrica."; _health=0
 fi
+# WF-05 (PRD 0005 §6): el project_kind se DECLARA en tools/project.conf; sin
+# declarar, los gates de scope caen a la heurística y ESTE es el único sitio
+# que lo dice — una línea por sesión, nunca un aviso por commit (ley del 10%).
+# SCOPE_NO_CI_EXIT=1: consulta pura — la lib jamás corta a session-start.
+if [ -f tools/lib/scope.sh ]; then
+  _pk="$(SCOPE_NO_CI_EXIT=1 bash -c '. tools/lib/scope.sh 2>/dev/null; _scope_project_kind' 2>/dev/null)"
+  [ -z "$_pk" ] && { echo "⚠️  project_kind sin declarar — tools/project.conf: los gates de scope infieren por heurística; declara harness|application|other (un repo doc-only sale 'harness' por defecto: declara 'other' si no quieres review sobre su contenido)."; _health=0; }
+fi
 # La suite del harness aprueba el conjunto vacío si no hay archivos de test:
 # "0 tests, 0 fallos, ✅" es exactamente el gate mudo que este harness combate.
 _ntests="$(find tools/tests -name 'test_*.sh' 2>/dev/null | wc -l | tr -d ' ')"

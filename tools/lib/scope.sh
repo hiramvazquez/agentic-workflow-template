@@ -19,16 +19,51 @@
 # mecanismo. Dicho del modo más incómodo posible: **nuestro propio reviewer-gate
 # no había bloqueado un commit en su vida.**
 #
-# La distinción no es nueva: `check-ring3.sh` ya dice, con estas palabras, "los
-# gates completos de un proyecto, o —en el repo del propio harness— la suite que
-# verifica los gates, que ahí es exactamente lo mismo". Un gate lo reconocía y
-# el otro no.
+# ── Cómo se decide (WF-05, PRD 0005 §6): la DECLARACIÓN gobierna ────
+# `tools/project.conf` declara `project_kind: harness|application|other`
+# (propiedad del adoptante, fuera del sync — mismo modelo que tools/preset).
+# La evidencia (¿hay fuentes de app?) solo VERIFICA: una contradicción
+# declarado-vs-evidencia AVISA (y en CI devuelve exit 3), pero JAMÁS cambia
+# el criterio — un monorepo con `packages/` declarado `application` obtiene
+# el criterio de app sin que ninguna heurística lo discuta.
 #
-# ── Cómo se decide, sin preguntarle al repo quién cree que es ───────
-# Un repo cuyo producto es el harness NO TIENE fuentes de aplicación. Es el
-# mismo discriminador que usa `verify-run.sh` para detectar un `verify.conf`
-# heredado, y por la misma razón: no depende de un nombre, de un remote ni de
-# un flag que alguien pueda poner mal.
+# Sin declaración, el fallback es la heurística de siempre (cero falsos
+# positivos nuevos en adoptantes existentes), y el diagnóstico "declara tu
+# kind" lo emite session-start UNA vez por sesión — nunca cada commit.
+
+_SCOPE_CONF="tools/project.conf"
+
+_scope_project_kind() { # → harness|application|other, o vacío (ausente/ilegible)
+  local k
+  [ -f "$_SCOPE_CONF" ] || return 0
+  k="$(grep -E '^project_kind:' "$_SCOPE_CONF" 2>/dev/null | head -1 \
+        | sed -E 's/^project_kind:[[:space:]]*//' | awk '{print $1}')"
+  case "$k" in harness|application|other) printf '%s' "$k" ;; esac
+  return 0
+}
+
+# ── La EVIDENCIA, definida (PRD 0005 §6, literal) ───────────────────
+# "fuentes de app" = archivos *.swift|kt|java|ts|tsx|js|py|go|rb|cs|rs bajo
+# CUALQUIER ruta del repo EXCEPTO tools/ scripts/ ci/ docs/ .agents/
+# enterprise/ y **/fixtures/. Cubre monorepos (packages/, services/) y no
+# cuenta los .py ni los fixtures del propio harness — los dos contraejemplos
+# que tumbaron a la heurística de directorios fijos (hallazgo 1).
+_scope_fuentes_de_app() { # → imprime la primera fuente de app hallada (vacío si no hay)
+  find . \( -path './.git' -o -path './tools' -o -path './scripts' \
+            -o -path './ci' -o -path './docs' -o -path './.agents' \
+            -o -path './enterprise' -o -name 'fixtures' \) -prune -o \
+       -type f \( -name '*.swift' -o -name '*.kt' -o -name '*.java' \
+            -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.py' \
+            -o -name '*.go' -o -name '*.rb' -o -name '*.cs' -o -name '*.rs' \) \
+       -print 2>/dev/null | head -1
+}
+
+# ── Heurística vieja: SOLO como fallback sin declaración ────────────
+# Un repo cuyo producto es el harness NO TIENE fuentes de aplicación en los
+# directorios convencionales. Es el mismo discriminador que usa
+# `verify-run.sh` para detectar un `verify.conf` heredado. Se conserva
+# INTACTA para el adoptante que aún no declaró: su comportamiento no cambia
+# ni un byte (lo fija test_scope_kind.sh).
 _repo_es_el_harness() {
   local p
   p="$(find ios android web src app lib Sources -type f \
@@ -49,6 +84,68 @@ _NON_PRODUCT_APP='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.c
 _NON_PRODUCT_HARNESS='^(docs/|backlog/|enterprise/|\.github/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|\.gitattributes|\.gitleaks|\.semgrepignore|muter\.conf|CLAUDE\.md|GEMINI\.md|tools/findings/ledger\.jsonl$|(ios|android|web|backend)/AGENTS\.md$)'
 
 scope_non_product() {
-  if _repo_es_el_harness; then printf '%s' "$_NON_PRODUCT_HARNESS"
-  else printf '%s' "$_NON_PRODUCT_APP"; fi
+  case "$(_scope_project_kind)" in
+    harness)           printf '%s' "$_NON_PRODUCT_HARNESS" ;;
+    # `other` = exención amplia estilo app (AMBER-5): en un repo doc-only sus
+    # directorios de contenido no exigen review; quien quiera review sobre
+    # docs declara `harness`. La tabla de §6 le asigna el criterio de app.
+    application|other) printf '%s' "$_NON_PRODUCT_APP" ;;
+    *) if _repo_es_el_harness; then printf '%s' "$_NON_PRODUCT_HARNESS"
+       else printf '%s' "$_NON_PRODUCT_APP"; fi ;;
+  esac
 }
+
+# ── Verificación declarado-vs-evidencia (corre al SOURCEAR) ─────────
+# Vive en el top-level del source y no dentro de `scope_non_product` porque
+# los consumidores llaman a esa función en un `$(…)`: un exit ahí muere en la
+# subshell y el gate ni se entera. Al ejecutarse cuando el gate hace
+# `. tools/lib/scope.sh`, el `exit 3` de CI llega al proceso del gate
+# (contrato de detectores 0/1/3) sin editar a ningún consumidor.
+#
+# Solo en CI se corta (CI=true o cualquier GATES_* en el entorno): en local la
+# contradicción avisa por stderr y el commit sigue — bloquear en la máquina
+# del adoptante por una línea de conf sería el ruido que apaga gates.
+# SCOPE_NO_CI_EXIT=1 es la vía de CONSULTA (session-start): jamás sale.
+_scope_en_ci() {
+  [ "${CI:-}" = "true" ] && return 0
+  local vars; vars="$(env | grep '^GATES_' || true)"
+  [ -n "$vars" ]
+}
+
+_scope_verifica_declaracion() {
+  local k ev
+  k="$(_scope_project_kind)"
+  case "$k" in
+    harness)
+      ev="$(_scope_fuentes_de_app)"
+      [ -n "$ev" ] || return 0 ;;
+    application)
+      ev="$(_scope_fuentes_de_app)"
+      [ -z "$ev" ] || return 0
+      ev="(ninguna)" ;;
+    *) return 0 ;;  # other: cualquier evidencia vale (§6) · sin declarar: heurística
+  esac
+  {
+    printf 'SCOPE_SUMMARY kind=%s evidencia=contradice\n' "${k}"
+    if [ "${k}" = "harness" ]; then
+      printf '⚠️  scope: project_kind=harness declarado, pero HAY fuentes de app (p.ej. %s).\n' "${ev#./}"
+      printf '   ¿Adopción por copia sin el flip? Corrige tools/project.conf (application u other).\n'
+    else
+      printf '⚠️  scope: project_kind=application declarado, pero NO hay ni una fuente de app.\n'
+      printf '   Si este repo es el harness o doc-only, corrige tools/project.conf (harness u other).\n'
+    fi
+    printf '   La declaración MANDA (se aplica su criterio); en CI esto devuelve exit 3.\n'
+  } >&2
+  # El corte de CI exige además el conf TRACKEADO. En un checkout real de CI
+  # todo archivo lo está, así que ahí esto no cambia nada; un conf sin
+  # trackear delata un SANDBOX (selftest de validate-harness, suites) al que
+  # CI=true le llegó heredado del entorno — cortar ahí con 3 rompería esos
+  # fixtures por la razón equivocada. El aviso de arriba se emite igual.
+  # Lo fija test_scope_kind.sh::test_conf_sin_trackear_con_ci_heredado_no_corta.
+  if _scope_en_ci && [ "${SCOPE_NO_CI_EXIT:-0}" != "1" ] \
+     && git ls-files --error-unmatch "$_SCOPE_CONF" >/dev/null 2>&1; then
+    exit 3
+  fi
+  return 0
+}
+_scope_verifica_declaracion

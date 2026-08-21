@@ -217,6 +217,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-19] La identidad del repo se infería en vez de declararse (WF-05) — `tools/tests/test_scope_kind.sh`
 - [2026-08-19] Un rojo que tira el exit y el stderr convierte cualquier fallo en el fallo equivocado — `tools/tests/test_agent_runner.sh`
 - [2026-08-19] Un JSONL escrito con printf es un formato solo hasta el primer valor hostil — `tools/tests/test_review_history.sh`
 - [2026-08-19] El mapa canónico declaró conteos que un comando recalcula, y se pudrieron — `tools/tests/test_execution_map.sh`

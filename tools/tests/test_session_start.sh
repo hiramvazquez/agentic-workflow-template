@@ -165,3 +165,35 @@ _case_cuatro_estados_cuatro_mensajes() {
 test_los_cuatro_estados_del_nivel4_no_comparten_mensaje() {
   _sst_sandbox _case_cuatro_estados_cuatro_mensajes
 }
+
+# ════════════════════════════════════════════════════════════════════
+# WF-05 (PRD 0005 §6): "project_kind sin declarar" — UNA línea, aquí
+# ════════════════════════════════════════════════════════════════════
+# El fallback sin declaración vive en tools/lib/scope.sh y es SILENCIOSO por
+# commit (ley del 10%): el único sitio que dice "declara tu kind" es este
+# reporte de arranque. Y el caso doc-only —al que la heurística llama
+# harness— necesita leer aquí su salida: declarar `other`.
+_case_sin_project_kind_una_linea() {
+  mkdir -p tools/lib
+  cp "$PROJECT_ROOT/tools/lib/scope.sh" tools/lib/
+  local out n
+  out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  case "$out" in *"project_kind sin declarar"*) : ;; *)
+    echo "    el arranque no diagnostica la falta de tools/project.conf"; return 1 ;; esac
+  n="$(printf '%s\n' "$out" | grep -c 'project_kind')"
+  [ "$n" = "1" ] || { echo "    el diagnóstico ocupa $n líneas (prometida UNA)"; return 1; }
+  case "$out" in *other*) : ;; *)
+    echo "    el diagnóstico no menciona la salida 'other' para repos doc-only"; return 1 ;; esac
+}
+test_project_kind_sin_declarar_avisa_en_el_arranque() { _sst_sandbox _case_sin_project_kind_una_linea; }
+
+# FALSO POSITIVO guard: declarado ⇒ ni una palabra sobre project_kind.
+_case_project_kind_declarado_calla() {
+  mkdir -p tools/lib
+  cp "$PROJECT_ROOT/tools/lib/scope.sh" tools/lib/
+  printf 'project_kind: application\n' > tools/project.conf
+  local out; out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  case "$out" in *project_kind*) echo "    declarado, y el arranque sigue hablando de project_kind"; return 1 ;; esac
+  return 0
+}
+test_project_kind_declarado_no_avisa() { _sst_sandbox _case_project_kind_declarado_calla; }

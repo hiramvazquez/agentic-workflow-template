@@ -3,16 +3,17 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **7** · Cerrados: 85 · Total: 92
+Abiertos: **8** · Cerrados: 86 · Total: 94
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
+| `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El sub-agente reviewer puede resetear el index y el marker firma un diff distinto del revisado |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
+| `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh (664) + 3 tests + capture-review-verdict (371)` | Cinco archivos del harness sobre o rozando su propio hard limit de 400 lineas |
-| `f-wf05-project-kind-inferido` | medium | auto-fix | `tools/lib/scope.sh` | El tipo de repo se infiere por ausencia de fuentes en directorios fijos: un monorepo se clasifica mal |
 | `f-wf06-kmp-detector-textual` | medium | auto-fix | `tools/check-source-sets.sh:69` | check-source-sets casa un import dentro de /* */ o de un string triple: detector textual para propiedad sintactica |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-wf08-git-add-A-canonico` | low | auto-fix | `docs/process/current_execution_map.md:41` | El mapa recomienda git add -A mientras AGENTS.md 7 lo prohibe con cambios fuera de scope |
@@ -103,6 +104,7 @@ Abiertos: **7** · Cerrados: 85 · Total: 92
 | `f-non-product-ciego-al-harness` | fixed | tools/lib/scope.sh como fuente unica de los dos markers: si el repo no tiene fuentes de aplicacion s |
 | `f-wf02-mapa-cifras-podridas` | fixed | PRD 0005 fase 0b, implementada por subagente y verificada: mapa sin cifras derivables (los conteos v |
 | `f-wf03-jsonl-sin-encoder` | fixed | Emisor unico scripts/agent-hooks/lib/json.sh (jq, fallback python3; sin runtime degrada declarandolo |
+| `f-wf05-project-kind-inferido` | fixed | Fase 1b entregada: la declaracion gobierna (tools/project.conf, propiedad del adoptante, verificado  |
 | `f-wf07-contexto-sin-headroom` | fixed | PRD 0005 fase 0c, implementada por subagente y verificada: rotador canonico e idempotente (canonical |
 | `f-watchdog-filtra-un-sleep-por-test` | fixed | pkill -P sobre el guardian antes de matarlo: mueren sus hijos primero. Medido tras el fix: 0 huerfan |
 | `f-test-0a-verde-linux-rojo-macos` | fixed | Inyeccion por PATH: stub de mktemp que falla, identico en ambos sistemas. Verificado verde en Linux; |
