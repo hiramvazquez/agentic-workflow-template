@@ -120,8 +120,9 @@ El corazón del template. Detalle completo en
 > sin CI es una pérdida explícita que `session-start` declara. Los YAML de `ci/examples/` son stubs.
 >
 > **Capa nativa de Claude Code (opcional, la más fuerte para empresa).** Para enforcement que
-> NI `--no-verify` NI los flags de CLI pueden saltar, despliega `enterprise/managed-settings.json`
-> (precedencia máxima). Y para bajar el coste de re-lectura, `.claude/rules/` carga la skill del
+> NI `--no-verify` NI los flags de CLI pueden saltar, despliega `enterprise/managed-settings.example.json`
+> en la ruta de OS que toque (precedencia máxima; el nombre YA desplegado es
+> `managed-settings.json` y no vive en el repo). Y para bajar el coste de re-lectura, `.claude/rules/` carga la skill del
 > área por path de forma nativa. Detalle en `enterprise/README.md`.
 
 ## Mapa de archivos
@@ -138,40 +139,72 @@ ios|android|web/AGENTS.md  ← overrides por plataforma (el más cercano gana)
   claude-security-guidance.md ← threat model para el revisor de contexto fresco
   rules/                   ← recordatorios cortos path-scoped (el gate duro es skill-matrix.conf)
   skills → .agents/skills
-.claude/commands/           ← /adoptar (rellena los FILL entrevistándote) · /historia (idea → historia de backlog) · /goal (objetivo verificable, nivel 8)
+.claude/commands/           ← /adoptar (rellena los FILL entrevistándote) · /historia (idea → historia de backlog) · /goal (objetivo verificable, nivel 8) · /reconciliar (drift spec↔código)
 .cursor/                   ← rules/*.mdc + hooks.json (eventos REALES de Cursor + gate-adapter)
 .codex/config.toml         ← config Codex (lee AGENTS.md directo)
 .codex/hooks.json          ← hooks Codex (2026): reviewer-gate vía gate-adapter
 
 scripts/agent-hooks/       ← UNA implementación de los gates, compartida por Claude+Cursor+Codex
+  run-hook.sh                ← ⭐ lanzador: `bash -n` al hook y a sus libs ANTES de ejecutarlo.
+                               Sin él, un hook con marcadores de conflicto se leía como DENY y
+                               dejaba al agente sin poder ni diagnosticarlo
   adapters/gate-adapter.sh   ← traduce exit-2 al JSON de deny de Cursor/Codex
   capture-review-verdict.sh  ← ⭐ SubagentStop: deriva el marker del veredicto REAL
+  reviewer-gate.sh           ← PreToolUse Bash: git-guard + marker de review + capas + semgrep
+  skill-reminder.sh          ← PreToolUse Edit/Write: BLOQUEA si no leíste la skill del path
   post-edit-verify.sh        ← ⭐ verificación in-loop (nivel 1 de la pirámide)
   post-compact.sh            ← reinyecta reglas tras compactar el contexto
-  canon-enforce.sh           ← reglas irrompibles (Stop, bloqueante)
-  track-failure.sh           ← detecta al agente atascado en un bucle de reintentos
-  inject-context.sh          ← estado vivo por turno (findings abiertos, cola de juicio)
+  canon-enforce.sh · drift-stop.sh ← Stop: reglas irrompibles y drift nuevo (bloqueantes)
+  session-start.sh           ← estado del proyecto + reset de markers al abrir sesión
   session-end.sh             ← encola la sesión para el process-judge si tocó código
+  track-failure.sh           ← detecta al agente atascado en un bucle de reintentos
+  track-reads.sh · track-trajectory.sh ← lecturas de skills y trayectoria (sin secretos)
+  inject-context.sh          ← estado vivo por turno (findings abiertos, cola de juicio)
   lib/io.sh                  ← normalización Claude/Cursor + hook_log_detection (telemetría)
+  lib/json.sh                ← emisor JSON único (jq → python3): un JSONL con `printf` es un
+                               formato solo hasta el primer valor con comillas o CR/LF
+  lib/verdict.sh · lib/skill-matrix.sh ← parseo del VERDICT y de la matriz path→skill
 
 tools/
+  preset                     ← `full` (los gates bloquean) | `lite` (avisan). Lo lee cada gate
+  project.conf               ← ⭐ `project_kind` DECLARADO: qué es el producto de este repo.
+                               La declaración gobierna el criterio de scope; la evidencia solo
+                               verifica y una contradicción avisa (exit 3 en CI). Es tuyo: el
+                               upgrade no lo pisa
+  lib/scope.sh               ← fuente única de ese criterio para los dos markers de abajo
   check-layers.sh + layers.conf  ← baseline de dirección de imports directos (nivel 6)
   architecture-check.sh          ← estado explícito de ciclos/complejidad por adapter
+  check-source-sets.sh           ← EL invariante de KMP: commonMain no importa plataforma
   semgrep/rules/ + semgrep-scan.sh ← detectores AST (nivel 2; exit 3 = "no pude mirar")
   gate-cache.sh                 ← reutiliza solo Semgrep staged 0/0 con identidad completa + TTL
   mutation-score.sh + mutation-ratchet.json ← calidad del test (nivel 4) — SOLO SUBE
   check-review-marker.sh     ← verificación local de review en git hooks/adapters
+  verify-run.sh + verify.conf + check-verify-marker.sh
+                             ← ⭐ el MISMO invariante, para los TESTS: firma el diff staged solo
+                               si el comando de verify.conf salió 0. Antes se podía commitear
+                               un árbol que nadie llegó a compilar, con todo en verde
+  agent-runner.sh + agent-backends/ ← boundary portable (`run` / `review`) para invocar un
+                               sub-agente sin atarse a un cliente; backends intercambiables
+  capabilities.json + render-capabilities.sh ← manifiesto de capacidades: GENERA los bloques
+                               `<!-- GENERATED -->` de esta doc y falla si divergen del manifiesto
+  probe-capability.sh        ← ausente / roto / operativo son tres hechos distintos, y se dicen
+                               distinto (un binario instalado no es un detector que funcione)
+  drift-ratchet.json + drift-ratchet.sh + check-drift.sh ← trinquete de deuda — SOLO BAJA
   lesson-detector-link.sh    ← toda lección tiene detector, y el detector (archivo Y test) existe
   check-finding-refs.sh      ← un id de finding citado en la doc resuelve contra el ledger
+  check-execution-map.sh     ← el mapa canónico no declara cifras que un comando recalcula
+                               (una cifra derivable en doc vivo es una mentira futura garantizada)
+  check-skill-matrix-doc.sh  ← la tabla de AGENTS.md §11 y skill-matrix.conf no divergen
   check-version-claims.sh    ← declarar una herramienta incapaz por versión exige citar el
                                repositorio: `brew` sirve el último RELEASE, no lo que soporta
                                el proyecto (nos costó dar el nivel 4 por imposible durante semanas)
   skill-matrix.conf          ← FUENTE ÚNICA de la matriz path→skill (la lee skill-reminder)
+  secret-scan.sh + secret-baseline.sh ← secretos sin depender de que gitleaks esté instalado
   upgrade.sh                 ← trae mejoras del template a tu proyecto (merge 3-vías + verificación)
   validate-harness.sh        ← ¿los gates EXISTEN de verdad? estático + checklist en vivo
+  harness-report.sh          ← empaqueta la evidencia dispersa en UN markdown pegable
   findings/findings.sh       ← CLI del ledger (bash+python3, único runtime)
   metrics/escape-rate.sh     ← contención por fase: ¿puedo bajar la revisión humana?
-  drift-ratchet.json         ← trinquete de deuda — SOLO BAJA
   tests/                     ← suite de shell de los propios gates (el total real lo imprime
                                run-tests.sh; no se mantiene un conteo manual)
                                (⅓ son casos de FALSO POSITIVO; test_meta_fp lo exige)
@@ -187,7 +220,7 @@ docs/ONBOARDING-IA.md      ← runbook para el AGENTE que estrena el harness: "l
 docs/EXAMPLES.md           ← 4 escenarios iOS end-to-end: bug, feature con PRD, /goal, backlog
 docs/process/              ← PRDs, lessons (con detector obligatorio), execution map, ledger
 .claude-plugin/            ← (opcional) plugin.json + marketplace.json
-enterprise/                ← (opcional) managed-settings.json: enforcement NO anulable
+enterprise/                ← (opcional) managed-settings.example.json: enforcement NO anulable
 ```
 
 ## El invariante que sostiene todo
@@ -206,6 +239,14 @@ Antes, el marker lo escribía un script que **el modelo** invocaba: un agente qu
 commitear solo tenía que ejecutarlo. El gate de review era decorativo. Ahora la evidencia la
 produce el sistema a partir del veredicto real, y está ligada al hash del diff exacto que se
 va a commitear.
+
+**Y el mismo invariante para los TESTS, no solo para el reviewer.** Durante meses ninguna
+ejecución de build o de tests se ligaba a ese diff, así que se podía commitear un árbol que
+**nadie llegó a compilar** con todo en verde: el reviewer no compila, los trinquetes no
+compilan y las capas tampoco. `tools/verify-run.sh` ejecuta el comando de `tools/verify.conf`
+—fuente única, compartida con el Anillo 3— y **solo si sale 0** firma ese mismo
+`sha256(diff staged)`; `tools/check-verify-marker.sh` lo exige. El flujo es el que ya pedía el
+review: **stagea → verifica → commitea**.
 
 ### Qué garantiza y qué no
 
