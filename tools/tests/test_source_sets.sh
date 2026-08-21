@@ -85,3 +85,258 @@ _case_el_conf_solo_puede_ampliar() {
   return 0
 }
 test_el_conf_amplia_la_lista_de_prohibidos() { _ss_repo _case_el_conf_solo_puede_ampliar; }
+
+# ════════════════════════════════════════════════════════════════════
+# PRD 0005 fase 1c — semgrep primario, y un fallback que SIGUE bloqueando
+# ════════════════════════════════════════════════════════════════════
+# `import` es una propiedad SINTÁCTICA y se comprobaba con texto. El anclaje a
+# inicio de línea tapa el caso fácil (`// import ...`), pero no el que la
+# gramática sí distingue: un bloque `/* */` sin asteriscos de adorno y un string
+# triple contienen líneas que EMPIEZAN por `import`. Medido sobre el corpus de
+# abajo, el grep daba 2 falsos positivos de 5 hits — 40%, cuatro veces la ley
+# del 10% (§14.2). Semgrep parsea Kotlin, así que ahí no hay nada que anclar.
+#
+# El fallback NO se retira: si semgrep no está, el grep sigue corriendo y una
+# violación REAL sigue saliendo 1. Degradar eso a 3 sería apagar el gate en la
+# única situación en la que el gate tenía algo que decir (PRD 0005 §6).
+
+_sin_semgrep() { PATH="/usr/bin:/bin" "$@"; }
+_semgrep_roto() {   # un binario que existe y revienta ≠ un binario ausente
+  mkdir -p bin; printf '#!/bin/sh\necho "boom" >&2\nexit 2\n' > bin/semgrep
+  chmod +x bin/semgrep; PATH="$PWD/bin:/usr/bin:/bin" "$@"
+}
+
+_case_bloque_comentado_no_es_import() {
+  _common 'package dominio' '/*' 'import android.net.Uri' '*/' 'class Repo'
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    FALSO POSITIVO: un import dentro de /* */ contó como import (exit $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_un_import_dentro_de_un_bloque_comentado_no_es_un_import() {
+  _ss_repo _case_bloque_comentado_no_es_import; }
+
+_case_string_triple_no_es_import() {
+  _common 'package dominio' 'val ejemplo = """' 'import android.net.Uri' '"""' 'class Repo'
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    FALSO POSITIVO: un import dentro de \"\"\" contó como import (exit $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_un_import_dentro_de_un_string_triple_no_es_un_import() {
+  _ss_repo _case_string_triple_no_es_import; }
+
+# El otro lado del mismo filo: parsear no puede AFLOJAR la detección. Espacios
+# de más, alias e import con estrella son imports para la gramática, y lo eran
+# para el grep — si al cambiar de motor dejaran de serlo, habríamos cambiado
+# 2 falsos positivos por 3 falsos negativos, que es peor.
+_case_variantes_sintacticas_siguen_bloqueando() {
+  local v; local -a variantes=(
+    'import   android.net.Uri'
+    'import android.net.*'
+    'import android.os.Build as B'
+  )
+  for v in "${variantes[@]}"; do
+    _common 'package dominio' "$v" 'class Repo'
+    bash tools/check-source-sets.sh >/dev/null 2>&1 \
+      && { echo "    FALSO NEGATIVO: '$v' no bloqueó"; return 1; }
+  done
+  return 0
+}
+test_alias_estrella_y_espacios_no_evaden_el_detector() {
+  _ss_repo _case_variantes_sintacticas_siguen_bloqueando; }
+
+# ── La tabla de fallback de PRD 0005 §6, fila por fila ──────────────
+_case_sin_semgrep_violacion_real_bloquea() {
+  _common 'package dominio' 'import android.net.Uri' 'class Repo'
+  local out rc; out="$(_sin_semgrep bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    sin semgrep, una violación REAL no bloqueó (exit $rc) — el fallback existe"
+    echo "    exactamente para esto; degradarlo a 3 aquí es apagar el gate"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_sin_semgrep_una_violacion_real_sigue_bloqueando() {
+  _ss_repo _case_sin_semgrep_violacion_real_bloquea; }
+
+_case_sin_semgrep_y_limpio_dice_que_no_miro() {
+  _common 'package dominio' 'import kotlinx.coroutines.flow.Flow' 'class Repo'
+  local out rc; out="$(_sin_semgrep bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "3" ] || {
+    echo "    sin semgrep y sin hits del grep debe salir 3 (no pude mirar), salió $rc."
+    echo "    Un 0 aquí convierte un scanner ausente en luz verde permanente (§14.3)."
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_sin_semgrep_y_limpio_declara_que_no_pudo_mirar() {
+  _ss_repo _case_sin_semgrep_y_limpio_dice_que_no_miro; }
+
+_case_en_ci_el_no_pude_mirar_bloquea() {
+  _common 'package dominio' 'import kotlinx.coroutines.flow.Flow' 'class Repo'
+  local rc; _sin_semgrep env GATES_REQUIRE_SOURCE_SETS=1 \
+    bash tools/check-source-sets.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    con GATES_REQUIRE_SOURCE_SETS=1 el exit 3 debe escalar a 1 (bloquea en CI), salió $rc"
+    return 1; }
+}
+test_sin_semgrep_y_limpio_en_ci_bloquea() { _ss_repo _case_en_ci_el_no_pude_mirar_bloquea; }
+
+_case_semgrep_roto_es_como_ausente() {
+  # "Instalado" no es "funciona". Un binario que revienta al arrancar es
+  # exactamente el estado que este harness tuvo durante días.
+  _common 'package dominio' 'import android.net.Uri' 'class Repo'
+  local rc; _semgrep_roto bash tools/check-source-sets.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    con semgrep ROTO y una violación real debe bloquear vía fallback, salió $rc"; return 1; }
+}
+test_semgrep_roto_se_trata_como_ausente_no_como_verde() {
+  _ss_repo _case_semgrep_roto_es_como_ausente; }
+
+# AMBER-4 del design-review: "operativo" no es un hecho binario POR REPO. Si
+# semgrep se atraganta con UN .kt, ese archivo concreto no lo ha mirado nadie.
+_case_el_kt_que_semgrep_no_digiere_pasa_por_el_grep() {
+  _common 'package dominio' 'class Repo'
+  # El import va DESPUÉS del constructo roto a propósito. Con el import delante,
+  # semgrep hace parsing parcial y lo encuentra igual — el test pasaría sin que
+  # la fusión con el grep existiera, que es como estaba escrito al principio y
+  # por qué no valía. Así semgrep devuelve CERO hits en este archivo y lo único
+  # que puede salvar la violación es el fallback.
+  printf '%s\n' 'class Roto { fun f( { { {{{ ][ )' 'import android.net.Uri' \
+    > shared/src/commonMain/kotlin/Roto.kt
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    un .kt que semgrep no pudo parsear entero debe pasar por el grep (exit $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  case "$out" in *Roto.kt*) : ;; *) echo "    no nombró el archivo saltado"; return 1 ;; esac
+}
+test_un_kt_que_semgrep_no_digiere_pasa_por_el_grep() {
+  _ss_repo _case_el_kt_que_semgrep_no_digiere_pasa_por_el_grep; }
+
+# ── El registro de "semgrep fue operativo aquí" (PRD 0005 §6, AMBER-3) ──
+# Habilita la auto-escalada en CI: una vez que semgrep analizó Kotlin en ESTE
+# repo, un "no pude mirar" posterior es una regresión del entorno, no una
+# limitación del proyecto. Vive commiteado y es del adoptante, así que las dos
+# cosas que NO puede hacer son pisarlo y duplicarlo.
+_case_el_registro_es_idempotente_y_no_pisa() {
+  printf '%s\n' 'project_kind: application' '' '# un comentario del adoptante' > tools/project.conf
+  _common 'package dominio' 'class Repo'
+  bash tools/check-source-sets.sh >/dev/null 2>&1
+  grep -q '^project_kind: application$' tools/project.conf \
+    || { echo "    PISÓ lo que el adoptante había declarado"; return 1; }
+  grep -q '^# un comentario del adoptante$' tools/project.conf \
+    || { echo "    se comió un comentario del adoptante"; return 1; }
+  local n; n="$(grep -c '^source_sets_semgrep:' tools/project.conf || true)"
+  [ "$n" = "1" ] || { echo "    esperaba 1 registro, hay $n"; return 1; }
+  bash tools/check-source-sets.sh >/dev/null 2>&1   # segunda pasada
+  n="$(grep -c '^source_sets_semgrep:' tools/project.conf || true)"
+  [ "$n" = "1" ] || { echo "    duplicó el registro en la segunda pasada ($n)"; return 1; }
+}
+test_el_registro_de_semgrep_no_pisa_ni_duplica_el_conf() {
+  _ss_repo _case_el_registro_es_idempotente_y_no_pisa; }
+
+# Un detector que ensucia el árbol EN MITAD de un commit cuesta más que la
+# escalada que habilita: verify-run se niega a firmar con cambios sin stagear,
+# así que un write aquí trabaría el commit que lo dispara.
+_case_dentro_de_un_git_hook_no_escribe() {
+  printf '%s\n' 'project_kind: application' > tools/project.conf
+  _common 'package dominio' 'class Repo'
+  GIT_INDEX_FILE=.git/index bash tools/check-source-sets.sh >/dev/null 2>&1
+  grep -q '^source_sets_semgrep:' tools/project.conf \
+    && { echo "    escribió en tools/project.conf dentro de un git hook"; return 1; }
+  return 0
+}
+test_dentro_de_un_git_hook_el_registro_no_ensucia_el_arbol() {
+  _ss_repo _case_dentro_de_un_git_hook_no_escribe; }
+
+# ── Regresión cazada por el reviewer de la fase 1c ──────────────────
+# La versión anterior iteraba `while IFS= read -r dir; do ... "$dir"`, inmune a
+# espacios. Al pasar los directorios como lista a semgrep y al grep, la primera
+# implementación los expandió SIN comillas y un `commonMain` bajo una ruta con
+# espacio dejaba de mirarse — en silencio, que es la parte grave: un detector
+# que no mira parece un detector que aprueba.
+_case_una_ruta_con_espacios_se_sigue_mirando() {
+  mkdir -p 'mi modulo/src/commonMain/kotlin'
+  printf '%s\n' 'package dominio' 'import android.net.Uri' 'class Repo' \
+    > 'mi modulo/src/commonMain/kotlin/Repo.kt'
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    un commonMain bajo una ruta CON ESPACIOS no se miró (exit $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  # Y el exit 1 NO basta como aserción. Si semgrep recibe la ruta partida en
+  # trozos no encuentra targets, `_semgrep_mira` devuelve "no miré" y el script
+  # cae al fallback, que sí la mira: mismo exit 1 por un camino distinto. El
+  # diseño se auto-cura y de paso se traga la mutación. Lo que fija que el motor
+  # PRIMARIO vio la ruta es el estado, no el código de salida.
+  case "$out" in *estado=operational*) : ;; *)
+    echo "    exit 1 pero NO por semgrep: el primario no miró la ruta con espacios"
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1 ;; esac
+  # Y lo mismo por el camino del fallback, que expande la misma lista.
+  out="$(_sin_semgrep bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    el fallback tampoco miró la ruta con espacios (exit $rc)"; return 1; }
+  case "$out" in *estado=fallback-textual*) : ;; *)
+    echo "    el fallback no declaró su estado: $out"; return 1 ;; esac
+}
+test_un_commonmain_bajo_una_ruta_con_espacios_se_sigue_mirando() {
+  _ss_repo _case_una_ruta_con_espacios_se_sigue_mirando; }
+
+# ── Doble conteo: el archivo con PartialParsing está en LAS DOS listas ──
+# Cazado por la ronda 3 del reviewer. Cuando semgrep parsea a medias, ese
+# archivo sale a la vez en sus hits (encontró lo que sí digirió) y en la lista
+# de saltados (reportó el error), así que el re-scan por grep lo cuenta otra
+# vez. El exit no cambia —sigue 1— pero `violaciones=N` miente, y una cifra
+# derivable podrida es el pecado del que va la mitad de este PRD.
+_case_partial_parsing_no_cuenta_dos_veces() {
+  _common 'package dominio' 'class Repo'
+  # Import ANTES del constructo roto: semgrep lo encuentra por parseo parcial Y
+  # marca el archivo como saltado. Es el caso que el test de AMBER-4 esquiva.
+  printf '%s\n' 'package dominio' 'import android.net.Uri' \
+    'class Roto { fun f( { { {{{ ][ )' > shared/src/commonMain/kotlin/Roto.kt
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    la violación real no bloqueó (exit $rc)"; return 1; }
+  case "$out" in *"violaciones=1"*) : ;; *)
+    echo "    la MISMA violación se contó más de una vez:"
+    printf '%s\n' "$out" | grep -E 'SOURCE_SETS|Roto.kt' | sed 's/^/      /'; return 1 ;; esac
+}
+test_una_violacion_en_un_kt_parseado_a_medias_se_cuenta_una_vez() {
+  _ss_repo _case_partial_parsing_no_cuenta_dos_veces; }
+
+# ── Terminabilidad: el detector se deja matar ───────────────────────
+# Dos rondas de review seguidas encontraron un bug en las mismas tres líneas de
+# limpieza de temporales. La segunda fue peor que la primera: `trap ... INT TERM`
+# NO es local a la función, así que quedaba instalado para el resto del script y,
+# como el handler solo borraba, el proceso dejaba de morir con SIGTERM — el
+# `timeout` de CI o el watchdog que debía matarlo perdían la capacidad. Encima el
+# handler leía LOCALES fuera de ámbito y bajo `set -u` reventaba, así que el
+# script salía 1 en vez de 143 y el código de salida mentía sobre por qué murió.
+# Un gate que no se puede matar es peor que el fichero de /tmp que la limpieza
+# venía a salvar (§14.3). Esto se fija con un test o vuelve una tercera vez.
+_case_un_sigterm_lo_mata_de_verdad() {
+  _common 'package dominio' 'class Repo'
+  # La señal tiene que llegar AL PROPIO detector, no a un envoltorio: el trap
+  # vive en su proceso. Un semgrep falso que se duerme lo deja parado justo
+  # DENTRO de _semgrep_mira, que es donde el trap malo estaba instalado.
+  mkdir -p bin; printf '#!/bin/sh\nsleep 30\n' > bin/semgrep; chmod +x bin/semgrep
+  PATH="$PWD/bin:/usr/bin:/bin" bash tools/check-source-sets.sh >/dev/null 2>&1 & local pid=$!
+  sleep 2; kill -TERM "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null; local rc=$?
+  [ "$rc" = "143" ] || {
+    echo "    un SIGTERM al detector debía matarlo con 143 y salió $rc"
+    case "$rc" in
+      0|1) echo "    (se tragó la señal: el trap la 'manejó' sin re-lanzarla ni salir." ;;
+    esac
+    echo "     Un gate que no se puede matar traba el commit — §14.3.)"
+    return 1; }
+}
+test_un_sigterm_mata_el_detector_en_vez_de_ser_ignorado() {
+  _ss_repo _case_un_sigterm_lo_mata_de_verdad; }
+
+# Y la otra mitad del contrato: el trap EXIT sí limpia en el camino normal.
+_case_no_deja_temporales_huerfanos() {
+  _common 'package dominio' 'import android.net.Uri' 'class Repo'
+  local antes despues
+  antes="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'sourcesets-*' 2>/dev/null | wc -l | tr -d ' ')"
+  bash tools/check-source-sets.sh >/dev/null 2>&1
+  despues="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'sourcesets-*' 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$antes" = "$despues" ] || {
+    echo "    dejó temporales sourcesets-* huérfanos ($antes → $despues)"; return 1; }
+}
+test_el_camino_normal_no_deja_temporales_huerfanos() {
+  _ss_repo _case_no_deja_temporales_huerfanos; }

@@ -32,6 +32,9 @@
 #    gate más barato y definitivo de todos. Se anota la baja aquí, en la lista
 #    de variables, que es donde alguien iría a buscarla.)
 #   GATES_REQUIRE_SEMGREP     default 1
+#   GATES_REQUIRE_SOURCE_SETS default: 1 si tools/project.conf registra que semgrep
+#                             analizó Kotlin aquí alguna vez, si no 0 (un exit 3 del
+#                             detector KMP avisa hasta entonces, y bloquea después)
 #   GATES_REQUIRE_MUTATION    default: 1 si el piso > 0, si no 0 (durante el
 #                             rollout el piso arranca en 0 y el gate no dice nada;
 #                             en cuanto mides una vez, medir pasa a ser obligatorio)
@@ -120,7 +123,18 @@ fi
 #     (estado `no-aplica`, exit 0): la mitad de los adoptantes no usa KMP y un
 #     aviso permanente para ellos se aprende a ignorar.
 if [ -f tools/check-source-sets.sh ]; then
-  bash tools/check-source-sets.sh || FAIL=1
+  # Auto-escalada, misma forma que mutation (paso 7): mientras nadie haya visto a
+  # semgrep analizar Kotlin en ESTE repo, un exit 3 es una limitación honesta del
+  # entorno y solo avisa. En cuanto el propio detector registró `source_sets_semgrep:
+  # operativo` en tools/project.conf —commiteado, así que viaja al checkout de CI—,
+  # un "no pude mirar" pasa a ser una REGRESIÓN y bloquea: si no, bastaría
+  # desinstalar semgrep para que el gate dejara de tener opinión.
+  _ss_req="${GATES_REQUIRE_SOURCE_SETS:-}"
+  if [ -z "$_ss_req" ]; then
+    if grep -q '^source_sets_semgrep:[[:space:]]*operativo' tools/project.conf 2>/dev/null
+    then _ss_req=1; else _ss_req=0; fi
+  fi
+  GATES_REQUIRE_SOURCE_SETS="$_ss_req" bash tools/check-source-sets.sh || FAIL=1
 fi
 
 # 5) Drift ratchet — el conteo no puede haber subido.

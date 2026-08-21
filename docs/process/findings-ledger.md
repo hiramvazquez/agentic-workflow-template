@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **9** · Cerrados: 86 · Total: 95
+Abiertos: **12** · Cerrados: 88 · Total: 100
 
 ## Abiertos
 
@@ -17,6 +17,9 @@ Abiertos: **9** · Cerrados: 86 · Total: 95
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh (664) + 3 tests + capture-review-verdict (371)` | Cinco archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf06-kmp-detector-textual` | medium | auto-fix | `tools/check-source-sets.sh:69` | check-source-sets casa un import dentro de /* */ o de un string triple: detector textual para propiedad sintactica |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
+| `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
+| `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
+| `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-wf08-git-add-A-canonico` | low | auto-fix | `docs/process/current_execution_map.md:41` | El mapa recomienda git add -A mientras AGENTS.md 7 lo prohibe con cambios fuera de scope |
 
 ## Cerrados
@@ -109,3 +112,5 @@ Abiertos: **9** · Cerrados: 86 · Total: 95
 | `f-wf07-contexto-sin-headroom` | fixed | PRD 0005 fase 0c, implementada por subagente y verificada: rotador canonico e idempotente (canonical |
 | `f-watchdog-filtra-un-sleep-por-test` | fixed | pkill -P sobre el guardian antes de matarlo: mueren sus hijos primero. Medido tras el fix: 0 huerfan |
 | `f-test-0a-verde-linux-rojo-macos` | fixed | Inyeccion por PATH: stub de mktemp que falla, identico en ambos sistemas. Verificado verde en Linux; |
+| `f-ab0d8266` | fixed | Arreglado en el mismo turno: export SEMGREP_ENABLE_VERSION_CHECK=0 y SEMGREP_SEND_METRICS=off al arr |
+| `f-31f757c0` | fixed | Arreglado: dedupe por archivo:linea con awk en vez de sort -u de linea entera. Test nuevo (test_una_ |

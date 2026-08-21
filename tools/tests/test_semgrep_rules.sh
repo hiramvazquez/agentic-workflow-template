@@ -130,3 +130,68 @@ test_el_selftest_elige_un_fixture_MALO_no_el_primero_del_directorio() {
   ls "$PROJECT_ROOT"/tools/semgrep/fixtures/*-malo.* >/dev/null 2>&1 \
     || { echo "    no hay ningún fixture *-malo.*: el selftest de semgrep se queda sin corpus"; return 1; }
 }
+
+# ════════════════════════════════════════════════════════════════════
+# Toda invocación de semgrep desactiva el version-check de red
+# ════════════════════════════════════════════════════════════════════
+# La lección existía —está en lessons_archive— y estaba arreglada en tres
+# invocadores. Pero era PROSA: no había detector, así que la fase 1c añadió un
+# cuarto invocador sin el flag y nadie lo vio hasta la tercera ronda de review.
+# Es el ejemplo exacto de §10: sin detector, una lección se repite.
+#
+# Por qué importa tanto: semgrep hace un version-check de red al arrancar y en
+# una red restringida NO falla, se CUELGA esperando. Un invocador sin el flag en
+# el path de un git hook congela los commits de cualquiera detrás de un firewall
+# — un bug del gate que traba el commit, que es lo que §14.3 prohíbe.
+# El patrón es cerrado A PROPÓSITO y su alcance se declara: casa `semgrep` como
+# PALABRA DE COMANDO (inicio de línea, tras `;`/`&&`/`|`/`$(`, con asignaciones
+# VAR=val por delante) y la forma argv de python `["semgrep", ...`. NO casa
+# `tools/semgrep-scan.sh` (eso es invocar el wrapper, que ya trae el flag), ni
+# `command -v semgrep`, ni la palabra dentro de prosa, comentarios o claves de
+# diccionario. Un detector más ancho aquí daba 8 hits de los cuales 5 eran
+# falsos: se descartaría entero, que es la ley del 10% (§14.2).
+# Lo que este patrón NO ve, dicho aquí y no descubierto luego: `exec semgrep`,
+# `... | xargs semgrep`, un subshell sin `$` (`(semgrep ...)`) y
+# `subprocess.run("semgrep ...", shell=True)`. Verificado que HOY ninguna de esas
+# formas existe en el repo, así que no es un falso negativo vivo — pero es un
+# hueco real del patrón, no una hipótesis, y vive en el ledger. Ensancharlo para
+# cubrirlas devolvía los falsos positivos de prosa que motivaron cerrarlo.
+_SEMGREP_INVOCA='(^|[;&|]|\$\()[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*semgrep[[:space:]]|\[[[:space:]]*"semgrep"[[:space:]]*,'
+
+test_toda_invocacion_de_semgrep_desactiva_el_version_check() {
+  local malos="" f hits
+  for f in $(git ls-files 'tools/*' 'scripts/*' 'ci/*' 2>/dev/null | grep -E '\.(sh|py)$'); do
+    [ -f "$f" ] || continue
+    hits="$(grep -nE "$_SEMGREP_INVOCA" "$f" 2>/dev/null \
+            | grep -vE '^[0-9]+:[[:space:]]*#' | grep -v 'command -v semgrep')"
+    [ -z "$hits" ] && continue
+    grep -q 'SEMGREP_ENABLE_VERSION_CHECK' "$f" 2>/dev/null && continue
+    malos="${malos}  $f"$'\n'
+  done
+  [ -z "$malos" ] || {
+    echo "    invocan semgrep SIN desactivar el version-check de red:"
+    printf '%s' "$malos"
+    echo "    En una red restringida semgrep NO falla: se cuelga esperando, y si"
+    echo "    el invocador vive en un git hook congela los commits (§14.3)."
+    echo "    Añade 'export SEMGREP_ENABLE_VERSION_CHECK=0' al arranque del script."
+    return 1; }
+}
+
+# FALSO POSITIVO: nombrar semgrep no es invocarlo. La mina de siempre en este
+# repo — el detector que se dispara con el texto que HABLA de la cosa. Los tres
+# casos de abajo son literales que el patrón ancho sí marcaba.
+test_nombrar_semgrep_sin_invocarlo_no_cuenta() {
+  local d; d="$(mktemp -d)" || return 1
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'echo "   exit 3 (semgrep roto, mutación sin runner) hace..."' \
+    'bash tools/semgrep-scan.sh --staged' \
+    'command -v semgrep >/dev/null 2>&1 || exit 3' \
+    'assert gate["gates"]["semgrep"]["events"] == 1' > "$d/x.sh"
+  local hits
+  hits="$(grep -nE "$_SEMGREP_INVOCA" "$d/x.sh" 2>/dev/null \
+          | grep -vE '^[0-9]+:[[:space:]]*#' | grep -v 'command -v semgrep')"
+  rm -rf "$d"
+  [ -z "$hits" ] || {
+    echo "    FALSO POSITIVO: texto que solo NOMBRA semgrep contó como invocación:"
+    printf '%s\n' "$hits" | sed 's/^/      /'; return 1; }
+}

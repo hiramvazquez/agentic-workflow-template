@@ -11,6 +11,72 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-21] Una limpieza que atrapa INT/TERM y no re-lanza deja el proceso ingobernable
+- **Qué pasó:** para no dejar temporales huérfanos se puso `trap 'rm -f …' RETURN INT TERM`
+  dentro de una función. `RETURN` sí es local a la función; **`INT` y `TERM` no**: son del
+  proceso y no se restauran al volver. Como el handler solo borraba —ni re-lanzaba la señal ni
+  salía—, a partir de la primera llamada el script dejaba de morir con `SIGTERM`. El `timeout`
+  de CI, el watchdog de la suite o cualquier supervisor perdían la capacidad de matarlo. Y como
+  el handler leía LOCALES fuera de ámbito, bajo `set -u` reventaba y el script salía 1 en vez de
+  143: el código de salida además mentía sobre por qué murió.
+- **Causa raíz:** se trató la limpieza de un fichero de `/tmp` como si valiera más que la
+  terminabilidad del proceso. Es el orden de prioridades invertido: un gate que no se puede
+  matar traba el commit (§14.3), y un temporal huérfano no le hace daño a nadie.
+- **Regla:** para limpiar temporales, `trap … EXIT` y nada más — que es la convención que ya
+  usaban `semgrep-scan.sh`, `secret-baseline.sh` y `upgrade.sh`. `EXIT` no toca la disposición
+  de señales, así que la limpieza es best-effort y la terminabilidad se conserva. Si de verdad
+  necesitas reaccionar a `INT`/`TERM`, el handler **re-lanza**: `trap - TERM; kill -TERM $$`.
+  Y los temporales viven a nivel de script, no como locales, o el handler explota fuera de ámbito.
+- **Detector:** tools/tests/test_source_sets.sh
+  (`test_un_sigterm_mata_el_detector_en_vez_de_ser_ignorado`, con un semgrep falso que duerme
+  para que la señal llegue al detector DENTRO de la función; verificado contra el trap malo, que
+  sale 3 en vez de 143. La primera versión del test mandaba la señal a un envoltorio y el
+  mutante sobrevivía — un test de señales que no apunta al proceso correcto no prueba nada)
+- **Área:** tools/check-source-sets.sh
+
+### [2026-08-21] Una lección arreglada tres veces y sin detector se repite a la cuarta
+- **Qué pasó:** la fase 1c añadió un invocador de `semgrep` sin `SEMGREP_ENABLE_VERSION_CHECK=0`.
+  En una red restringida semgrep no falla al arrancar: se **cuelga** esperando el version-check.
+  Ese invocador vive en el path de CADA commit (lefthook), así que habría congelado los commits
+  de cualquiera detrás de un firewall — un bug del gate trabando el commit, justo lo que §14.3
+  prohíbe. Dos rondas de review no lo vieron; lo cazó la tercera.
+- **Causa raíz:** la lección ya existía y ya estaba arreglada en `semgrep-scan.sh`,
+  `harness-report.sh` y `probe-capability.sh`. Pero vivía como **prosa en el archivo histórico**
+  y como tres arreglos puntuales. Nada comprobaba la propiedad "todo invocador desactiva el
+  version-check", así que el cuarto invocador nació sin ella y nada chilló. Es la tesis de §10
+  demostrada por su contraejemplo: sin detector, una lección no es una defensa, es un recuerdo.
+- **Regla:** cuando arregles el mismo bug en un segundo sitio, para y escribe el detector de la
+  PROPIEDAD, no el tercer arreglo. El patrón "N invocadores deben todos hacer X" es siempre
+  mecanizable y siempre se rompe en el invocador N+1, que lo escribe alguien que no vivió los
+  otros N. Y el detector va cerrado: la primera versión de éste marcaba 8 archivos, de los que
+  5 eran prosa que nombraba semgrep — un detector así se descarta entero (§14.2).
+- **Detector:** tools/tests/test_semgrep_rules.sh
+  (`test_toda_invocacion_de_semgrep_desactiva_el_version_check`, verificado quitando el flag del
+  invocador nuevo y viéndolo rojo, más `test_nombrar_semgrep_sin_invocarlo_no_cuenta` como guard
+  de falso positivo con los cinco literales que la versión ancha marcaba mal)
+- **Área:** tools/check-source-sets.sh · tools/semgrep-scan.sh · tools/probe-capability.sh
+
+### [2026-08-21] Anclar un grep no lo convierte en un parser: solo mueve el falso positivo
+- **Qué pasó:** `check-source-sets.sh` protegía EL invariante de KMP —`commonMain` no importa
+  plataforma— con un `grep` anclado a inicio de línea. El anclaje se defendía citando la
+  gramática de Kotlin, y tapaba el caso fácil (`// import android...`). No tapaba los dos que
+  la gramática sí distingue y el ancla no: un bloque `/* */` sin asteriscos de adorno y un
+  string triple contienen líneas que EMPIEZAN por `import`. Medido: 2 falsos positivos sobre
+  5 hits — 40%, cuatro veces la ley del 10% (§14.2).
+- **Causa raíz:** el comentario del script argumentaba correctamente que un import es una
+  propiedad SINTÁCTICA, y de ahí concluía que bastaba un ancla textual. El razonamiento correcto
+  llevaba a la conclusión contraria: si la propiedad es sintáctica, quien la decide es un parser.
+  Un ancla es una heurística que se parece a la gramática en los casos de una línea.
+- **Regla:** cuando la propiedad que compruebas es sintáctica, el motor primario parsea. El
+  detector textual NO se retira —queda de fallback— pero el fallback conserva el BLOQUEO: sin
+  el parser, un hit real sigue saliendo 1 y solo el "no encontré nada" degrada a 3. Degradar
+  también el hit convertiría el fallback en el gate apagado, justo en la única situación en la
+  que tenía algo que decir.
+- **Detector:** tools/tests/test_source_sets.sh (los dos casos de FP vistos en rojo contra la
+  versión anterior; la fila "salta un .kt" verificada con un mutante que le quita la fusión
+  con el grep y solo ese test se pone rojo)
+- **Área:** tools/check-source-sets.sh · ci/run-gates.sh
+
 ### [2026-08-19] La identidad del repo se infería en vez de declararse (WF-05)
 - **Qué pasó:** `scope.sh` decidía si el repo era harness o app mirando fuentes en directorios
   fijos (`ios android web src app lib Sources`): un monorepo `packages/` se clasificaba como
