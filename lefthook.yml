@@ -40,8 +40,17 @@ pre-commit:
     # comentarios) y porque un `import android.*` en commonMain compila hasta
     # que alguien añade el target iOS, semanas después y en el CI de otro.
     # Inerte y mudo en repos sin commonMain/ (estado `no-aplica`, exit 0).
+    # El exit 3 (sin semgrep + grep limpio = "no pude mirar") AVISA en local y
+    # bloquea en CI, igual que semgrep-staged doce líneas más abajo. Sin este
+    # wrapper, un adoptante KMP sin semgrep instalado no podía commitear — un
+    # bug del gate trabando el commit, que es lo que §14.3 prohíbe. Y el
+    # sobre-bloqueo repetido es la presión que empuja a `--no-verify`, que sí
+    # es un bypass total: la defensa se pierde por el camino que la protege.
     - name: check-source-sets
-      run: bash tools/check-source-sets.sh
+      run: |
+        bash tools/check-source-sets.sh; rc=$?
+        [ "$rc" = "3" ] && { echo "⚠️  check-source-sets no pudo mirar — commit permitido, CI lo bloqueará."; exit 0; }
+        exit $rc
 
     # ── Semgrep sobre lo STAGED (patrones AST, nivel 2) ──────────────
     # Invocado DIRECTO, no vía check-drift: el agregador descarta el exit code

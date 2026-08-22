@@ -134,7 +134,15 @@ if [ -f tools/check-source-sets.sh ]; then
     if grep -q '^source_sets_semgrep:[[:space:]]*operativo' tools/project.conf 2>/dev/null
     then _ss_req=1; else _ss_req=0; fi
   fi
-  GATES_REQUIRE_SOURCE_SETS="$_ss_req" bash tools/check-source-sets.sh || FAIL=1
+  GATES_REQUIRE_SOURCE_SETS="$_ss_req" bash tools/check-source-sets.sh; _ss_rc=$?
+  # 1 = tu código tiene un problema · 3 = el detector no pudo mirar. Los dos
+  # bloquean en CI (que es el backstop), pero se DICEN distinto: confundirlos
+  # manda a alguien a buscar un import que no existe (§14.3).
+  case "$_ss_rc" in
+    0) ;;
+    3) echo "   (exit 3: el detector no pudo mirar. En CI eso bloquea.)"; FAIL=1 ;;
+    *) FAIL=1 ;;
+  esac
 fi
 
 # 5) Drift ratchet — el conteo no puede haber subido.

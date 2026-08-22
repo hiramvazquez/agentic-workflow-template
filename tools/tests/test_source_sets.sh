@@ -72,19 +72,6 @@ _case_repo_sin_kmp_calla() {
 }
 test_un_repo_sin_kmp_declara_no_aplica_y_no_avisa() { _ss_repo _case_repo_sin_kmp_calla; }
 
-_case_el_conf_solo_puede_ampliar() {
-  # Misma dirección que los trinquetes (§9): la lista de prohibidos solo crece.
-  # Un conf que pudiera recortarla convertiría el invariante en una sugerencia,
-  # y bastaría añadir una línea para dejar de ver la violación de al lado.
-  _common 'package dominio' 'import com.miorg.nativo.Cosa' 'class Repo'
-  bash tools/check-source-sets.sh >/dev/null 2>&1 \
-    || { echo "    un import no prohibido bloqueó sin estar en la lista"; return 1; }
-  printf '%s\n' '# prohibidos extra de este proyecto' 'com\.miorg\.nativo\.' > tools/source-sets.conf
-  bash tools/check-source-sets.sh >/dev/null 2>&1 \
-    && { echo "    el conf no amplió la lista: el prefijo añadido no bloqueó"; return 1; }
-  return 0
-}
-test_el_conf_amplia_la_lista_de_prohibidos() { _ss_repo _case_el_conf_solo_puede_ampliar; }
 
 # ════════════════════════════════════════════════════════════════════
 # PRD 0005 fase 1c — semgrep primario, y un fallback que SIGUE bloqueando
@@ -329,14 +316,52 @@ test_un_sigterm_mata_el_detector_en_vez_de_ser_ignorado() {
   _ss_repo _case_un_sigterm_lo_mata_de_verdad; }
 
 # Y la otra mitad del contrato: el trap EXIT sí limpia en el camino normal.
+#
+# TMPDIR PROPIO, no el compartido. La primera versión contaba `sourcesets-*` en
+# el TMPDIR del sistema, y eso es medir una variable GLOBAL: se puso roja en
+# cuanto otros agentes corrieron la suite en paralelo y dejaron sus temporales
+# ahí (4 ficheros ajenos, comprobado en vivo). Un test que depende de que nadie
+# más esté trabajando no es un test, es una coincidencia — y produce
+# exactamente la señal intermitente que la fase 0a de este PRD existe para
+# erradicar. Con un TMPDIR privado el conteo es del detector y de nadie más.
 _case_no_deja_temporales_huerfanos() {
   _common 'package dominio' 'import android.net.Uri' 'class Repo'
-  local antes despues
-  antes="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'sourcesets-*' 2>/dev/null | wc -l | tr -d ' ')"
-  bash tools/check-source-sets.sh >/dev/null 2>&1
-  despues="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'sourcesets-*' 2>/dev/null | wc -l | tr -d ' ')"
-  [ "$antes" = "$despues" ] || {
-    echo "    dejó temporales sourcesets-* huérfanos ($antes → $despues)"; return 1; }
+  local tmp; tmp="$(mktemp -d)" || return 1
+  TMPDIR="$tmp" bash tools/check-source-sets.sh >/dev/null 2>&1
+  local quedan; quedan="$(find "$tmp" -maxdepth 1 -name 'sourcesets-*' 2>/dev/null | wc -l | tr -d ' ')"
+  rm -rf "$tmp"
+  [ "$quedan" = "0" ] || { echo "    dejó $quedan temporal(es) sourcesets-* huérfanos"; return 1; }
 }
 test_el_camino_normal_no_deja_temporales_huerfanos() {
   _ss_repo _case_no_deja_temporales_huerfanos; }
+
+
+# ── El detector no puede dejar de mirar en silencio ─────────────────
+# Tenía `find ... | head -20`. En el corpus con el que se cerró el gate de la
+# fase 1c (57 `commonMain`) eso miraba 20 y callaba 37 — y en orden de
+# filesystem, así que CUÁLES miraba no era ni determinista. Un gate que aprueba
+# lo que no leyó tiene la forma exacta de uno que pasó (§14.3), y lo cazó el
+# reviewer al reproducir la medición a escala completa por su cuenta.
+_case_mira_todos_los_commonmain_no_los_primeros() {
+  # CUENTA, no posición. Poner la violación "en el último" no vale: `find`
+  # devuelve en orden de filesystem, así que cuál cae dentro del tope no es
+  # determinista y el test pasaba con el tope puesto. Con una violación en CADA
+  # módulo, el número que reporta el detector dice exactamente cuántos miró.
+  rm -rf shared
+  local i n=30
+  for i in $(seq 1 $n); do
+    mkdir -p "mod$i/src/commonMain/kotlin"
+    printf '%s\n' 'package dominio' 'import android.net.Uri' "class M$i" \
+      > "mod$i/src/commonMain/kotlin/A.kt"
+  done
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || { echo "    $n módulos en violación y no bloqueó (exit $rc)"; return 1; }
+  case "$out" in
+    *"violaciones=$n"*) : ;;
+    *) echo "    miró solo una PARTE de los $n módulos — un gate que aprueba lo"
+       echo "    que no leyó tiene la forma de uno que pasó (§14.3):"
+       printf '%s\n' "$out" | grep SOURCE_SETS | sed 's/^/      /'; return 1 ;;
+  esac
+}
+test_con_muchos_modulos_no_deja_de_mirar_los_ultimos() {
+  _ss_repo _case_mira_todos_los_commonmain_no_los_primeros; }

@@ -105,13 +105,33 @@ CONF="${SOURCE_SETS_CONF:-tools/source-sets.conf}"
 # NO se pueden reducir desde ahí: una lista que el proyecto puede recortar deja
 # de ser un invariante y pasa a ser una sugerencia (§9, misma lógica que los
 # trinquetes).
-PROHIBIDOS='android\.|androidx\.|java\.|javax\.|dalvik\.|platform\.(UIKit|Foundation|darwin)|kotlinx\.cinterop|org\.robolectric|okhttp3\.|com\.google\.android'
+# ── Por qué `androidx.` NO está entero en esta lista ────────────────
+# Estaba, y era un generador de falsos positivos del 100%. Medido contra un
+# corpus KMP AJENO (compose-multiplatform de JetBrains, 57 `commonMain`): 31
+# violaciones reportadas, 31 falsas. Compose Multiplatform **reusa el namespace
+# `androidx.compose`** para código que compila en iOS, desktop y web — JetBrains
+# publica esos artefactos bajo `org.jetbrains.compose`. Uno de los hits vivía en
+# `html/compose-compiler-integration`, que compila para WEB. Y no es solo Compose:
+# `androidx.navigation`, `androidx.lifecycle` y `androidx.savedstate` también son
+# multiplataforma hoy. Prohibir `androidx.` a secas acusa al stack KMP más común
+# que existe, y un detector así no se corrige: se desactiva entero (§14.2).
+# Quedan los subpaquetes que SIGUEN siendo solo-Android. Con ellos, el mismo
+# corpus da 0 hits y 0 falsos positivos. Un proyecto que quiera prohibir más
+# `androidx` lo añade en `source-sets.conf` — la lista solo puede crecer (§9).
+_ANDROIDX_SOLO_ANDROID='androidx\.(core|activity|appcompat|fragment|recyclerview|constraintlayout|work|camera|media|preference)\.'
+PROHIBIDOS="android\.|${_ANDROIDX_SOLO_ANDROID}|java\.|javax\.|dalvik\.|platform\.(UIKit|Foundation|darwin)|kotlinx\.cinterop|org\.robolectric|okhttp3\.|com\.google\.android\."   # el punto final es límite de palabra: sin él, `com.google.androidxyz` casaría
 if [ -f "$CONF" ]; then
   _extra="$(grep -vE '^[[:space:]]*(#|$)' "$CONF" 2>/dev/null | tr '\n' '|' | sed 's/|$//')"
   [ -n "$_extra" ] && PROHIBIDOS="${PROHIBIDOS}|${_extra}"
 fi
 
-COMMON="$(find . -type d -name commonMain -not -path './.git/*' 2>/dev/null | head -20)"
+# SIN `head -20`, que es lo que había y lo que este propio comentario dos líneas
+# más abajo declaraba inaceptable. En el corpus con el que se cerró el gate de
+# 1c (compose-multiplatform: 57 `commonMain`) el detector miraba 20 y callaba
+# los otros 37 — y en orden de filesystem, o sea que CUÁLES miraba no era ni
+# determinista. Eso no es un detector con cobertura parcial: es un gate que
+# aprueba lo que no leyó, con la forma exacta de uno que pasó (§14.3).
+COMMON="$(find . -type d -name commonMain -not -path './.git/*' 2>/dev/null)"
 # Un array, no una cadena que luego se expanda sin comillas: `commonMain` puede
 # colgar de una ruta con espacios y un detector que deja de mirar en silencio
 # parece un detector que aprueba. La versión pre-1c era inmune porque iteraba
