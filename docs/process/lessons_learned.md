@@ -217,6 +217,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-22] Un detector que casa acentos da verde a mano y rojo en el runner — `tools/tests/test_execution_map.sh`
 - [2026-08-21] Una limpieza que atrapa INT/TERM y no re-lanza deja el proceso ingobernable — `tools/tests/test_source_sets.sh`
 - [2026-08-21] Una lección arreglada tres veces y sin detector se repite a la cuarta — `tools/tests/test_semgrep_rules.sh`
 - [2026-08-21] Anclar un grep no lo convierte en un parser: solo mueve el falso positivo — `tools/tests/test_source_sets.sh`

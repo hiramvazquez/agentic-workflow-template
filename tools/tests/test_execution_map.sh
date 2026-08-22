@@ -490,3 +490,101 @@ test_el_detector_corre_limpio_contra_el_repo_real() {
     echo "    check-execution-map falla contra el repo real (exit $rc):"
     printf '%s\n' "$out" | tail -8 | sed 's/^/      /'; return 1; }
 }
+
+# ════════════════════════════════════════════════════════════════════
+# PRD 0005 fase 2b — ningún doc canónico recomienda `git add -A` a ciegas
+# ════════════════════════════════════════════════════════════════════
+# `f-wf08-git-add-A-canonico`: el mapa —que `session-start.sh` imprime en CADA
+# arranque y `post-compact.sh` reinyecta tras cada compactación— recomendaba
+# `git add -A && verify-run && commit` mientras AGENTS.md §7 prohíbe `-A` con
+# cambios fuera de scope. No era un doc cualquiera contradiciendo la regla: era
+# la puerta de entrada de cada sesión enseñando lo contrario de la norma, con
+# más autoridad práctica que la norma.
+#
+# La precondición NO es una lista de negaciones (esa lista crece para siempre y
+# el detector se vuelve un colador). Es concreta y sale del propio PRD: `-A`
+# solo tiene sentido tras comprobar `git status`, así que se exige que `git
+# status` o una prohibición explícita aparezcan en la MISMA línea o en una
+# adyacente. Medido contra la doc real: 2 candidatos, 0 falsos positivos.
+#
+# Histórico EXCLUIDO a propósito — `lessons_archive`, `docs/process/reviews/`,
+# los PRDs y el ledger renderizado NARRAN el problema y citarlo no es
+# recomendarlo. Un detector que no distingue narrar de prescribir es el mismo
+# falso positivo que este repo ya ha pisado siete veces.
+_ADDA_PATRON='git add (-A|--all|\.)([[:space:]]|$|`|&|;)'
+# Cuidado con el locale: la suite corre con LANG="" (locale C), y ahí una CLASE
+# de caracteres como `[áa]` no es "á o a" — son los BYTES de `á` en UTF-8 más
+# `a`, así que deja de casar lo que casaba en tu shell. El detector daba verde a
+# mano y rojo en el runner por eso. Lo que NO falla en locale C es un LITERAL
+# no-ASCII fuera de corchetes: `prohíb` casa "prohíbe" sin problema. De ahí que
+# aquí convivan un stem ASCII y un literal acentuado, y no una clase.
+#
+# Y hace falta el literal: `prohib` a secas NO casa "prohíbe" —la forma
+# conjugada, que es la que domina en este repo ("AGENTS.md §7 lo prohíbe")—
+# porque exige una `i` ASCII donde el texto tiene `í`. Estuvo como rama muerta
+# y lo cazó el reviewer: el comentario afirmaba cubrirla y era falso.
+_ADDA_PRECOND='git status|[Jj]am|[Nn]unca|NUNCA|prohib|prohíb'
+_ADDA_DOCS() {
+  git ls-files '*.md' 2>/dev/null \
+    | grep -vE 'lessons_archive|docs/process/reviews/|findings-ledger|docs/process/prds/'
+}
+_adda_infractores() {  # _adda_infractores <archivo>... → líneas sin precondición
+  local f n ctx
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    for n in $(grep -nE "$_ADDA_PATRON" "$f" 2>/dev/null | cut -d: -f1); do
+      ctx="$(sed -n "$((n > 1 ? n - 1 : 1)),$((n + 1))p" "$f" 2>/dev/null)"
+      printf '%s\n' "$ctx" | grep -qE "$_ADDA_PRECOND" && continue
+      echo "$f:$n"
+    done
+  done
+}
+
+test_ningun_doc_canonico_recomienda_git_add_A_a_ciegas() {
+  local malos; malos="$(_adda_infractores $(_ADDA_DOCS))"
+  [ -z "$malos" ] || {
+    echo "    recomiendan 'git add -A' sin precondición:"
+    printf '%s\n' "$malos" | sed 's/^/      /'
+    echo "    AGENTS.md §7 lo prohíbe con cambios fuera de scope. Stagea por paths,"
+    echo "    o menciona 'git status' como precondición en la línea o su vecina."
+    return 1; }
+}
+
+# FALSO POSITIVO: narrar no es prescribir. Los tres literales de abajo son
+# formas legítimas que una versión ingenua del patrón marcaría.
+test_narrar_git_add_A_no_cuenta_como_recomendarlo() {
+  local d rc=0; d="$(mktemp -d)" || return 1
+  # Cada caso en SU PROPIO archivo. Juntos, la ventana de ±1 línea hace que el
+  # vecino de al lado satisfaga la precondición y el caso deja de probar lo
+  # suyo — pasó: con los cuatro en un archivo, quitar `prohíb` del patrón no
+  # ponía rojo nada, porque la línea siguiente traía un `git status`.
+  printf '%s\n' '- Jamás `git add -A` con cambios fuera de scope.'          > "$d/1.md"
+  printf '%s\n' 'Usa `git add -A` solo si `git status --short` sale limpio.' > "$d/2.md"
+  printf '%s\n' 'Este doc prohíbe usar `git add -A` a ciegas.'              > "$d/3.md"
+  printf '%s\n' 'Nunca uses `git add -A` aquí.'                             > "$d/4.md"
+  # 5 y 6 existen porque el reviewer aplicó a este patrón el mismo criterio que
+  # yo le pedí: quitó cada alternativa por separado y `NUNCA` y `prohib` no
+  # mataban ningún test. Una rama que nadie ejercita es decoración — y encima
+  # estas dos son las que NO cubren sus vecinas (`[Nn]unca` no casa mayúsculas;
+  # `prohíb` no casa la forma sin acento). O se ejercitan o se retiran.
+  printf '%s\n' 'NUNCA uses `git add -A` en este repo.'                     > "$d/5.md"
+  printf '%s\n' 'Está prohibido hacer `git add -A` sin revisar.'            > "$d/6.md"
+  local f malos
+  for f in "$d"/1.md "$d"/2.md "$d"/3.md "$d"/4.md "$d"/5.md "$d"/6.md; do
+    malos="$(_adda_infractores "$f")"
+    [ -z "$malos" ] || {
+      echo "    FALSO POSITIVO en $(basename "$f"): prosa que NOMBRA -A contó como recomendación"
+      sed 's/^/      /' "$f"; rc=1; }
+  done
+  rm -rf "$d"; return $rc
+}
+
+# Y el otro lado: una recomendación de verdad SÍ se caza.
+test_una_recomendacion_real_de_git_add_A_se_caza() {
+  local d; d="$(mktemp -d)" || return 1
+  printf '%s\n' 'Para cerrar el cambio:' '' '```bash' \
+    'git add -A && git commit -m "listo"' '```' > "$d/doc.md"
+  local malos; malos="$(_adda_infractores "$d/doc.md")"
+  rm -rf "$d"
+  [ -n "$malos" ] || { echo "    FALSO NEGATIVO: una recomendación real de -A pasó"; return 1; }
+}

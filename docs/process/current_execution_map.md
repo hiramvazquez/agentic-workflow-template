@@ -11,7 +11,14 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** nada. **PRD 0004 (reconciliación del workflow agéntico) está Shipped**: fases
+- **En curso:** **PRD 0005 (estabilización del harness)**, Approved. Entregadas 0a, 0b, 0c,
+  1a, 1b, 1c y 2b; quedan **2a** (bajar del hard limit los archivos que
+  lo exceden — `f-wf04-archivos-sobre-el-limite` los lista y trae el comando que los
+  recalcula; no los cuentes desde aquí — con la restricción de bootstrap) y **3** (reporte keep/tune/retire, cuya ventana
+  de medición EMPIEZA al cerrar la ola 2). Dos gates siguen abiertos a propósito y no los
+  cierra quien implementó: el 30/30 de macOS de 0a y el FP contra corpus KMP ajeno de 1c.
+  El detalle por fase vive en el PRD, no aquí.
+- **Antes:** **PRD 0004 (reconciliación del workflow agéntico) está Shipped**: fases
   1a–10 mergeadas. Qué dejó, en una frase por bloque — el detalle vive en el PRD, no aquí:
   manifiesto de capacidades que gobierna los bloques documentales; probes funcionales que
   distinguen ausente / roto / operativo; scope mecánico del backlog antes de `in-review`;
@@ -42,18 +49,32 @@
 2. El arreglo se hace **en el template**, con su test **verificado fallando contra la versión
    anterior** — no basta con que el test pase.
 3. Lección en `lessons_learned.md` (con `Detector:`) + entrada en el ledger, en el mismo cambio.
-4. `git add -A && bash tools/verify-run.sh && git commit` → `git push`. El adoptante sincroniza
-   y **verifica en su repo**, que es la única verificación independiente que existe: quien
-   escribe el arreglo no es quien lo aprueba (§14).
+4. **Stagea por paths**, nunca `-A` a ciegas: `git add <los archivos del cambio>` →
+   `bash tools/verify-run.sh` → `git commit` (comandos separados: el marker liga
+   `sha256(diff staged)` y encadenarlos lo evade) → `git push`. `git add -A` solo tiene
+   sentido cuando `git status --short` ya salió limpio de todo lo demás, y entonces no
+   ahorra nada. Este doc recomendaba `-A` mientras AGENTS.md §7 lo prohíbe con cambios
+   fuera de scope (`f-wf08-git-add-A-canonico`): el mapa contradecía la regla canónica desde la puerta de
+   entrada de cada sesión.
+5. El adoptante sincroniza y **verifica en su repo**, que es la única verificación
+   independiente que existe: quien escribe el arreglo no es quien lo aprueba (§14).
 
 ## Próximo paso
 
-- **Siguiente entrega:** ninguna iniciativa abierta. El trabajo vuelve al bucle de arriba: el
-  adoptante sincroniza, usa el harness y reporta con medición; el arreglo se hace aquí.
-- **Handoff para el siguiente agente:** no hay fase pendiente que retomar. Antes de abrir una
-  iniciativa nueva, mira `bash tools/metrics/escape-rate.sh` y el ledger: PRD 0004 §16 pide 2–4
-  semanas de datos del adoptante antes de retirar o endurecer cualquier defensa, y endurecer sin
-  ese dato es añadir ceremonia.
+- **Siguiente entrega: PRD 0005 fase 2a** — bajar del hard limit los archivos del harness que
+  lo exceden, sin debilitar nada. Cuáles son y cuántos, en `f-wf04-archivos-sobre-el-limite`,
+  que trae el comando que lo recalcula: ese finding ya congeló el conteo mal dos veces. Es la fase con más riesgo del programa y su
+  restricción de diseño está escrita en el PRD §6: la auto-actualización copia HOY solo
+  `upgrade.sh` a un temporal y hace `exec`, así que un orquestador que sourcee libs inexistentes
+  en el árbol del adoptante **rompe a todos los adoptantes en el salto de versión**. Léela antes
+  de tocar una línea. Después queda la fase 3 (keep/tune/retire).
+- **Handoff para el siguiente agente:** lee el PRD 0005 §5b, que dice fase por fase qué se
+  entregó y qué gate sigue abierto. Dos gates NO los cierra quien implementó, a propósito: el
+  30/30 de macOS de la fase 0a (bloqueado por presupuesto de Actions; plan B es el bucle en el
+  Mac del owner) y el FP contra corpus KMP ajeno de la fase 1c. Antes de abrir una iniciativa
+  NUEVA —distinta de terminar 0005— mira `bash tools/metrics/escape-rate.sh` y el ledger:
+  PRD 0004 §16 pide 2–4 semanas de datos del adoptante antes de retirar o endurecer cualquier
+  defensa, y endurecer sin ese dato es añadir ceremonia.
 - **Base verificada de fase 10:** sobre `61e3d06` (2026-08-12) la matriz E2E y la suite completa
   salieron verdes en macOS — las cifras exactas las imprimen `bash tools/tests/run-tests.sh
   e2e_matrix` y la suite completa; no se copian aquí porque caducan. Cada test de la matriz se

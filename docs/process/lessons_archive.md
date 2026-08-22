@@ -11,6 +11,31 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-22] Un detector que casa acentos da verde a mano y rojo en el runner
+- **Qué pasó:** el detector de `git add -A` usaba `[Jj]am[áa]s` para reconocer una prohibición.
+  Medido a mano en la terminal: 2 candidatos, 0 falsos positivos. Corrido por la suite: falso
+  positivo en `AGENTS.md`. El mismo patrón, el mismo archivo, dos resultados.
+- **Causa raíz:** `run-tests.sh` corre con `LANG=""` (locale C). Ahí una clase de caracteres como
+  `[áa]` no es "á o a": son los **bytes** de `á` en UTF-8 más `a`, así que `[áa]s` nunca casa la
+  `á` de verdad. En una terminal con locale UTF-8 sí casa. El detector no estaba mal escrito: era
+  correcto en un entorno e incorrecto en el otro, que es peor, porque "funciona en mi máquina"
+  aplicado a un detector significa que en CI protege menos de lo que crees.
+- **Regla:** lo que rompe en locale C son las **clases de caracteres** con bytes no-ASCII
+  (`[áa]`), no los literales: `prohíb` fuera de corchetes casa "prohíbe" perfectamente. Así que
+  la regla no es "ASCII puro" a secas —eso fue la primera formulación y era más ancha de lo
+  necesario— sino: **nada de acentos DENTRO de corchetes**; fuera, un literal acentuado vale.
+  Y ojo con el stem sin acentuar, que parece cubrir más de lo que cubre: `prohib` **no** casa
+  "prohíbe" (exige una `i` ASCII donde el texto tiene `í`), y el comentario del detector afirmaba
+  que sí — una rama muerta que el reviewer cazó leyendo el comentario contra el patrón. Mide la
+  tasa de falsos positivos **con el locale del runner**; con el de tu shell mides otro detector.
+- **Detector:** tools/tests/test_execution_map.sh
+  (`test_ningun_doc_canonico_recomienda_git_add_A_a_ciegas` corre dentro de la suite, o sea con
+  el locale del runner, y sus dos guards con él. El guard de falso positivo pone **cada caso en
+  su propio archivo**: juntos, la ventana de ±1 línea hacía que el vecino satisficiera la
+  precondición y quitar `prohíb` del patrón no ponía rojo nada — un fixture que no aísla
+  convierte un guard en decoración)
+- **Área:** tools/tests/ · cualquier detector con patrones sobre prosa en español
+
 ### [2026-08-21] Una limpieza que atrapa INT/TERM y no re-lanza deja el proceso ingobernable
 - **Qué pasó:** para no dejar temporales huérfanos se puso `trap 'rm -f …' RETURN INT TERM`
   dentro de una función. `RETURN` sí es local a la función; **`INT` y `TERM` no**: son del

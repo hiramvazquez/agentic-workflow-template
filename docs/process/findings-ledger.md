@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **12** · Cerrados: 88 · Total: 100
+Abiertos: **14** · Cerrados: 89 · Total: 103
 
 ## Abiertos
 
@@ -14,13 +14,15 @@ Abiertos: **12** · Cerrados: 88 · Total: 100
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
-| `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh (664) + 3 tests + capture-review-verdict (371)` | Cinco archivos del harness sobre o rozando su propio hard limit de 400 lineas |
+| `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
+| `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
+| `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 7 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf06-kmp-detector-textual` | medium | auto-fix | `tools/check-source-sets.sh:69` | check-source-sets casa un import dentro de /* */ o de un string triple: detector textual para propiedad sintactica |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
-| `f-wf08-git-add-A-canonico` | low | auto-fix | `docs/process/current_execution_map.md:41` | El mapa recomienda git add -A mientras AGENTS.md 7 lo prohibe con cambios fuera de scope |
+| `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 
 ## Cerrados
 
@@ -110,6 +112,7 @@ Abiertos: **12** · Cerrados: 88 · Total: 100
 | `f-wf03-jsonl-sin-encoder` | fixed | Emisor unico scripts/agent-hooks/lib/json.sh (jq, fallback python3; sin runtime degrada declarandolo |
 | `f-wf05-project-kind-inferido` | fixed | Fase 1b entregada: la declaracion gobierna (tools/project.conf, propiedad del adoptante, verificado  |
 | `f-wf07-contexto-sin-headroom` | fixed | PRD 0005 fase 0c, implementada por subagente y verificada: rotador canonico e idempotente (canonical |
+| `f-wf08-git-add-A-canonico` | fixed | PRD 0005 fase 2b. El paso 4 del bucle del mapa pasa a staging por PATHS con los tres comandos separa |
 | `f-watchdog-filtra-un-sleep-por-test` | fixed | pkill -P sobre el guardian antes de matarlo: mueren sus hijos primero. Medido tras el fix: 0 huerfan |
 | `f-test-0a-verde-linux-rojo-macos` | fixed | Inyeccion por PATH: stub de mktemp que falla, identico en ambos sistemas. Verificado verde en Linux; |
 | `f-ab0d8266` | fixed | Arreglado en el mismo turno: export SEMGREP_ENABLE_VERSION_CHECK=0 y SEMGREP_SEND_METRICS=off al arr |
