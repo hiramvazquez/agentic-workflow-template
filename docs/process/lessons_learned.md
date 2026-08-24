@@ -208,6 +208,27 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
   que el límite: devuelve 124 y explica que se colgó)
 - **Área:** tools/tests/run-tests.sh · AGENTS.md §2
 
+### [2026-08-24] Una review acotada vale lo que valga la afirmación que la acota
+- **Qué pasó:** tras una ronda AMBER cuyo único hallazgo se atendió tocando solo el ledger, se pidió
+  una re-review "acotada", diciéndole al reviewer que *el delta desde entonces es solo el ledger*.
+  Él miró `git diff --cached`, vio 15 archivos y 882 líneas, y **se negó a revisar**: desde su
+  contexto en frío no podía distinguir "el diff staged completo" de "lo que cambió desde la ronda
+  anterior", y concluyó —razonablemente— que la premisa era falsa.
+- **Causa raíz:** el prompt era ambiguo entre dos sentidos de "delta", y el sub-agente arranca sin
+  el historial que los desambigua. Pedir una review acotada es pedirle a alguien que confíe en un
+  recorte que no puede verificar. Si la afirmación que acota es falsa —o solo suena falsa—, lo que
+  sale no es una review parcial: es una review que no ocurrió.
+- **Regla:** no acotes una review con una afirmación sobre lo que cambió. O le das el objeto
+  completo, o le das **el medio para verificar el recorte por sí mismo** (el sha de la revisión
+  anterior, para que compare él). Y celébralo cuando se niegue: un reviewer que rechaza una premisa
+  que no cuadra con lo que ve está haciendo exactamente su trabajo — es la misma propiedad que hace
+  que su GREEN valga algo.
+- **Detector:** n/a-manual — es una regla sobre cómo se redacta un prompt de sub-agente, no sobre
+  el contenido del repo; no hay artefacto en el árbol que un detector pueda inspeccionar. Vive en
+  `.agents/skills/process/references/multi-agent-orchestration.md`, que es donde el que va a
+  escribir ese prompt lo busca.
+- **Área:** .agents/skills/process/references/multi-agent-orchestration.md
+
 ---
 
 ## Lecciones mecanizadas (índice)
@@ -217,6 +238,9 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-24] Cuando una lista se queda corta seis veces, el defecto es que sea una lista — `tools/tests/test_scope_superficie.sh`
+- [2026-08-22] Lo que decide sobre un diff se lee de la misma fuente que el diff — `tools/tests/test_scope_kind.sh`
+- [2026-08-22] Un corpus escrito por quien construye el detector confirma sus errores — `tools/tests/test_source_sets.sh`
 - [2026-08-22] Un detector que casa acentos da verde a mano y rojo en el runner — `tools/tests/test_execution_map.sh`
 - [2026-08-21] Una limpieza que atrapa INT/TERM y no re-lanza deja el proceso ingobernable — `tools/tests/test_source_sets.sh`
 - [2026-08-21] Una lección arreglada tres veces y sin detector se repite a la cuarta — `tools/tests/test_semgrep_rules.sh`

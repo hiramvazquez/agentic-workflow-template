@@ -61,7 +61,22 @@
 
 ## Próximo paso
 
-- **Siguiente entrega: PRD 0005 fase 2a** — bajar del hard limit los archivos del harness que
+- **DECISIÓN DEL OWNER 2026-08-24 — el freeze de gates nuevos (PRD 0005 §3) sigue VIGENTE y se
+  cumple.** El motivo está medido, no intuido: desde el 19 de agosto el ledger abre 2–3× más
+  hallazgos de los que cierra mientras los commits/día caían de 13–17 a 2–3. El proyecto pasó de
+  construir a auditar. **No se añaden gates.** PRD 0006 (inversión a fail-closed de la superficie
+  de enforcement) queda On hold pese a cerrar un agujero vivo, y sus vías 8 y 9 quedan como
+  findings documentados.
+- **PRD 0007 (Draft) — el arranque real de un proyecto.** Salido de una conversación de diseño con
+  el owner: decisiones de arquitectura tomadas y escritas, un módulo de referencia que las
+  instancia, el harness cableado a esa arquitectura, y un criterio FALSABLE de cuándo la IA puede
+  trabajar sola (el segundo módulo autónomo pasa el design-reviewer sin desviaciones). No choca con
+  el freeze —no es un gate, es una fase de arranque— y absorbe lo que hoy hace `/adoptar`. Pendiente
+  de design-review antes de `Approved`.
+- **Siguiente entrega: PRD 0005 FASE 3** — medir el valor de cada gate y decidir keep/tune/retire.
+  Es el mecanismo que responde "¿está listo?", y lleva parado desde que empezó la ola 2. Lo que
+  falta para cerrar `f-wf09-ventana-de-valor` no es más maquinaria: es la medición.
+- **Después, y no antes: PRD 0005 fase 2a** — bajar del hard limit los archivos del harness que
   lo exceden, sin debilitar nada. Cuáles son y cuántos, en `f-wf04-archivos-sobre-el-limite`,
   que trae el comando que lo recalcula: ese finding ya congeló el conteo mal dos veces. Es la fase con más riesgo del programa y su
   restricción de diseño está escrita en el PRD §6: la auto-actualización copia HOY solo

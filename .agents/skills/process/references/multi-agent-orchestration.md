@@ -57,6 +57,13 @@ Reglas del patrón:
 
 1. **Contexto fresco cada uno** — ven el diff, no el razonamiento que lo produjo, ni los
    veredictos de los otros (evita anclaje).
+1b. **No acotes una review con una afirmación sobre lo que cambió.** "El delta desde tu ronda
+   anterior es solo X" le pide al sub-agente que confíe en un recorte que no puede verificar desde
+   contexto cero. Pasó: se pidió una re-review acotada al ledger, el reviewer vio 15 archivos
+   staged y se negó — con razón. O le das el objeto completo, o le das el **medio para verificar
+   el recorte** (el sha de la revisión anterior, para que compare él). Y cuando un reviewer
+   rechaza una premisa que no cuadra con lo que ve, está haciendo su trabajo: es la misma
+   propiedad que hace que su GREEN valga algo.
 2. **Prompt a REFUTAR, no a validar.** "¿Está bien?" produce confirmación; "rómpelo" produce
    hallazgos.
 3. **Cada juez emite el contrato `VERDICT:`** — el hook SubagentStop registra cada veredicto.

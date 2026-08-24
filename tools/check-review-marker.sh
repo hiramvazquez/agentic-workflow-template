@@ -40,8 +40,10 @@ if [ -f tools/lib/scope.sh ]; then
   # shellcheck source=lib/scope.sh
   . tools/lib/scope.sh
   NON_PRODUCT="$(scope_non_product)"
+  SIEMPRE_PRODUCTO="$(scope_siempre_producto)"
 else
   NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|\.gitattributes|lefthook|\.gitleaks|\.semgrepignore|muter\.conf|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
+  SIEMPRE_PRODUCTO='^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
 fi
 
 fail() { echo "$1"; exit 1; }
@@ -56,6 +58,10 @@ fi
 [ -z "$CHANGED" ] && { echo "✅ review-marker: sin cambios que revisar."; exit 0; }
 
 CRITICAL="$(printf '%s\n' "$CHANGED" | grep -vE "$NON_PRODUCT" || true)"
+# Y se vuelven a SUMAR las llaves del reino: la declaración que gobierna un
+# gate no puede eximirse a sí misma (ver scope_siempre_producto).
+_LLAVES="$(printf '%s\n' "$CHANGED" | grep -E "$SIEMPRE_PRODUCTO" || true)"
+CRITICAL="$(printf '%s\n%s\n' "$CRITICAL" "$_LLAVES" | grep -v '^$' | sort -u || true)"
 [ -z "$CRITICAL" ] && { echo "✅ review-marker: el cambio no toca código de producto (solo docs/tooling)."; exit 0; }
 
 # ── Commit de MERGE: el contenido YA pasó sus gates en su rama ──────

@@ -11,6 +11,109 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-24] Cuando una lista se queda corta seis veces, el defecto es que sea una lista
+- **Qué pasó:** `scope_siempre_producto()` enumera lo que exige review gobierne quien gobierne el
+  repo. Se quedó corta **seis rondas seguidas**, y cada arreglo tapaba el agujero recién visto:
+  la declaración, luego los scripts del gate, luego la definición del propio revisor y el cableado
+  de los otros clientes, luego `.gitleaks.toml` —el gate de secretos—, y al final `run-tests.sh` y
+  `lesson-detector-link.sh`, que son gates **bloqueantes invocados hoy**. Seis rondas, seis
+  hallazgos reales, y ninguna fue la última.
+- **Causa raíz:** la clasificación era **fail-open** —lo no enumerado quedaba exento— y la lista se
+  mantenía desde el ATAQUE, no desde el uso. Así no hay forma de saber cuándo termina: cada ronda
+  demuestra que faltaba algo y ninguna demuestra que ya no falta nada. Iterar sobre una lista
+  fail-open es una carrera que el defensor no puede ganar, porque el criterio de "completa" no
+  existe.
+- **Regla:** cuando un arreglo se queda corto dos veces, deja de arreglarlo y **deriva la lista
+  desde su consumidor**. Aquí: si `lefthook.yml` o `ci/run-gates.sh` invocan un script que puede
+  tumbar el commit o el build, ese script decide algo y por tanto es producto. La lista se mantiene
+  sola desde quien la usa, y un gate nuevo entra el día que se cablea, no el día que se explota.
+  Y declara qué NO cubre: esto caza gates cableados-y-no-protegidos, no los conf que esos gates
+  leen — de las seis vías habría cazado dos.
+- **Detector:** tools/tests/test_scope_superficie.sh
+  (`test_todo_gate_invocado_esta_en_la_superficie_de_enforcement`, verificado contra la lista de
+  cada ronda anterior: contra la de la ronda 5 nombra exactamente los dos gates de la sexta vía,
+  que un reviewer había encontrado a mano. Con guard de suelo —un extractor vacío haría que pasara
+  por vacuidad— y guard de FP para el invocador informativo)
+- **Área:** tools/lib/scope.sh · cualquier lista de excepciones de seguridad
+
+### [2026-08-22] Lo que decide sobre un diff se lee de la misma fuente que el diff
+- **Qué pasó:** `tools/project.conf` declara `project_kind`, y esa declaración gobierna qué rutas
+  exigen review. `scope.sh` la leía **del árbol de trabajo**. Reproducido: con `harness` declarado
+  y `tools/` staged, el gate salía 1 (bloquea); editando el archivo a `application` **sin
+  stagearlo**, salía 0 diciendo "el cambio no toca código de producto". El commit resultante no
+  lleva ni una línea de `project.conf` — sin override, sin `override_log`, indistinguible de un
+  commit que legítimamente no requería review. Un bypass completo del reviewer-gate, en el código
+  del propio gate, introducido el mismo día por quien lo escribió.
+- **Causa raíz:** se trató la declaración como "configuración" en vez de como "entrada de una
+  decisión de seguridad". Una config se lee de donde esté; una entrada que decide si un gate
+  aplica tiene que venir de la **misma fuente que aquello sobre lo que decide**. Si el gate juzga
+  lo staged, su entrada se lee del índice; si juzga un rango, de la base del rango. Un archivo del
+  árbol de trabajo que gobierna un gate sobre lo staged no viaja con el commit que habilita — y
+  eso no es una config, es una puerta trasera.
+- **Regla:** todo gate que lea configuración para decidir SI aplica, la lee de `git show :<path>`
+  (staged) o `git show <base>:<path>` (rango), nunca del disco. Y protégela en Anillo 0: el poder
+  del archivo y su protección tienen que ir en la misma dirección — aquí `tools/preset`, que solo
+  cambia avisar-vs-bloquear, estaba en `permissions.deny`, y `project.conf`, que puede eximir el
+  repo entero, no lo estaba.
+- **Y una segunda mitad, porque el primer arreglo solo cerró media puerta:** leer del índice tapó
+  el flip *sin* stagear y dejó vivo el flip *stageado*, que es peor porque parece honesto — deja
+  el cambio a la vista en el commit y aun así pasaba. La causa de fondo era otra: `project.conf`
+  vive bajo `tools/`, que el criterio de app exime, así que **la declaración se eximía a sí
+  misma**. Corolario general: un archivo que decide SI un gate aplica es producto bajo cualquier
+  criterio, y esa excepción se escribe explícita — no se deduce de la lista de exentos.
+- **Y una tercera, que es la que enseña la regla de verdad:** los propios scripts del gate viven
+  bajo `tools/` y `.claude/settings.json` estaba exento bajo **los dos** criterios. O sea que no
+  hacía falta ni tocar la declaración: añades `exit 0` a `check-review-marker.sh` y el script
+  exime su propia edición; o vacías `permissions.deny` y nadie se entera. Las tres rondas fallaron
+  por lo mismo — se pensó en *quién declara el criterio* en vez de en *quién decide o ejecuta el
+  gate*. **El criterio correcto: todo lo que decide si un gate aplica, o lo implementa, es
+  producto gobierne quien gobierne.** Gate nuevo ⇒ su script entra en esa lista el mismo día.
+- **Detector:** tools/tests/test_scope_kind.sh
+  (`test_un_flip_de_project_kind_sin_stagear_no_desactiva_el_gate`,
+  `test_un_flip_stageado_de_project_kind_no_exime_su_propio_commit`,
+  `test_editar_el_script_del_gate_sigue_exigiendo_review` y
+  `test_tocar_settings_json_sigue_exigiendo_review`, más los cuatro de la cuarta ronda
+  (`..._la_definicion_del_revisor`, `..._el_cableado_del_anillo3`, `..._los_hooks_de_codex`,
+  `..._los_hooks_de_cursor`) — cada uno verificado rojo contra la versión que dejaba pasar su
+  variante: exit 0 donde debía ser 1)
+- **Y una cuarta, que es la que explica por qué hubo cuatro:** la lista se quedó corta CADA vez, y
+  no por descuido — porque era una lista. Cada ronda añadía los archivos del ataque recién visto y
+  dejaba fuera el siguiente: primero la declaración, luego los scripts del gate, luego
+  `.claude/agents/reviewer.md` (la definición del propio revisor), `.github/workflows/` (el
+  Anillo 3 entero) y los hooks de Codex y Cursor — se protegió el cableado de UN cliente y se dejó
+  el mismo agujero para los otros dos que el proyecto dice soportar. **Enumerar archivos donde
+  hacía falta nombrar una propiedad.** El arreglo definitivo no es una lista más larga: son
+  PREFIJOS, para que un archivo nuevo bajo `ci/` o `scripts/agent-hooks/` quede cubierto el día
+  que se crea y no el día que alguien lo explota.
+- **Área:** tools/lib/scope.sh · .claude/settings.json · cualquier gate con config propia
+
+### [2026-08-22] Un corpus escrito por quien construye el detector confirma sus errores
+- **Qué pasó:** el detector KMP prohibía `androidx.` entero en `commonMain`. Contra mi propio
+  corpus de tests: impecable. Contra un corpus AJENO —`compose-multiplatform` de JetBrains, 57
+  `commonMain`— **31 violaciones, las 31 falsas**. `androidx.` no es sinónimo de Android: Compose
+  Multiplatform **reusa ese namespace** para código que compila en iOS, desktop y web (uno de los
+  hits vivía en el módulo que compila para navegador), y `androidx.navigation`, `androidx.lifecycle`
+  y `androidx.savedstate` también son multiplataforma hoy. El detector acusaba al stack KMP más
+  común que existe: 100% de FP, diez veces la ley del 10%.
+- **Causa raíz:** escribí los casos de prueba con la misma creencia falsa con la que escribí el
+  detector ("androidx = Android"). Un corpus propio no es una muestra del mundo: es una segunda
+  copia de tus supuestos. Por eso pasaba todo — mis tests no verificaban el detector, lo
+  acompañaban.
+- **Regla:** un detector nuevo no se da por bueno hasta medirlo contra **código que no escribiste
+  tú**, y de un proyecto que no sea tuyo. Y al reportar la medición, di qué se miró de verdad: mi
+  primera redacción decía "31 sobre 57 `commonMain`" cuando la corrida real solo alcanzó 20 de los
+  57 (un `head -20` preexistente en el propio detector). La conclusión aguantó porque el reviewer
+  rehízo la medición a escala completa, pero la evidencia que yo presenté afirmaba más cobertura
+  de la que tuvo — y una medición sobre-declarada es una defensa anunciada que no existe (§14.4). Es barato: un clon superficial de un repo público de
+  referencia del ecosistema y una corrida. Y al corregir el falso positivo, escribe a la vez el
+  test de la otra mitad —lo que SÍ debe seguir bloqueando—, porque "arreglar un FP" degenera con
+  facilidad en apagar la regla.
+- **Detector:** tools/tests/test_source_sets.sh
+  (`tools/tests/test_source_sets_prefijos.sh::test_androidx_multiplataforma_no_cuenta_como_import_de_plataforma`
+  y `::test_los_androidx_solo_de_android_siguen_bloqueando`: las dos mitades, para que quitar el falso
+  positivo no se lleve por delante la cobertura real)
+- **Área:** tools/check-source-sets.sh · cualquier detector con listas de paquetes prohibidos
+
 ### [2026-08-22] Un detector que casa acentos da verde a mano y rojo en el runner
 - **Qué pasó:** el detector de `git add -A` usaba `[Jj]am[áa]s` para reconocer una prohibición.
   Medido a mano en la terminal: 2 candidatos, 0 falsos positivos. Corrido por la suite: falso

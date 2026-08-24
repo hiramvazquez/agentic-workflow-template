@@ -72,9 +72,16 @@ test_lite_no_relaja_las_capas() { _rm_sandbox _case_lite_no_relaja_capas; }
 _case_meta_doc_exento() {
   git reset -q                       # fuera el src/App.swift del sandbox
   echo "## nueva regla" >> AGENTS.md 2>/dev/null || echo "# reglas" > AGENTS.md
-  # …y config de CI (.github/), el segundo olvido del clasificador cazado en vivo:
-  mkdir -p .github/workflows; echo "name: ci" > .github/workflows/ci.yml
-  git add AGENTS.md .github/workflows/ci.yml
+  # `.github/workflows/` ESTABA aquí como exento, y se retiró a propósito el
+  # 2026-08-22. Chocaban dos criterios y ganó el de seguridad:
+  #   · el de antes: "config de CI es meta-doc, exigir marker era un FP".
+  #   · el que gana: ese directorio CABLEA el Anillo 3. Y §14.4 dice que TODO el
+  #     fail-open local (exit 3 avisa, no bloquea) está justificado *por* la
+  #     existencia de ese backstop. Si el workflow que lo invoca se puede vaciar
+  #     sin review, el razonamiento de los otros niveles se cae con él.
+  # Lo cazó un reviewer al que se le pidió buscar la cuarta vía del bypass de
+  # scope. El coste es real —tocar CI ahora pide review— y se acepta.
+  git add AGENTS.md
   # …incluso con un marker viejo e inválido presente (el caso real):
   printf 'agent: reviewer\nverdict: GREEN\nsource: hook\n' > .agents/state/markers/reviewer_run.txt
   touch -t 202001010000 .agents/state/markers/reviewer_run.txt 2>/dev/null

@@ -33,10 +33,42 @@
 
 _SCOPE_CONF="tools/project.conf"
 
+# ── De dónde se LEE la declaración, que resultó ser lo importante ───
+# Del ÍNDICE (o de HEAD), nunca del árbol de trabajo. La primera versión hacía
+# `grep` sobre el archivo en disco, y eso abría un bypass completo del gate,
+# reproducido en vivo: editas `project_kind: application`, NO lo stageas, y
+# `check-review-marker` pasa de exit 1 a exit 0 declarando "el cambio no toca
+# código de producto" — con el diff resultante sin una sola línea de
+# project.conf. Sin override, sin entrada en override_log, sin rastro.
+#
+# El principio general, que vale para cualquier gate: **lo que decide sobre un
+# diff se lee de la misma fuente que ese diff.** Si el gate juzga lo staged,
+# su configuración se lee del índice; si juzga un rango, de su base. Leer del
+# árbol de trabajo deja la decisión en manos de un archivo que no va a viajar
+# con el commit, y eso no es una config: es una puerta trasera.
+#
+# Es la misma clase que f-cb48c808 (el marker firma un diff distinto del
+# revisado), atacando la clasificación de scope en vez del binding sha256.
+_scope_lee_conf() { # → contenido de project.conf desde la fuente que toca
+  # Modo rango (Anillo 3): la declaración es la de la base del rango.
+  if [ -n "${SCOPE_BASE_REF:-}" ]; then
+    git show "${SCOPE_BASE_REF}:${_SCOPE_CONF}" 2>/dev/null && return 0
+  fi
+  # Modo normal: el índice. Si el archivo no está trackeado todavía —primer
+  # arranque de un adoptante, o el sandbox de un test— no hay nada en el índice
+  # y se cae al disco A PROPÓSITO: sin declaración trackeada la tabla de §6 ya
+  # exige el fallback heurístico, y un `git show` fallido no debe convertirse en
+  # "sin declaración" cuando el archivo sí existe y aún nadie lo commiteó.
+  if git ls-files --error-unmatch "$_SCOPE_CONF" >/dev/null 2>&1; then
+    git show ":${_SCOPE_CONF}" 2>/dev/null && return 0
+  fi
+  [ -f "$_SCOPE_CONF" ] && cat "$_SCOPE_CONF" 2>/dev/null
+  return 0
+}
+
 _scope_project_kind() { # → harness|application|other, o vacío (ausente/ilegible)
   local k
-  [ -f "$_SCOPE_CONF" ] || return 0
-  k="$(grep -E '^project_kind:' "$_SCOPE_CONF" 2>/dev/null | head -1 \
+  k="$(_scope_lee_conf | grep -E '^project_kind:' 2>/dev/null | head -1 \
         | sed -E 's/^project_kind:[[:space:]]*//' | awk '{print $1}')"
   case "$k" in harness|application|other) printf '%s' "$k" ;; esac
   return 0
@@ -82,6 +114,62 @@ _NON_PRODUCT_APP='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.c
 # generados o anotados y pedirían un reviewer por cada lección apuntada — eso
 # sí sería el ruido que mata el gate.
 _NON_PRODUCT_HARNESS='^(docs/|backlog/|enterprise/|\.github/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|\.gitattributes|\.gitleaks|\.semgrepignore|muter\.conf|CLAUDE\.md|GEMINI\.md|tools/findings/ledger\.jsonl$|(ios|android|web|backend)/AGENTS\.md$)'
+
+# ── Las llaves del reino NUNCA se eximen a sí mismas ────────────────
+# `tools/project.conf` vive bajo `tools/`, y el criterio de app exime `tools/`.
+# Eso hacía que la DECLARACIÓN se auto-eximiera: bastaba stagear el flip a
+# `application` junto al cambio y el gate aplicaba el criterio NUEVO al propio
+# flip que lo introducía. Reproducido: exit 1 → exit 0 en el mismo commit, sin
+# override y sin entrada en override_log.
+#
+# La primera versión de este arreglo solo cerró la variante SIN stagear (leer
+# del índice en vez del disco). Cerrar media puerta es no cerrarla: quedaba la
+# variante que además deja el flip A LA VISTA dentro del commit y aun así pasa.
+#
+# Estos tres archivos deciden SI un gate aplica, así que son producto bajo
+# cualquier criterio. No se pueden restar de la ERE de exentos —ERE no tiene
+# lookahead—, así que se declaran aparte y los consumidores los vuelven a SUMAR
+# después de filtrar. Es más verboso y es a propósito: la resta silenciosa es
+# lo que abrió el agujero.
+# ── La SUPERFICIE DE ENFORCEMENT nunca es andamio ───────────────────
+# Esta lista se quedó corta CINCO veces seguidas. El historial se deja escrito
+# porque el patrón vale más que el arreglo:
+#   1ª  `project.conf` leído del disco             → flip sin stagear
+#   2ª  `project.conf` bajo `tools/`, exento       → flip stageado
+#   3ª  los propios scripts del gate, exentos      → editas el gate y se exime solo
+#   4ª  `.claude/agents/reviewer.md` (¡el revisor!), `.github/workflows/` y
+#       `.codex/`+`.cursor/` — se protegió UN cliente y se dejaron los otros dos
+#   5ª  `.gitleaks.toml` y `.semgrepignore` — el gate de SECRETOS, Anillo 1, el
+#       de más leverage de todos: añades un path al `allowlist` y no pide review
+#
+# Las cinco fallaron por lo mismo: **la clasificación era fail-OPEN**. Lo no
+# enumerado quedaba exento, así que cada ronda tapaba el agujero recién visto y
+# dejaba abierto el siguiente. Ahora los patrones son de FORMA, no de nombre —
+# `tools/*.sh`, `tools/*.conf`, `scripts/`, `ci/`— para que un gate nuevo quede
+# cubierto el día que se crea y no el día que alguien lo explote.
+#
+# La propiedad: **todo lo que decide si un gate aplica, lo implementa, lo
+# configura, o lo cablea a un cliente, es producto — gobierne quien gobierne el
+# resto del repo.** Ante la duda sobre un archivo la pregunta no es "¿es código
+# de la app?" sino "¿degradarlo debilita una defensa?".
+#
+# Bajo `tools/` NO vale `*.sh` a secas, y esto es un límite deliberado: en un
+# proyecto de app, `tools/deploy.sh` es tooling del adoptante, no un gate, y
+# tratarlo como producto rompía la promesa de la fase 1b (cero falsos positivos
+# nuevos para quien no declara nada) — lo cazó su propio test. Así que el patrón
+# sigue la CONVENCIÓN DE NOMBRES del harness (`check-`, `verify-`, `secret-`,
+# `mutation-`, `drift-`, `semgrep-`, `architecture-`, `probe-`, `gate-`), que un
+# gate nuevo hereda y un script del adoptante no.
+#
+# Y NO se afirma aquí que la lista esté completa. La versión anterior decía
+# "para que no haya quinta" y la quinta llegó en la misma sesión — prometer
+# exhaustividad en un comentario es justo la clase de afirmación sin test que
+# este repo persigue. Lo que sí se sostiene: los tests de `test_scope_kind.sh`
+# fijan las cinco vías conocidas, y **un gate con nombre fuera de la convención
+# hay que añadirlo aquí, con su test, el día que se escribe.**
+scope_siempre_producto() { # → ERE de FORMAS que exigen review, gobierne quien gobierne
+  printf '%s' '^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
+}
 
 scope_non_product() {
   case "$(_scope_project_kind)" in

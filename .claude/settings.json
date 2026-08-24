@@ -17,6 +17,7 @@
       "Edit(./tools/drift-ratchet.json)",
       "Edit(./tools/mutation-ratchet.json)",
       "Edit(./tools/preset)",
+      "Edit(./tools/project.conf)",
       "Edit(./.agents/state/**)"
     ],
     "ask": [

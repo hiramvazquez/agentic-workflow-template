@@ -3,25 +3,39 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **14** · Cerrados: 89 · Total: 103
+Abiertos: **28** · Cerrados: 99 · Total: 127
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
+| `f-12fcc211` | high | auto-fix | `tools/agent-prompts/review.md + tools/agent-runner.sh + tools/agent-backends/` | El prompt del reviewer de IA es editable sin review: el archivo de mas leverage del repo esta exento |
+| `f-1ae68da7` | high | owner-decision | `tools/upgrade.sh + lefthook.yml` | lefthook.yml esta congelado para adoptantes por copia: ninguna mejora del Anillo 1 les llega |
+| `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
+| `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El sub-agente reviewer puede resetear el index y el marker firma un diff distinto del revisado |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
+| `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
+| `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
+| `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
+| `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
+| `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
+| `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |
 | `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
-| `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 7 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
-| `f-wf06-kmp-detector-textual` | medium | auto-fix | `tools/check-source-sets.sh:69` | check-source-sets casa un import dentro de /* */ o de un string triple: detector textual para propiedad sintactica |
+| `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
+| `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
+| `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
+| `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
+| `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
+| `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 
 ## Cerrados
@@ -111,9 +125,19 @@ Abiertos: **14** · Cerrados: 89 · Total: 103
 | `f-wf02-mapa-cifras-podridas` | fixed | PRD 0005 fase 0b, implementada por subagente y verificada: mapa sin cifras derivables (los conteos v |
 | `f-wf03-jsonl-sin-encoder` | fixed | Emisor unico scripts/agent-hooks/lib/json.sh (jq, fallback python3; sin runtime degrada declarandolo |
 | `f-wf05-project-kind-inferido` | fixed | Fase 1b entregada: la declaracion gobierna (tools/project.conf, propiedad del adoptante, verificado  |
+| `f-wf06-kmp-detector-textual` | fixed | PRD 0005 fase 1c COMPLETA, gate de cierre incluido. Semgrep con regla kotlin generada en runtime des |
 | `f-wf07-contexto-sin-headroom` | fixed | PRD 0005 fase 0c, implementada por subagente y verificada: rotador canonico e idempotente (canonical |
 | `f-wf08-git-add-A-canonico` | fixed | PRD 0005 fase 2b. El paso 4 del bucle del mapa pasa a staging por PATHS con los tres comandos separa |
 | `f-watchdog-filtra-un-sleep-por-test` | fixed | pkill -P sobre el guardian antes de matarlo: mueren sus hijos primero. Medido tras el fix: 0 huerfan |
 | `f-test-0a-verde-linux-rojo-macos` | fixed | Inyeccion por PATH: stub de mktemp que falla, identico en ambos sistemas. Verificado verde en Linux; |
 | `f-ab0d8266` | fixed | Arreglado en el mismo turno: export SEMGREP_ENABLE_VERSION_CHECK=0 y SEMGREP_SEND_METRICS=off al arr |
 | `f-31f757c0` | fixed | Arreglado: dedupe por archivo:linea con awk en vez de sort -u de linea entera. Test nuevo (test_una_ |
+| `f-9b77444e` | fixed | Cerrado por la mitad 1 del arreglo, en este mismo cambio: scope.sh lee la declaracion del INDICE (gi |
+| `f-f387276` | fixed | Cerrado en este mismo cambio: lefthook.yml envuelve check-source-sets con el mismo wrapper de exit 3 |
+| `f-9024b380` | fixed | Cerrado con la otra mitad del arreglo. scope.sh exporta scope_siempre_producto() con las tres rutas  |
+| `f-1b033530` | fixed | Cerrado cambiando la FORMA del arreglo, no alargando la lista. La lista se quedo corta cuatro veces  |
+| `f-80e8df8c` | fixed | Arreglado en este diff: la superficie incluye .gitleaks (sin ancla, cubre .gitleaks.toml), .semgrepi |
+| `f-28006397` | fixed | Cerrado construyendo el detector que proponia, en vez de alargando la lista otra vez. tools/tests/te |
+| `f-e1293daa` | fixed | Arreglado en este diff: el helper usa git -C con el sandbox explicito y ruta absoluta, asi que un cd |
+| `f-d467930f` | fixed | Arreglado en este diff: prefijo lesson- y la ruta explicita de tools/tests/run-tests.sh en la superf |
+| `f-1f559fc7` | fixed | El bucle de ci/run-gates.sh quedo desenrollado a invocaciones literales y el extractor pasa de ver 1 |
