@@ -1,6 +1,10 @@
 # Fase 3 de PRD 0005 — valor por defensa: keep / tune / retire
 
-> **Fecha:** 2026-08-24 · **Alcance:** solo lectura, sin tocar ningún gate.
+> **Fecha:** 2026-08-24 · **Alcance:** la MEDICIÓN es solo lectura; el commit que trae este informe
+> **no lo es** — instrumenta las tres primitivas de bloqueo de `lib/io.sh` y añade 465 líneas de
+> tests. Ningún gate cambia su comportamiento de bloqueo (dos guards lo fijan:
+> `test_telemetria_rota_no_impide_que_hook_block_bloquee` y `…_que_el_gate_bloquee`), pero decir
+> "solo lectura" era falso y lo desmentía el propio §1 tres párrafos más abajo (`f-18a2c2ef`).
 > **Estado: PARCIAL.** Este informe responde la pregunta para las defensas de revisión y **no puede
 > responderla para los gates mecánicos** — la razón está en §1 y es el hallazgo principal.
 
@@ -120,7 +124,7 @@ Estos datos no dependen de la telemetría de hooks. Son los hallazgos reales acu
 | `design-reviewer` | **1** | 4 en el ledger · **9 autorreportados** | **4.0 – 9.0** |
 | Juez adversarial | 3 ⚠️ | 10 | **3.3** |
 | `reviewer` | 56 invocaciones · **31 diffs distintos** | 47 | **0.84 / invocación · 1.5 / diff** |
-| `process-judge` | 0 (cola sin procesar) | — | n/a |
+| `process-judge` | 0 (cola sin procesar: `wc -l < .agents/state/judge-queue.txt`) | — | n/a |
 
 ### Cómo se atribuyeron, y por qué hay dos cifras para el `design-reviewer`
 

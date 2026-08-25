@@ -3,21 +3,24 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **34** · Cerrados: 110 · Total: 144
+Abiertos: **35** · Cerrados: 117 · Total: 152
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
 | `f-12fcc211` | high | auto-fix | `tools/agent-prompts/review.md + tools/agent-runner.sh + tools/agent-backends/` | El prompt del reviewer de IA es editable sin review: el archivo de mas leverage del repo esta exento |
-| `f-18f51176` | high | auto-fix | `scripts/agent-hooks/lib/io.sh` | Un gate que BLOQUEA no dejaba rastro: la fase 3 medía el instrumento, no las defensas |
 | `f-1ae68da7` | high | owner-decision | `tools/upgrade.sh + lefthook.yml` | lefthook.yml esta congelado para adoptantes por copia: ninguna mejora del Anillo 1 les llega |
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
+| `f-298e3cd2` | high | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
+| `f-ee9787d9` | high | owner-decision | `scripts/agent-hooks/post-edit-verify.sh + .claude/settings.json (PostToolUse matcher)` | El nivel 1 del bucle (shellcheck + bash -n in-loop) no corrio ni una vez en 13h y 533 lineas de shell: cuelga de Edit|Write y la sesion escribio el 100% por Bash |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
+| `f-15089319` | medium | owner-decision | `tools/check-diff-nature.sh + flujo de invocacion del reviewer` | check-diff-nature aviso sobre el diff que costo 8 rondas (3 naturalezas, 10 archivos) y el lote no se partio |
+| `f-153aef5b` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh` | La trayectoria no registra QUE archivo se escribio cuando la escritura va por Bash: el process-judge no puede responder su pregunta numero 1 |
 | `f-24968270` | medium | auto-fix | `tools/tests/ + tools/validate-harness.sh` | Cuatro divisiones de la fase 2a hechas y verificadas, sin integrar, en worktrees que se van a limpiar |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
@@ -25,15 +28,14 @@ Abiertos: **34** · Cerrados: 110 · Total: 144
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
-| `f-945ee54a` | medium | auto-fix | `docs/process/current_execution_map.md` | El mapa se contradecia sobre el orden de fases y su seccion autoritativa estaba caducada |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
-| `f-9e0e21b0` | medium | auto-fix | `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md` | El informe de fase 3 atribuyo mal su cifra insignia con un clasificador por subcadenas |
 | `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |
 | `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
+| `f-e416ab5e` | medium | auto-fix | `scripts/process-judge-context.sh + .agents/state/judge-queue.txt` | La cola del process-judge encola 4 de 7 sesiones sin trayectoria y su script de contexto falla en abierto con exit 0 |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
@@ -42,7 +44,6 @@ Abiertos: **34** · Cerrados: 110 · Total: 144
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
-| `f-fa194587` | low | auto-fix | `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md` | El informe de fase 3 declaro exactas unas invocaciones que crecian mientras se escribia |
 
 ## Cerrados
 
@@ -147,6 +148,10 @@ Abiertos: **34** · Cerrados: 110 · Total: 144
 | `f-e1293daa` | fixed | Arreglado en este diff: el helper usa git -C con el sandbox explicito y ruta absoluta, asi que un cd |
 | `f-d467930f` | fixed | Arreglado en este diff: prefijo lesson- y la ruta explicita de tools/tests/run-tests.sh en la superf |
 | `f-1f559fc7` | fixed | El bucle de ci/run-gates.sh quedo desenrollado a invocaciones literales y el extractor pasa de ver 1 |
+| `f-18f51176` | fixed | Cerrado por 35f9a8f. Las TRES primitivas de bloqueo de lib/io.sh registran por _hook_log_block; veri |
+| `f-9e0e21b0` | fixed | Cerrado por 35f9a8f. El informe corrige la atribucion y DECLARA el error en su §2: la primera versio |
+| `f-945ee54a` | fixed | Cerrado por 35f9a8f. 'Estado actual' —la unica seccion que session-start extrae e inyecta— dice que  |
+| `f-fa194587` | fixed | Cerrado por 35f9a8f. El informe ya no declara absolutos sobre un contador vivo: marca esas cifras co |
 | `f-2bd11525` | fixed | Instrumentadas las TRES primitivas de bloqueo de lib/io.sh en un unico punto (_hook_log_block), no p |
 | `f-658e2533` | fixed | Los tres defectos corregidos. (1) La linea de 'Estado actual' decia 'dos gates siguen abiertos' y en |
 | `f-6c1a0f6a` | fixed | El mapa dice ahora los DOS hechos y los separa, que era lo que faltaba desde el principio: en CI el  |
@@ -158,3 +163,6 @@ Abiertos: **34** · Cerrados: 110 · Total: 144
 | `f-51c9d0ea` | fixed | Ninguna de las dos se ACTUALIZO — se quitaron, que es lo unico que cierra la clase. (1) El informe y |
 | `f-8c2f57b1` | fixed | Las tres lineas del informe remiten a 'wc -l < .agents/state/judge-queue.txt' en vez de dar un numer |
 | `f-2f6b90c4` | fixed | Quitado el '**' sobrante; el conteo vuelve a 184, par. NO se anade detector: validar markdown entero |
+| `f-783ff97a` | fixed | Los cuatro cerrados en este mismo cambio, tras verificar uno a uno contra el arbol. La causa comun:  |
+| `f-3ccb2aca` | fixed | Los dos atendidos. (1) La resolucion de f-8c2f57b1 sobregeneralizaba: decia que 'las tres lineas rem |
+| `f-18a2c2ef` | fixed | La cabecera separa ahora las dos cosas que confundia: la MEDICION fue solo lectura, el COMMIT que tr |
