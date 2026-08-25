@@ -120,7 +120,7 @@ Estos datos no dependen de la telemetría de hooks. Son los hallazgos reales acu
 | `design-reviewer` | **1** | 4 en el ledger · **9 autorreportados** | **4.0 – 9.0** |
 | Juez adversarial | 3 ⚠️ | 10 | **3.3** |
 | `reviewer` | 56 invocaciones · **31 diffs distintos** | 47 | **0.84 / invocación · 1.5 / diff** |
-| `process-judge` | 0 (3 en cola) | 3 | n/a |
+| `process-judge` | 0 (cola sin procesar) | — | n/a |
 
 ### Cómo se atribuyeron, y por qué hay dos cifras para el `design-reviewer`
 
@@ -186,7 +186,7 @@ existían solo porque el marker se invalidaba tras un cambio de una línea en el
 **El adoptante usándolo de verdad es la tercera fuente, con 25 hallazgos y coste cero por
 invocación.** No hay defensa sintética que compita con eso.
 
-**El `process-judge` tiene 3 sesiones sin procesar.** Es la única defensa que lee la *trayectoria*
+**El `process-judge` tiene una cola sin procesar** —cuántas lo dice `wc -l < .agents/state/judge-queue.txt`, no este informe: es un contador vivo que solo vacía el propio `process-judge` al correr, y esta línea llegó a decir "3" cuando ya iba por 7. Es la única defensa que lee la *trayectoria*
 —cómo se trabajó— y no solo el diff. Con 3 hallazgos y cero invocaciones registradas no se puede
 juzgar, pero está sin usar.
 
@@ -201,7 +201,7 @@ con que sea la que más ha cambiado.
 | `design-reviewer` | **KEEP y subir su uso** | Mayor rendimiento observado. Hoy es opcional en la práctica; debería ser obligatorio antes de código en cambios de diseño, que es lo que §12 ya dice y no se cumple. |
 | Jueces adversariales | **KEEP para maquinaria de enforcement** | 3.3 por invocación y encontraron lo que 8 rondas de reviewer no. Caros: reservarlos para cambios a los gates. |
 | `reviewer` | **KEEP, TUNE la invocación** | Es la red de seguridad. El ajuste no es al agente sino al flujo: menos rondas por cambios triviales. |
-| `process-judge` | **Sin datos — usarlo antes de decidir** | 3 sesiones en cola. Procesarlas es el experimento barato. |
+| `process-judge` | **Sin datos — usarlo antes de decidir** | Cola sin procesar (`wc -l < .agents/state/judge-queue.txt`). Procesarlas es el experimento barato. |
 | Gates mecánicos | **Sin datos — NO decidir todavía** | El instrumento estaba roto hasta hoy (§1). Volver a medir cuando haya ventana real. |
 | Nivel 4 (mutación) | **Sigue MUDO** | `min_score: 0, measured: false`. No es candidato a retire porque nunca fue candidato a nada: no ha medido jamás. Ver §5. |
 

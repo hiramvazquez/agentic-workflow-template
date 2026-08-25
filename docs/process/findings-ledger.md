@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **34** · Cerrados: 108 · Total: 142
+Abiertos: **34** · Cerrados: 110 · Total: 144
 
 ## Abiertos
 
@@ -156,3 +156,5 @@ Abiertos: **34** · Cerrados: 108 · Total: 142
 | `f-9f30ac55` | fixed | El informe declara 13, dice explicitamente contra que se cuenta (HEAD, o sea lo que se commitea), im |
 | `f-4e8a1c37` | fixed | Anadido '< /dev/null' a la invocacion. Fijado por test_analizar_un_archivo_que_lee_stdin_no_cuelga,  |
 | `f-51c9d0ea` | fixed | Ninguna de las dos se ACTUALIZO — se quitaron, que es lo unico que cierra la clase. (1) El informe y |
+| `f-8c2f57b1` | fixed | Las tres lineas del informe remiten a 'wc -l < .agents/state/judge-queue.txt' en vez de dar un numer |
+| `f-2f6b90c4` | fixed | Quitado el '**' sobrante; el conteo vuelve a 184, par. NO se anade detector: validar markdown entero |
