@@ -22,22 +22,38 @@
 # ════════════════════════════════════════════════════════════════════
 # GOLDEN 10 — dos plataformas, y un smoke real que no puede mentir
 # ════════════════════════════════════════════════════════════════════
-# Las dos mitades del escenario: (a) la promesa de macOS+Linux es una matriz
-# real en el workflow, no una frase en un doc; (b) el smoke contra el entorno
+# Las dos mitades del escenario: (a) la promesa de plataformas es código en
+# workflows reales, no una frase en un doc. Desde 2026-08-25 el contrato es
+# Linux en cada push (la única pata que ninguna máquina local cubre) y macOS
+# a demanda en harness-ci-macos.yml (workflow_dispatch) — el pre-push local
+# ya corre la suite en el Mac de quien publica, y macOS consume cupo a 10×
+# (f-787568d2; racional en las cabeceras de ambos YAML). Este test fija que
+# LAS DOS mitades del contrato nuevo sigan siendo código, no que la matriz
+# vieja vuelva. (b) el smoke contra el entorno
 # de ESTA máquina no exige un estado concreto —puede faltar semgrep, puede
 # estar roto— pero sí que estado y exit code sean el mismo hecho. Un verde
 # solo puede salir de un probe que corrió y detectó su fixture.
 test_golden_10_dos_plataformas_y_smoke_sin_falso_verde() {
   local wf="$PROJECT_ROOT/.github/workflows/harness-ci.yml"
+  local wf_mac="$PROJECT_ROOT/.github/workflows/harness-ci-macos.yml"
   [ -f "$wf" ] || { echo "    no hay workflow que ejecute la suite"; return 1; }
   local matriz
   matriz="$(awk '/^ *os: \[/{print; exit}' "$wf")"
   case "$matriz" in
-    *ubuntu*macos*|*macos*ubuntu*) : ;;
-    *) echo "    la matriz de OS no cubre Linux y macOS: ${matriz:-ausente}"; return 1 ;;
+    *ubuntu*) : ;;
+    *) echo "    la matriz por push perdió la pata Linux: ${matriz:-ausente}"; return 1 ;;
   esac
   grep -q 'bash tools/tests/run-tests.sh' "$wf" \
-    || { echo "    la matriz de OS no ejecuta la suite del harness"; return 1; }
+    || { echo "    el workflow por push no ejecuta la suite del harness"; return 1; }
+  # La pata macOS no desapareció: vive a demanda, y eso también es código.
+  [ -f "$wf_mac" ] \
+    || { echo "    falta harness-ci-macos.yml: macOS a demanda sería una promesa sin workflow"; return 1; }
+  grep -q 'workflow_dispatch' "$wf_mac" \
+    || { echo "    harness-ci-macos.yml no es disparable a demanda (sin workflow_dispatch)"; return 1; }
+  grep -q 'macos' "$wf_mac" \
+    || { echo "    harness-ci-macos.yml no corre en macOS"; return 1; }
+  grep -q 'bash tools/tests/run-tests.sh' "$wf_mac" \
+    || { echo "    harness-ci-macos.yml no ejecuta la suite del harness"; return 1; }
 
   local probe rc estado
   probe="$(PROBE_TIMEOUT_SECS=20 bash "$PROJECT_ROOT/tools/probe-capability.sh" semgrep 2>/dev/null)"

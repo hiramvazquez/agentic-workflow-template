@@ -4,9 +4,16 @@
 # El harness exige tests rigurosos a los proyectos que lo adoptan; este
 # workflow le aplica la misma medicina a él mismo en cada push:
 #
-#   · la suite completa (tools/tests/run-tests.sh) en Linux Y macOS —
-#     la diferencia de OS ya cazó un bug real (stat -f/-c: un marker de
-#     review válido se rechazaba siempre en runners Linux)
+#   · la suite completa (tools/tests/run-tests.sh) en Linux. La pata
+#     macOS vive en harness-ci-macos.yml (workflow_dispatch, a demanda):
+#     macOS consume minutos de Actions a 10× el ritmo de Linux y era el
+#     grueso del gasto por push — así se agotó el presupuesto del plan
+#     (f-787568d2). La cobertura macOS por push NO se pierde: el
+#     pre-push local (lefthook: harness-suite) corre la suite completa
+#     en el Mac de quien publica, ANTES de publicar. Linux aquí es la
+#     pata que ninguna máquina local cubre — la diferencia de OS ya
+#     cazó un bug real (stat -f/-c: un marker de review válido se
+#     rechazaba siempre en runners Linux).
 #   · lesson-detector-link: toda lección tiene su detector, y existe
 #   · validate-harness: eventos de hooks válidos, scripts que parsean,
 #     matriz de skills íntegra, reglas semgrep que CARGAN de verdad (G15)
@@ -26,7 +33,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # Solo Linux por push (ver cabecera): macOS es 10× más caro y ya
+        # está cubierto por el pre-push local. Pasada cruzada a demanda:
+        # gh workflow run harness-ci-macos.yml
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
