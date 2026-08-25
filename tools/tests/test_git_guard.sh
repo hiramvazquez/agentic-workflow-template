@@ -103,3 +103,42 @@ _case_commit_normal_no_choca_con_guard() {
   [ "$rc" = "0" ] || { echo "    un commit normal fue bloqueado por el guard (exit $rc)"; return 1; }
 }
 test_commit_normal_pasa_el_guard() { _gg_sandbox _case_commit_normal_no_choca_con_guard; }
+
+# ── El guard que bloquea deja rastro medible (f-2bd11525) ───────────
+# El fix de telemetría de la fase 3 instrumentó UNA de las tres primitivas de
+# `lib/io.sh`, y la que quedó fuera —`hook_block`— es justo la del git-guard.
+# Consecuencia: bloqueaba `--no-verify` a diario y en la ventana de medición
+# figuraba con CERO eventos, que es exactamente lo que la fase 3 decía haber
+# arreglado. El reviewer lo reprodujo en sandbox; esto lo fija.
+#
+# Va aquí y no en test_metrics.sh a propósito: allí se prueba la primitiva
+# aislada, aquí el hook REAL de punta a punta. El bug vivía en la distancia
+# entre ambas cosas.
+_case_git_guard_registra_su_bloqueo() {
+  local rc; rc="$(_gate 'git commit --no-verify -m x' full)"
+  [ "$rc" = "2" ] || { echo "    el guard no bloqueó (exit $rc) — test inválido"; return 1; }
+  local ev=".agents/state/metrics/detections.jsonl"
+  [ -s "$ev" ] || {
+    echo "    el git-guard BLOQUEÓ y no registró nada. Quien mida este gate en"
+    echo "    una ventana futura verá cero eventos y lo leerá como 'nadie lo"
+    echo "    intentó', cuando bloquea a diario (f-2bd11525)."
+    return 1; }
+  grep -q '"source":"reviewer-gate"' "$ev" || {
+    echo "    registró el bloqueo pero no como reviewer-gate: sin fuente correcta"
+    echo "    gate-value lo atribuye a otro gate."
+    sed 's/^/      /' "$ev"; return 1; }
+}
+test_el_git_guard_registra_cuando_bloquea() { _gg_sandbox _case_git_guard_registra_su_bloqueo; }
+
+_case_bloqueo_de_reset_hard_tambien_se_registra() {
+  # `reset --hard` no pasa por el camino de commit: es otro call-site de la
+  # misma primitiva. Si la instrumentación hubiera vuelto a ponerse por
+  # call-site, este saldría mudo.
+  local rc; rc="$(_gate 'git reset --hard HEAD~1' full)"
+  [ "$rc" = "2" ] || { echo "    reset --hard no bloqueó (exit $rc) — test inválido"; return 1; }
+  grep -q '"source":"reviewer-gate"' ".agents/state/metrics/detections.jsonl" 2>/dev/null || {
+    echo "    reset --hard bloqueó sin registrar: la instrumentación cubre unos"
+    echo "    call-sites y no otros, que es el bug original con otra cara."
+    return 1; }
+}
+test_reset_hard_bloqueado_tambien_se_registra() { _gg_sandbox _case_bloqueo_de_reset_hard_tambien_se_registra; }

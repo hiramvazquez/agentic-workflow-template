@@ -11,13 +11,44 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
-- **En curso:** **PRD 0005 (estabilización del harness)**, Approved. Entregadas 0a, 0b, 0c,
-  1a, 1b, 1c y 2b; quedan **2a** (bajar del hard limit los archivos que
-  lo exceden — `f-wf04-archivos-sobre-el-limite` los lista y trae el comando que los
-  recalcula; no los cuentes desde aquí — con la restricción de bootstrap) y **3** (reporte keep/tune/retire, cuya ventana
-  de medición EMPIEZA al cerrar la ola 2). Dos gates siguen abiertos a propósito y no los
-  cierra quien implementó: el 30/30 de macOS de 0a y el FP contra corpus KMP ajeno de 1c.
-  El detalle por fase vive en el PRD, no aquí.
+- **En curso:** **PRD 0005 (estabilización del harness)**, Approved. Entregadas 0a, 0b, 0c, 1a, 1b,
+  1c y 2b. La **fase 3 corrió parcialmente el 2026-08-24** —informe en
+  `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`— y le falta una segunda pasada: lo
+  primero que encontró fue que los gates **no registraban cuando bloquean**, así que no hay base
+  para decidir sobre los mecánicos hasta que la telemetría (ya arreglada) acumule ventana. Queda
+  también la **2a**: bajar del hard limit los archivos que lo exceden, con la restricción de
+  bootstrap; `f-wf04-archivos-sobre-el-limite` los lista y trae el comando que los recalcula — no
+  los cuentes desde aquí.
+- **El diff de la fase 3 llegó a commiteable el 2026-08-24, en la cuarta ronda.** Venía de **tres
+  rondas en RED**, todas por la misma causa: afirmar cobertura que no se verificó (`f-20ed9b44`,
+  abierto — es owner-decision, la pregunta es qué cambio de proceso evita la cuarta). Cerrados
+  `f-2bd11525` (las tres primitivas de bloqueo de `lib/io.sh` instrumentadas en un punto común, con
+  el git-guard cubierto de punta a punta) y `f-658e2533` (contradicción del gate KMP + tasa vieja
+  del reviewer). Lo que cambió respecto de las tres rondas anteriores no es el parche: es que **la
+  afirmación de cobertura pasó a ser un test** que relee `io.sh` y deriva las primitivas en vez de
+  listarlas. Lección rotada al archivo con su detector.
+- **Sigue pendiente el `process-judge`**, que lee CÓMO se trabajó y no solo el diff. Es la única
+  defensa sin datos para decidir, y estas cuatro rondas son justo su materia prima.
+- **ORDEN, porque el mapa se contradecía a sí mismo y lo cazó un reviewer:** cola del
+  `process-judge` → **segunda pasada de la fase 3** → **fase 2a**. La fase 3 va antes que la 2a
+  porque el owner decidió el 2026-08-24 que el freeze sigue vigente: se cierra y se mide antes de
+  seguir tocando. Cualquier frase de este doc que sugiera lo contrario está obsoleta.
+- **UN gate sigue abierto, y conviene separar sus dos mitades porque se confunden.** El gate de 0a
+  pedía **30 corridas macOS seguidas sin rerun**. En CI no llegó a correr: los dos runs despachados
+  (2026-08-19) murieron en 5s por presupuesto de Actions (`gh run list --workflow=gate-0a-macos.yml`).
+  Pero el **plan B sí corrió** —el bucle en el Mac del owner, que PRD 0005 §5b acepta explícitamente
+  como vía válida— el **2026-08-24**, con resultado **29 verdes y 1 rojo** (corrida 9,
+  `test_review_timeout_tambien_mata_descendientes`). De ahí las dos mitades: el **gate literal NO se
+  cumple** (29 ≠ 30) y por eso sigue abierto; pero la **hipótesis de la fase 0a queda REFUTADA** —se
+  atribuía el flaky a presión de spawn en runners de pocos núcleos y una máquina en reposo lo
+  reprodujo igual—. Fuente de los dos hechos: `f-wf01-ci-macos-intermitente` en el ledger y el
+  mensaje del commit `206bc16`; no los cuentes desde aquí.
+  **Este párrafo llegó a afirmar que ese 29/30 era una cifra fabricada** que "no existe en ningún
+  commit, PRD, ledger ni artefacto de CI". Era falso y estaba a un `grep` de distancia: la búsqueda
+  se hizo por la grafía `29/30` y la fuente dice `29 verdes`. Una búsqueda encuentra lo que hay con
+  la grafía que buscas — **nunca demuestra que algo no exista** (`f-6c1a0f6a`). El FP contra corpus
+  KMP ajeno de 1c **está CERRADO desde el 2026-08-22** (PRD 0005 §5b). El detalle por fase vive en
+  el PRD, no aquí.
 - **Antes:** **PRD 0004 (reconciliación del workflow agéntico) está Shipped**: fases
   1a–10 mergeadas. Qué dejó, en una frase por bloque — el detalle vive en el PRD, no aquí:
   manifiesto de capacidades que gobierna los bloques documentales; probes funcionales que
@@ -73,20 +104,40 @@
   trabajar sola (el segundo módulo autónomo pasa el design-reviewer sin desviaciones). No choca con
   el freeze —no es un gate, es una fase de arranque— y absorbe lo que hoy hace `/adoptar`. Pendiente
   de design-review antes de `Approved`.
-- **Siguiente entrega: PRD 0005 FASE 3** — medir el valor de cada gate y decidir keep/tune/retire.
-  Es el mecanismo que responde "¿está listo?", y lleva parado desde que empezó la ola 2. Lo que
-  falta para cerrar `f-wf09-ventana-de-valor` no es más maquinaria: es la medición.
+- **FASE 3 EJECUTADA (parcial) 2026-08-24** — informe en
+  `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`. Lo primero que encontró fue un agujero
+  en su propio instrumento: los gates que BLOQUEAN no registraban nada, así que casi todos figuraban
+  con cero eventos. Arreglado. Lo que sí quedó medido, sobre los 127 hallazgos del ledger:
+  el `design-reviewer` rinde entre **4.0 y 9.0** hallazgos por invocación (4 llegaron al ledger, 9
+  autorreportó), los jueces adversariales 3.3 y el `reviewer` **0.84 por invocación y 1.5 por diff
+  revisado** (dos tasas porque un mismo diff se revisó hasta 17 veces; la cifra por invocación está
+  deprimida por ese artefacto del flujo, no por el agente) — y el `design-reviewer` se había
+  invocado **UNA vez en toda la vida del proyecto**. No falta maquinaria: falta usar antes la que ya
+  existe. **Sobre los gates mecánicos no se decide nada** hasta que haya ventana real con la
+  telemetría arreglada. El informe declara su método de atribución y el error que cometió: la
+  primera versión daba 5.0 al `design-reviewer` porque un clasificador por subcadenas se tragó una
+  entrada de otra fecha y de otra fuente.
+- **Siguiente entrega: procesar la cola del `process-judge`.** Cuántas hay lo dice
+  `wc -l < .agents/state/judge-queue.txt`, no este doc: es un contador vivo que solo vacía el propio
+  `process-judge` al correr, así que un número escrito aquí nace caducado. Esta línea decía "3"
+  cuando ya había 5 — la misma cifra podrida de `f-wf02-mapa-cifras-podridas` que el bloque de «Salud», dos párrafos más
+  arriba, explica cómo evitar. Es la única defensa
+  que lee la TRAYECTORIA y no solo el diff, y la única sobre la que no hay datos para decidir.
+  Procesarlas es el experimento barato.
+- **Después: segunda pasada de la fase 3**, ya con la telemetría de bloqueos acumulando. Es lo que
+  cierra `f-wf09-ventana-de-valor`, y lo que falta para eso no es más maquinaria: es la medición.
 - **Después, y no antes: PRD 0005 fase 2a** — bajar del hard limit los archivos del harness que
   lo exceden, sin debilitar nada. Cuáles son y cuántos, en `f-wf04-archivos-sobre-el-limite`,
   que trae el comando que lo recalcula: ese finding ya congeló el conteo mal dos veces. Es la fase con más riesgo del programa y su
   restricción de diseño está escrita en el PRD §6: la auto-actualización copia HOY solo
   `upgrade.sh` a un temporal y hace `exec`, así que un orquestador que sourcee libs inexistentes
   en el árbol del adoptante **rompe a todos los adoptantes en el salto de versión**. Léela antes
-  de tocar una línea. Después queda la fase 3 (keep/tune/retire).
+  de tocar una línea. (La fase 3 va ANTES que ésta — ver el bloque de orden en «Estado actual».)
 - **Handoff para el siguiente agente:** lee el PRD 0005 §5b, que dice fase por fase qué se
-  entregó y qué gate sigue abierto. Dos gates NO los cierra quien implementó, a propósito: el
-  30/30 de macOS de la fase 0a (bloqueado por presupuesto de Actions; plan B es el bucle en el
-  Mac del owner) y el FP contra corpus KMP ajeno de la fase 1c. Antes de abrir una iniciativa
+  entregó y qué gate sigue abierto. Queda UNO y no lo cierra quien implementó, a propósito: el
+  30/30 de macOS de la fase 0a, que dio **29/30** en el bucle del Mac del owner — el gate literal no
+  se cumple, aunque su hipótesis quedó refutada (detalle en «Estado actual»). El de corpus KMP de 1c
+  cerró el 2026-08-22. Antes de abrir una iniciativa
   NUEVA —distinta de terminar 0005— mira `bash tools/metrics/escape-rate.sh` y el ledger:
   PRD 0004 §16 pide 2–4 semanas de datos del adoptante antes de retirar o endurecer cualquier
   defensa, y endurecer sin ese dato es añadir ceremonia.

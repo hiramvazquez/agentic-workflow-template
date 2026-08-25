@@ -3,27 +3,32 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **28** · Cerrados: 99 · Total: 127
+Abiertos: **34** · Cerrados: 108 · Total: 142
 
 ## Abiertos
 
 | id | sev | tier | área | título |
 |---|---|---|---|---|
 | `f-12fcc211` | high | auto-fix | `tools/agent-prompts/review.md + tools/agent-runner.sh + tools/agent-backends/` | El prompt del reviewer de IA es editable sin review: el archivo de mas leverage del repo esta exento |
+| `f-18f51176` | high | auto-fix | `scripts/agent-hooks/lib/io.sh` | Un gate que BLOQUEA no dejaba rastro: la fase 3 medía el instrumento, no las defensas |
 | `f-1ae68da7` | high | owner-decision | `tools/upgrade.sh + lefthook.yml` | lefthook.yml esta congelado para adoptantes por copia: ninguna mejora del Anillo 1 les llega |
+| `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
-| `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El sub-agente reviewer puede resetear el index y el marker firma un diff distinto del revisado |
+| `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
+| `f-24968270` | medium | auto-fix | `tools/tests/ + tools/validate-harness.sh` | Cuatro divisiones de la fase 2a hechas y verificadas, sin integrar, en worktrees que se van a limpiar |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
+| `f-945ee54a` | medium | auto-fix | `docs/process/current_execution_map.md` | El mapa se contradecia sobre el orden de fases y su seccion autoritativa estaba caducada |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
+| `f-9e0e21b0` | medium | auto-fix | `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md` | El informe de fase 3 atribuyo mal su cifra insignia con un clasificador por subcadenas |
 | `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |
 | `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
@@ -37,6 +42,7 @@ Abiertos: **28** · Cerrados: 99 · Total: 127
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
+| `f-fa194587` | low | auto-fix | `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md` | El informe de fase 3 declaro exactas unas invocaciones que crecian mientras se escribia |
 
 ## Cerrados
 
@@ -141,3 +147,12 @@ Abiertos: **28** · Cerrados: 99 · Total: 127
 | `f-e1293daa` | fixed | Arreglado en este diff: el helper usa git -C con el sandbox explicito y ruta absoluta, asi que un cd |
 | `f-d467930f` | fixed | Arreglado en este diff: prefijo lesson- y la ruta explicita de tools/tests/run-tests.sh en la superf |
 | `f-1f559fc7` | fixed | El bucle de ci/run-gates.sh quedo desenrollado a invocaciones literales y el extractor pasa de ver 1 |
+| `f-2bd11525` | fixed | Instrumentadas las TRES primitivas de bloqueo de lib/io.sh en un unico punto (_hook_log_block), no p |
+| `f-658e2533` | fixed | Los tres defectos corregidos. (1) La linea de 'Estado actual' decia 'dos gates siguen abiertos' y en |
+| `f-6c1a0f6a` | fixed | El mapa dice ahora los DOS hechos y los separa, que era lo que faltaba desde el principio: en CI el  |
+| `f-3ab77c21` | fixed | Se abandono el parser escrito a mano: BASH ES EL PARSER. tools/tests/lib/primitivas-de-bloqueo.sh so |
+| `f-b0e4d952` | fixed | El test corre el hook con DETECTION_DEDUP_WINDOW=0, lo que aisla el guard del dedup anti-rafaga y lo |
+| `f-7d21e4b3` | fixed | El informe nombra ahora la ubicacion exacta del mutante ('dentro de _hook_log_block') y dedica un pa |
+| `f-9f30ac55` | fixed | El informe declara 13, dice explicitamente contra que se cuenta (HEAD, o sea lo que se commitea), im |
+| `f-4e8a1c37` | fixed | Anadido '< /dev/null' a la invocacion. Fijado por test_analizar_un_archivo_que_lee_stdin_no_cuelga,  |
+| `f-51c9d0ea` | fixed | Ninguna de las dos se ACTUALIZO — se quitaron, que es lo unico que cierra la clase. (1) El informe y |

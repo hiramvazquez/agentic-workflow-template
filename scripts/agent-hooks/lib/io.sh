@@ -53,8 +53,57 @@ hook_rel_path() {
 }
 
 # ── Decisiones (universales vía exit code) ──────────────────────────
+# _hook_log_block <fase> [rule] [area] — instrumenta UN bloqueo, UNA vez.
+#
+# Va en las PRIMITIVAS, no en cada call-site: enumerar sitios es exactamente el
+# error que costó ocho rondas en el bypass de scope. La fuente se DERIVA del
+# script que llama, así que un hook nuevo queda instrumentado el día que se
+# escribe y no el día que alguien se acuerda de añadirlo a una lista.
+#
+# "Todas las primitivas de bloqueo pasan por aquí" NO es una afirmación de este
+# comentario: lo enumera `test_toda_primitiva_de_bloqueo_esta_instrumentada`
+# (tools/tests/test_metrics.sh), que relee ESTE archivo con
+# `tools/tests/lib/primitivas-de-bloqueo.sh`, DERIVA qué funciones deniegan y
+# falla si alguna no registra. La versión anterior sí era solo un comentario
+# —decía "por aquí pasan TODOS los bloqueos" escrito sobre `hook_block_or_warn`,
+# que es UNA de tres— y con ella el git-guard bloqueaba `--no-verify`,
+# `push --force` y `reset --hard` sin dejar rastro (f-2bd11525).
+#
+# ALCANCE EXACTO, porque prometer de más aquí es el bug que este comentario
+# arrastra. Ese inventario NO reconoce formas de bash con regex —dos versiones
+# lo intentaron y acumularon cinco puntos ciegos, cazados de uno en uno—: lo
+# hace **bash**, sourceando este archivo en un subshell y preguntando a
+# `declare -f`. Por eso no hay shape que se le escape: no hay shape que
+# reconocer. Sus propios límites los fijan
+# `test_el_inventario_caza_una_primitiva_no_instrumentada_en_toda_forma` y
+# `test_el_inventario_no_inventa_primitivas_ni_falsos_incumplimientos` — un
+# meta-test sin tests es la misma sobre-afirmación una capa más adentro.
+# Lo que NO cubre y conviene saber: una denegación escrita FUERA de cualquier
+# función (nivel superior del archivo), o en otro archivo.
+#
+# `fase` (block|warn) viaja en rule/area, no en el campo `phase`: el bucket de
+# phase lo deriva `hook_log_detection` por `source`, que es lo que quiere
+# gate-value. Aquí se pasa igualmente para no cambiar esa derivación.
+#
+# El guard evita el doble conteo cuando una primitiva delega en otra
+# (`hook_json_block` → `hook_block` para eventos sin shape JSON conocido).
+_HOOK_BLOCK_LOGGED=""
+_hook_log_block() {
+  [ -n "$_HOOK_BLOCK_LOGGED" ] && return 0
+  _HOOK_BLOCK_LOGGED=1
+  local _lb_fase="${1:-block}" _lb_src
+  _lb_src="$(basename "${0:-hook}" .sh)"
+  # Best-effort TOTAL: hook_log_detection ya corre en subshell con `set +e` y
+  # devuelve 0 pase lo que pase, pero el `|| true` deja el contrato explícito.
+  # Instrumentar un gate no puede convertirlo en fail-open — lo fijan los
+  # tests `*_no_impide_que_el_gate_bloquee`.
+  hook_log_detection "$_lb_src" "${2:-$_lb_fase}" "${3:-$_lb_fase}" 1 "" "$_lb_fase" || true
+  return 0
+}
+
 # BLOQUEAR: imprime razón a stderr + exit 2. Funciona en Claude y Cursor.
 hook_block() {
+  _hook_log_block block
   printf '%s\n' "$1" >&2
   exit 2
 }
@@ -95,6 +144,7 @@ hook_context() {
 # Fijado por tools/tests/test_hook_json_shapes.sh.
 hook_json_block() {
   local ev="$1" why="$2"
+  _hook_log_block block
   if command -v jq >/dev/null 2>&1; then
     case "$ev" in
       Stop|SubagentStop|stop)
@@ -126,8 +176,25 @@ hook_preset() {
 }
 
 # Bloquea (exit 2) en full; avisa a stderr y permite (exit 0) en lite.
+# hook_block_or_warn <mensaje> [rule] [area]
+#
+# La fase 3 de PRD 0005 destapó por qué el registro importa: el informe de valor
+# por gate daba CERO eventos para casi todos, y `gate-value.sh` avisa de que un
+# cero es ambiguo entre disuasión y mudo. Había un TERCER estado que nadie
+# contemplaba — el gate disparó, bloqueó, hizo su trabajo, y no dejó rastro. En
+# la sesión que lo descubrió, el git-guard y el `skill-reminder` bloquearon dos
+# veces cada uno y los dos figuraban con cero.
+#
+# Esta primitiva es la ÚNICA que distingue `block` de `warn`: un gate que avisa
+# mucho en `lite` es candidato a revisión igual que uno que bloquea, pero solo
+# si queda constancia de que avisó. El registro en sí lo hace `_hook_log_block`,
+# común a las tres primitivas.
 hook_block_or_warn() {
-  if [ "$(hook_preset)" = "lite" ]; then printf '⚠️  [lite] %s\n' "$1" >&2; exit 0; fi
+  local _bw_preset _bw_fase
+  _bw_preset="$(hook_preset)"
+  [ "$_bw_preset" = "lite" ] && _bw_fase="warn" || _bw_fase="block"
+  _hook_log_block "$_bw_fase" "${2:-}" "${3:-}"
+  if [ "$_bw_preset" = "lite" ]; then printf '⚠️  [lite] %s\n' "$1" >&2; exit 0; fi
   printf '%s\n' "$1" >&2; exit 2
 }
 

@@ -11,6 +11,58 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-24] Un comentario que afirma cobertura es la afirmación MÁS peligrosa del repo
+- **Qué pasó:** el fix de telemetría de la fase 3 instrumentó `hook_block_or_warn` y escribió
+  encima: *"instrumentado AQUÍ, que es por donde pasan TODOS los bloqueos"*. Eran **tres**
+  primitivas de bloqueo en el mismo archivo, y la que quedó fuera —`hook_block`— es la del
+  git-guard: la que bloquea `--no-verify`, `push --force` y `reset --hard`. El comentario no
+  documentaba el diseño, lo **sustituía**: cerró la pregunta "¿y las demás?" para todo el que
+  leyera después, incluido su autor. Tercer RED consecutivo de la misma clase (`f-20ed9b44`).
+- **Causa raíz:** una afirmación de cobertura escrita en prosa **no puede fallar**. Un test que
+  cubre un caso al menos falla si ese caso se rompe; una frase que dice "cubre todos los casos"
+  sigue leyéndose igual de verdadera el día que aparece el cuarto. Y el agravante: escribir la
+  frase produce la sensación de haberla comprobado — la lección de no cometer este error se estaba
+  documentando *mientras* se cometía.
+- **Regla:** **si una afirmación de cobertura no puede ser un test, no puede ser una afirmación.**
+  Cuando el conjunto cubierto es enumerable desde el código (primitivas de un archivo, call-sites
+  de una API, ramas de un `case`), el test lo DERIVA releyendo el código — nunca lo lista a mano,
+  porque una lista escrita a mano es el mismo bug con otra cara. Y ese meta-test declara qué hace
+  si no encuentra nada: uno que no ve ninguna primitiva pasa siempre, y un gate mudo se lee igual
+  que uno verde.
+- **Y la coda, que es media lección aparte porque pasó a continuación, dos veces:** convertir la
+  afirmación en un meta-test **no cierra el problema, lo muda**. La primera versión de ese meta-test
+  tenía tres puntos ciegos; al arreglarlos aparecieron dos más, y uno de ellos estaba en el test que
+  se había escrito para protegerlo —comparaba el conteo del parser contra un `grep` con la MISMA
+  regex, o sea una tautología que daba verde con una función entera invisible para ambos—. **Un
+  meta-test sin tests propios es una afirmación de cobertura con sintaxis de test**, y un test que
+  se verifica contra algo que comparte su punto ciego no verifica nada.
+- **Y una tercera, que salió en la ronda 7 y es la más barata de repetir:** la misma pulsión de
+  afirmar de más se disfraza de *negativo*. Corrigiendo la sobre-afirmación anterior se escribió en
+  el mapa que una cifra "no existe en ningún commit, PRD, ledger ni artefacto de CI" — apoyado en un
+  `git log -S` por **una** grafía (`29/30`). La fuente decía `29 verdes`, estaba commiteada, con
+  fecha y número de corrida, y el propio ledger la traía dos líneas más abajo. **Una búsqueda es
+  evidencia de presencia, jamás de ausencia**: "grep no lo encuentra" significa "no está con la
+  grafía que busqué". Un negativo universal es la afirmación más cara de sostener y a la que menos
+  evidencia se le suele exigir, justo porque suena a rigor. Si vas a escribir "no existe", busca por
+  varias grafías, di cuáles buscaste, y prefiere "no lo encontré en X buscando Y".
+- **La regla que sale de la coda, y es la que evita la sexta ronda:** cuando estés reconociendo
+  formas de un lenguaje con expresiones regulares, **para** — la lista de formas válidas la decide
+  el lenguaje, no tú, y las irás descubriendo de una en una a razón de una ronda de review cada vez.
+  Pregúntale al intérprete. Aquí el inventario dejó de parsear bash y pasó a *sourcear* la librería
+  y consultar `declare -f`: bash devuelve el cuerpo ya parseado, normalizado y sin comentarios, así
+  que no queda shape que reconocer ni, por tanto, shape que se escape. Cuando eso no sea posible,
+  al menos verifica el reconocedor contra algo que **no** comparta su implementación.
+- **Detector:** `tools/tests/test_metrics.sh` ·
+  `test_toda_primitiva_de_bloqueo_esta_instrumentada` — relee `scripts/agent-hooks/lib/io.sh` con
+  `tools/tests/lib/primitivas-de-bloqueo.sh`, deriva qué funciones deniegan (`exit 2` /
+  `permissionDecision` / `decision:"block"`, ignorando comentarios) y falla si alguna no llama a
+  `_hook_log_block`, o si no encuentra ninguna. El propio inventario lo fijan
+  `test_el_inventario_caza_una_primitiva_no_instrumentada_en_toda_forma` (9 fixtures hostiles),
+  `test_el_inventario_no_inventa_primitivas_ni_falsos_incumplimientos` (la recíproca, ley del 10%) y
+  `test_el_inventario_contiene_lo_que_encuentra_un_grep_ingenuo`. Verificados rojos contra las
+  versiones que motivaron la lección.
+- **Área:** scripts/agent-hooks/lib/io.sh · tools/tests/test_metrics.sh
+
 ### [2026-08-24] Cuando una lista se queda corta seis veces, el defecto es que sea una lista
 - **Qué pasó:** `scope_siempre_producto()` enumera lo que exige review gobierne quien gobierne el
   repo. Se quedó corta **seis rondas seguidas**, y cada arreglo tapaba el agujero recién visto:
