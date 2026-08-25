@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **34** · Cerrados: 131 · Total: 165
+Abiertos: **35** · Cerrados: 131 · Total: 166
 
 ## Abiertos
 
@@ -14,6 +14,7 @@ Abiertos: **34** · Cerrados: 131 · Total: 165
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-298e3cd2` | high | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
+| `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
