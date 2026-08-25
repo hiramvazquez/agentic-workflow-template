@@ -80,14 +80,24 @@
 2. El arreglo se hace **en el template**, con su test **verificado fallando contra la versión
    anterior** — no basta con que el test pase.
 3. Lección en `lessons_learned.md` (con `Detector:`) + entrada en el ledger, en el mismo cambio.
-4. **Stagea por paths**, nunca `-A` a ciegas: `git add <los archivos del cambio>` →
+4. **Antes de invocar al `reviewer`, mira la naturaleza del lote:**
+   `bash tools/check-diff-nature.sh` — **sin flags**, que es el modo `--staged`. NO uses
+   `--range`: compara `BASE...HEAD` y por construcción no ve lo que está staged sin commitear,
+   o sea justo lo que vas a mandar a revisar. Esta línea nació diciendo `--range` y su
+   "verificación" salió limpia por eso mismo: un falso verde producido por el flag equivocado,
+   dentro del paso escrito para evitar falsos verdes. Si avisa, **parte el lote
+   antes de la primera review, no después de la tercera**. No es ceremonia: el lote de la fase 3
+   disparó ese aviso, no se partió, y el coste está medido en `f-15089319` — no lo copies aquí, que
+   es justo la clase de cifra que se pudre (`f-wf02-mapa-cifras-podridas`). La cabecera del propio
+   script trae su propio dato y su racional: partido por naturaleza, GREEN a la primera.
+5. **Stagea por paths**, nunca `-A` a ciegas: `git add <los archivos del cambio>` →
    `bash tools/verify-run.sh` → `git commit` (comandos separados: el marker liga
    `sha256(diff staged)` y encadenarlos lo evade) → `git push`. `git add -A` solo tiene
    sentido cuando `git status --short` ya salió limpio de todo lo demás, y entonces no
    ahorra nada. Este doc recomendaba `-A` mientras AGENTS.md §7 lo prohíbe con cambios
    fuera de scope (`f-wf08-git-add-A-canonico`): el mapa contradecía la regla canónica desde la puerta de
    entrada de cada sesión.
-5. El adoptante sincroniza y **verifica en su repo**, que es la única verificación
+6. El adoptante sincroniza y **verifica en su repo**, que es la única verificación
    independiente que existe: quien escribe el arreglo no es quien lo aprueba (§14).
 
 ## Próximo paso

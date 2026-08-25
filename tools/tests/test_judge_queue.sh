@@ -171,3 +171,58 @@ _case_sesion_que_solo_lee_no_se_encola() {
 test_una_sesion_sin_commits_ni_cambios_no_se_encola() {
   _jq_sandbox _case_sesion_que_solo_lee_no_se_encola
 }
+
+# ── El contexto del juez no puede fingir que miró la trayectoria ────
+# El `process-judge` existe para juzgar CÓMO se trabajó, no solo qué salió. Su
+# script de contexto salía 0 cuando le pedías una sesión cuya trayectoria no
+# existe, así que el juez recibía solo el diff y no tenía forma de saber que le
+# faltaba la mitad de su encargo. Lo destapó él mismo: de las 7 entradas que
+# había en la cola, 4 no tenían archivo (`f-e416ab5e`).
+#
+# Contrato de §14.3: 0 = limpio · 1 = hay un problema en lo tuyo · 3 = el
+# detector NO PUDO MIRAR. Un gate que no corrió no puede parecer uno que pasó.
+_jc_sandbox() { # reusa el repo desechable de _jq_sandbox y añade el script
+  _jq_sandbox "$1"
+}
+
+_case_sid_sin_trayectoria_es_exit3() {
+  cp "$PROJECT_ROOT/scripts/process-judge-context.sh" scripts/
+  local out rc
+  out="$(bash scripts/process-judge-context.sh sid-que-no-existe 2>&1)"; rc=$?
+  [ "$rc" = "3" ] || {
+    echo "    pidió una sesión sin trayectoria y salió $rc (esperaba 3)."
+    echo "    Con 0, el juez juzga solo el diff creyendo que vio el proceso."
+    return 1; }
+  printf '%s' "$out" | grep -q 'NO HAY TRAYECTORIA' || {
+    echo "    salió 3 pero sin decirlo en la salida: el juez lee el texto,"
+    echo "    no el exit code. Sin el aviso, el 3 no llega a quien decide."
+    return 1; }
+}
+test_pedir_una_sesion_sin_trayectoria_devuelve_3_y_lo_dice() {
+  _jc_sandbox _case_sid_sin_trayectoria_es_exit3; }
+
+_case_sid_con_trayectoria_es_exit0() {
+  cp "$PROJECT_ROOT/scripts/process-judge-context.sh" scripts/
+  printf '{"tool":"Bash"}\n' > .agents/state/trajectory/sid-real.jsonl
+  local out rc
+  out="$(bash scripts/process-judge-context.sh sid-real 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || { echo "    con trayectoria presente salió $rc (esperaba 0)"; return 1; }
+  printf '%s' "$out" | grep -q '"tool":"Bash"' || {
+    echo "    salió 0 pero no volcó la trayectoria"; return 1; }
+}
+test_pedir_una_sesion_con_trayectoria_devuelve_0_y_la_vuelca() {
+  _jc_sandbox _case_sid_con_trayectoria_es_exit0; }
+
+_case_sin_sid_es_listado_y_no_falla() {
+  # FALSO POSITIVO a evitar: invocarlo SIN argumento es el modo listado, para
+  # ver qué trayectorias hay. Eso no es "no pude mirar" — no se pidió nada.
+  cp "$PROJECT_ROOT/scripts/process-judge-context.sh" scripts/
+  local rc
+  bash scripts/process-judge-context.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    el modo listado (sin sid) salió $rc; no se pidió ninguna sesión,"
+    echo "    así que no hay nada que no se pudiera mirar."
+    return 1; }
+}
+test_sin_session_id_es_modo_listado_y_sale_0() {
+  _jc_sandbox _case_sin_sid_es_listado_y_no_falla; }

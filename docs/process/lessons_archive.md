@@ -45,6 +45,14 @@
   grafía que busqué". Un negativo universal es la afirmación más cara de sostener y a la que menos
   evidencia se le suele exigir, justo porque suena a rigor. Si vas a escribir "no existe", busca por
   varias grafías, di cuáles buscaste, y prefiere "no lo encontré en X buscando Y".
+  **Y el dato que convierte esto en la lección más importante de la sesión: se repitió dos horas
+  después de escribirla.** Al auditar unos logs de override se miró cada archivo con `tail -1` —una
+  línea— y de ahí salió "solo se registró media auditoría". Los archivos tenían dos líneas y estaban
+  completos. Cambia el instrumento (un `grep` con una grafía, un `tail` con una línea) y el error es
+  el mismo: **mirar una rendija y reportar la habitación**. Tenerla escrita, entenderla y acabar de
+  redactarla no impidió repetirla — así que la defensa no puede ser recordarla. Cuando vayas a
+  escribir "no existe", "no aparece" o "falta", el paso obligatorio es enseñar el comando completo
+  con el que miraste: si no soporta escribirse al lado de la afirmación, la afirmación no está lista.
 - **La regla que sale de la coda, y es la que evita la sexta ronda:** cuando estés reconociendo
   formas de un lenguaje con expresiones regulares, **para** — la lista de formas válidas la decide
   el lenguaje, no tú, y las irás descubriendo de una en una a razón de una ronda de review cada vez.

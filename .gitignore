@@ -39,6 +39,9 @@ config/secrets/
 
 # Worktrees del backlog runner (runtime, jamás al repo)
 .agents/worktrees/
+# Los worktrees de sub-agentes de Claude Code viven aquí. Son worktrees de git:
+# nunca se commitean desde el repo padre, y su trabajo vive en SU rama.
+.claude/worktrees/
 
 # Carpetas TRANSITORIAS del puente Claude↔disco (jamás al repo):
 # _pending-claude/ = archivos de .claude/ pendientes de mover a mano;
