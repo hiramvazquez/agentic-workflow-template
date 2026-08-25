@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **35** · Cerrados: 120 · Total: 155
+Abiertos: **33** · Cerrados: 131 · Total: 164
 
 ## Abiertos
 
@@ -16,10 +16,8 @@ Abiertos: **35** · Cerrados: 120 · Total: 155
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
-| `f-ee9787d9` | high | owner-decision | `scripts/agent-hooks/post-edit-verify.sh + .claude/settings.json (PostToolUse matcher)` | El nivel 1 del bucle (shellcheck + bash -n in-loop) no corrio ni una vez en 13h y 533 lineas de shell: cuelga de Edit|Write y la sesion escribio el 100% por Bash |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
-| `f-153aef5b` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh` | La trayectoria no registra QUE archivo se escribio cuando la escritura va por Bash: el process-judge no puede responder su pregunta numero 1 |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
@@ -165,7 +163,18 @@ Abiertos: **35** · Cerrados: 120 · Total: 155
 | `f-8c2f57b1` | fixed | Las tres lineas del informe remiten a 'wc -l < .agents/state/judge-queue.txt' en vez de dar un numer |
 | `f-2f6b90c4` | fixed | Quitado el '**' sobrante; el conteo vuelve a 184, par. NO se anade detector: validar markdown entero |
 | `f-783ff97a` | fixed | Los cuatro cerrados en este mismo cambio, tras verificar uno a uno contra el arbol. La causa comun:  |
+| `f-ee9787d9` | fixed | post-edit-verify cuelga ahora tambien de Bash (matcher Edit|Write|MultiEdit|Bash) y sabe QUE archivo |
+| `f-153aef5b` | fixed | track-trajectory registra ahora un campo 'writes' con los archivos que el comando cambio de verdad,  |
 | `f-e416ab5e` | fixed | process-judge-context.sh cumple ahora el contrato de §14.3: sale 3 —y lo DICE en la salida, que es l |
 | `f-3ccb2aca` | fixed | Los dos atendidos. (1) La resolucion de f-8c2f57b1 sobregeneralizaba: decia que 'las tres lineas rem |
 | `f-15089319` | fixed | El paso entra en el bucle de trabajo del mapa (seccion 'Como se trabaja aqui', paso 4), ANTES de sta |
 | `f-18a2c2ef` | fixed | La cabecera separa ahora las dos cosas que confundia: la MEDICION fue solo lectura, el COMMIT que tr |
+| `f-70b2ca19` | fixed | El test escribe un archivo ANTES de borrar la foto, asi que si el borrado no surtiera efecto habria  |
+| `f-b91ee6f0` | fixed | (1) El modo degradado pasa a SOBRE-reportar: una linea sin huella se reporta SIEMPRE, porque sin hue |
+| `f-1d7c33a5` | fixed | Espacio anadido y '${REVISADOS# }' aplicado tambien en el mensaje, igual que ya se hacia en la telem |
+| `f-75b0eb42` | fixed | Se distinguen los dos consumidores, que era el fondo: piden cosas distintas a la misma senal. writes |
+| `f-c4f8a71d` | fixed | (1) La leccion ya no da un numero: remite a 'grep -c ^test_ tools/tests/test_bash_writes.sh' y conse |
+| `f-30ad6c92` | fixed | (1) Las rutas viajan separadas por SALTO DE LINEA y jq parte por '\n' con map(select(length>0)): el  |
+| `f-a6d21f84` | fixed | (1) El contrato pasa a estar escrito al reves de como estaba: la ruta SI puede traer tabuladores, lo |
+| `f-2e94db73` | fixed | (1) Dos tests end-to-end nuevos que pasan por los hooks REALES con un tabulador en el nombre: test_e |
+| `f-fb03e5d1` | fixed | writes_mark barre los temporales al dejar la marca, con 'find -mmin +10 -delete'. El umbral NO es co |

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════
-# post-edit-verify.sh — hook PostToolUse Edit|Write|MultiEdit
+# post-edit-verify.sh — hook PostToolUse Edit|Write|MultiEdit|Bash
 # ════════════════════════════════════════════════════════════════════
 # EL BUCLE DE VERIFICACIÓN IN-LOOP. Es el gate de mayor ROI del harness.
 #
@@ -14,7 +14,7 @@
 #   - NUNCA bloquea. Solo informa. Un formateador con una opinión no debe
 #     poder trabar el trabajo; para lo que sí debe bloquear están canon-enforce
 #     (Stop) y los anillos 1 y 3.
-#   - Solo el archivo tocado, jamás el repo. Debe costar < 2s.
+#   - Solo los archivos tocados, jamás el repo. Debe costar < 2s (tope de 5).
 #   - Silencioso cuando todo está bien: ruido constante = ruido ignorado.
 #   - Sin linter configurado → no-op silencioso (lo reporta el health-check
 #     del SessionStart, no cada edición).
@@ -27,15 +27,26 @@ cd "$PROJECT_ROOT" || exit 0
 hook_read_input
 EV="PostToolUse"
 
+# ── QUÉ ARCHIVOS MIRAR ──────────────────────────────────────────────
+# Antes solo `Edit|Write`, y ahí estaba el agujero: en una sesión medida, 589
+# de 609 tool-calls fueron Bash y ninguna Edit, así que 533 líneas de shell
+# nuevo no recibieron NI UNA pasada del nivel 1 — el gate de mayor ROI del
+# harness, mudo por el matcher (f-ee9787d9). Escribir con `sed -i`, un heredoc
+# o `python3 -c` es escribir igual.
+#
+# Para Bash no se parsea el comando —esa carrera se pierde— sino que se
+# OBSERVA el efecto: `lib/writes.sh` compara contra una marca temporal.
+FILES=""
 case "$(hook_tool)" in
-  Edit|Write|MultiEdit|create_file|edit_file|search_replace|str_replace*) : ;;
+  Edit|Write|MultiEdit|create_file|edit_file|search_replace|str_replace*)
+    FILES="$(hook_file_path)" ;;
+  Bash|run_terminal_cmd|shell)
+    # shellcheck source=lib/writes.sh
+    . "$PROJECT_ROOT/scripts/agent-hooks/lib/writes.sh"
+    FILES="$(writes_since_mark)" ;;
   *) hook_allow ;;
 esac
-
-FILE="$(hook_file_path)"
-[ -z "$FILE" ] && hook_allow
-[ -f "$FILE" ] || hook_allow
-REL="$(hook_rel_path "$FILE")"
+[ -z "$FILES" ] && hook_allow
 
 OUT=""
 add() { [ -n "$1" ] && OUT="${OUT}$1"$'\n'; }
@@ -48,6 +59,14 @@ try() { # try <etiqueta> <comando...>
   add "── $label ──"
   add "$(printf '%s' "$o" | head -25)"
 }
+
+# verify_one <ruta-absoluta> — acumula en OUT lo que encuentre de ESE archivo.
+# Antes esto era el cuerpo del script y solo podia mirar uno; ahora hay que
+# poder recorrer los N que escribio un comando de Bash.
+verify_one() {
+  local FILE="$1" REL o n dq legacy
+  [ -f "$FILE" ] || return 0
+  REL="$(hook_rel_path "$FILE")"
 
 case "$REL" in
   # ── Shell: el harness es shell, así que esto SÍ está cableado ─────
@@ -117,14 +136,36 @@ case "$REL" in
     fi
     ;;
 esac
+  REVISADOS="${REVISADOS} ${REL}"
+}
+
+# Tope de 5 archivos: el contrato de este hook es "< 2s, jamás bloquea". Un
+# comando que toca 40 archivos no puede convertir el bucle in-loop en una
+# espera. Cuando se recorta se DICE — un gate que mira menos de lo que parece
+# es exactamente lo que este cambio viene a arreglar.
+REVISADOS=""; VISTOS=0; OMITIDOS=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  # Formato `<estado><TAB><ruta>`: `?` = no se pudo comparar contenido. Aquí se
+  # lintá igual, porque para "¿qué reviso?" mirar de más es barato. Se corta por
+  # el TABULADOR y no por un prefijo pegado: un archivo puede llamarse `?x.sh`.
+  f="${f#*"$(printf '\t')"}"
+  case "$f" in /*) : ;; *) f="$PROJECT_ROOT/$f" ;; esac
+  if [ "$VISTOS" -ge 5 ]; then OMITIDOS=$((OMITIDOS + 1)); continue; fi
+  VISTOS=$((VISTOS + 1))
+  verify_one "$f"
+done <<EOF_FILES
+$FILES
+EOF_FILES
+[ "$OMITIDOS" -gt 0 ] && add "(y $OMITIDOS archivo(s) más sin revisar: el hook mira 5 por turno)"
 
 [ -z "$OUT" ] && hook_allow   # todo limpio → silencio
 
 # Telemetría (nivel 9): la señal in-loop encontró algo — es el bucket más
 # barato de gate-value; si se promueve a finding, el ledger alimenta escape-rate.
 # Best-effort, jamás afecta al flujo.
-hook_log_detection "post-edit-verify" "in-loop" "$REL" 1
+hook_log_detection "post-edit-verify" "in-loop" "${REVISADOS# }" 1
 
-hook_context "$EV" "🔧 Verificación automática de \`$REL\` (no bloquea, pero arréglalo AHORA — cuesta 10× menos que en el review):
+hook_context "$EV" "🔧 Verificación automática de \`${REVISADOS# }\` (no bloquea, pero arréglalo AHORA — cuesta 10× menos que en el review):
 
 $OUT"

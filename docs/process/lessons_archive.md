@@ -11,6 +11,48 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-25] El gate de mayor ROI llevaba una sesión entera mudo, por el matcher
+- **Qué pasó:** `post-edit-verify` —el nivel 1, lint in-loop— colgaba de `PostToolUse Edit|Write`.
+  Una sesión escribió **533 líneas de shell** haciendo 589 de sus 609 tool-calls por `Bash` y
+  **ninguna** por `Edit`. El hook no corrió ni una vez. Nadie lo notó: un gate que no dispara y uno
+  que no existe se ven igual desde fuera, y el `SessionStart` seguía anunciándolo como activo.
+- **Causa raíz:** el matcher describía **cómo** se escribe (una tool concreta), no **qué** pasa
+  (un archivo cambió). En cuanto el agente cambió de canal —`sed -i`, heredoc, `python3 -c`—, la
+  defensa se quedó fuera sin que nada avisara. Y el canal no fue un capricho: otro gate empujaba
+  a ello (`f-6d4e01b8`).
+- **Regla:** **engancha las defensas al EFECTO, no al canal.** Si un gate se define por la
+  herramienta que lo dispara, existe un rodeo trivial y alguien lo tomará sin querer. Corolario
+  práctico: para saber qué escribió un comando, no lo parsees —la lista de formas la decide el
+  shell— sino compara el antes y el después.
+- **Y la coda, que acabó costando CUATRO bugs de la misma forma:** cada vez que esta librería
+  falló, falló **haciendo nada en silencio** — devolviendo vacío, que es indistinguible de "no hubo
+  escrituras", que es exactamente el fallo que viene a eliminar. Una marca calculada en UTC para un
+  `touch` que lee hora local. Un `-nt` que compara segundos enteros en bash (verificado en zsh, que
+  usa nanosegundos). Un `$(printf '\n')` que devuelve cadena vacía y hace que el patrón `*""*` case
+  con todo. Y un `case` cuyo `)` cerraba la sustitución `$( )` que lo envolvía, con el error de
+  sintaxis tragado por el `2>/dev/null` del contrato best-effort. **Ninguno lo habría cazado un test
+  de la pieza; los cazó correr el ciclo completo.** Regla operativa: cuando un componente es
+  best-effort y silencia sus errores, sus tests NO pueden probar la pieza — tienen que ejercitar el
+  ciclo entero y afirmar sobre la salida, porque el silenciador que lo hace robusto en producción es
+  el mismo que le esconde los bugs al desarrollarlo.
+- **Y la primera coda, que costó dos bugs seguidos:** la primera versión comparaba marcas de tiempo.
+  Falló dos veces por razones distintas — la marca se calculaba en UTC para un `touch -t` que
+  interpreta hora local (quedaba seis horas en el futuro, y el detector devolvía vacío para todo,
+  *indistinguible de "no hubo escrituras"*), y después `[ a -nt b ]` en el bash de macOS resultó
+  comparar segundos enteros aunque el sistema de archivos guarde nanosegundos. Lo peor: la
+  comprobación que dio por bueno ese primitivo se corrió en **zsh**, no en el shell que lo ejecuta.
+  **Verifica el primitivo en el mismo intérprete que lo va a correr**, y cuando el tiempo sea solo
+  un proxy del hecho que te importa, mide el hecho: comparar contenido no depende del huso, ni del
+  shell, ni de la granularidad del disco.
+- **Detector:** `tools/tests/test_bash_writes.sh` — cada test verificado matando su mutante.
+  (Aquí decía "seis tests" y ya eran once cuando se escribió: cifra derivable congelada en la
+  lección que va justo debajo de la que prohíbe congelarlas. La lista la da
+  `grep -c '^test_' tools/tests/test_bash_writes.sh`.) `test_el_hook_real_revisa_lo_que_escribio_un_comando_de_bash` muere si el matcher vuelve
+  a excluir Bash; `test_se_ve_toda_forma_de_escritura_sin_parsear_el_comando` cubre cinco formas
+  distintas de escribir; y `test_la_deteccion_no_depende_de_un_margen_temporal` corre el ciclo 20
+  veces dentro del mismo segundo — es el que habría cazado los dos bugs de tiempo.
+- **Área:** scripts/agent-hooks/lib/writes.sh · scripts/agent-hooks/post-edit-verify.sh · scripts/agent-hooks/track-trajectory.sh
+
 ### [2026-08-24] Un comentario que afirma cobertura es la afirmación MÁS peligrosa del repo
 - **Qué pasó:** el fix de telemetría de la fase 3 instrumentó `hook_block_or_warn` y escribió
   encima: *"instrumentado AQUÍ, que es por donde pasan TODOS los bloqueos"*. Eran **tres**

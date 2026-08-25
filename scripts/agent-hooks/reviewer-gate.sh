@@ -25,6 +25,12 @@ hook_read_input
 CMD="$(hook_command)"
 GATE_T0="$(date +%s 2>/dev/null || echo 0)"
 
+# Marca temporal para que el PostToolUse sepa QUÉ archivos escribió este
+# comando. Va lo antes posible y es best-effort total: si falla, lo único que
+# se pierde es la señal in-loop de este turno, nunca el gate.
+# shellcheck source=lib/writes.sh
+. "$PROJECT_ROOT/scripts/agent-hooks/lib/writes.sh" 2>/dev/null && writes_mark
+
 # ── 0. GIT-GUARD: prohibiciones de flags — la garantía DURA del Anillo 0 ─
 # permissions.deny con comodín intermedio (`git commit:*--no-verify*`) no está
 # garantizado por la sintaxis documentada de Claude Code, y un deny que no

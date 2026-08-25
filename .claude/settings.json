@@ -118,10 +118,10 @@
         ]
       }
     ],
-    "_comment_PostToolUse": "post-edit-verify es el bucle de verificación IN-LOOP: lint/typecheck del archivo recién tocado, con el resultado de vuelta al agente vía additionalContext en el MISMO turno. Es el gate de mayor ROI del harness: sin él, un error del turno 3 se descubre en el turno 40. track-failure detecta el bucle de reintentos LEYENDO el resultado de la tool (éxito resetea la racha, fallo la incrementa) — antes vivía en un evento 'PostToolUseFailure' que no existe.",
+    "_comment_PostToolUse": "post-edit-verify es el bucle de verificación IN-LOOP: lint/typecheck de los archivos recién tocados, con el resultado de vuelta al agente vía additionalContext en el MISMO turno. Es el gate de mayor ROI del harness: sin él, un error del turno 3 se descubre en el turno 40. Incluye Bash a propósito: una sesión medida hizo 589 de 609 tool-calls por Bash y CERO Edit, así que 533 líneas de shell nuevo no recibieron ni una pasada del nivel 1 (f-ee9787d9). Qué archivos escribió un comando NO se adivina parseándolo: lib/writes.sh observa el efecto contra una marca que deja el PreToolUse. track-failure detecta el bucle de reintentos LEYENDO el resultado de la tool (éxito resetea la racha, fallo la incrementa) — antes vivía en un evento 'PostToolUseFailure' que no existe.",
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|Bash",
         "hooks": [
           {
             "type": "command",
