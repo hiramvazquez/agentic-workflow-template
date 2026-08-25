@@ -124,7 +124,10 @@ test_el_selftest_elige_un_fixture_MALO_no_el_primero_del_directorio() {
   # empezó a coger uno de esos y a declarar el nivel 2 MUDO estando sano.
   # Un selftest con falsos positivos se ignora entero, y deja de proteger justo
   # de aquello para lo que existe.
-  grep -q 'fixtures/\*-malo\.\*' "$PROJECT_ROOT/tools/validate-harness.sh" 2>/dev/null \
+  # La división de fase 2a movió el selftest a tools/lib/validate-selftest.sh;
+  # se mira el orquestador Y sus libs para que otra reorganización no dé falso rojo.
+  grep -q 'fixtures/\*-malo\.\*' "$PROJECT_ROOT/tools/validate-harness.sh" \
+      "$PROJECT_ROOT"/tools/lib/validate-*.sh 2>/dev/null \
     || { echo "    validate-harness no selecciona un fixture *-malo.*: cualquier archivo"
          echo "    nuevo en tools/semgrep/fixtures/ puede volver a romper el selftest"; return 1; }
   ls "$PROJECT_ROOT"/tools/semgrep/fixtures/*-malo.* >/dev/null 2>&1 \

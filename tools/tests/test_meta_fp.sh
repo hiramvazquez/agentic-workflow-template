@@ -39,8 +39,8 @@ tools/check-skill-matrix-doc.sh              :: test_skill_matrix.sh
 tools/check-execution-map.sh                 :: test_execution_map.sh
 tools/check-verify-marker.sh                 :: test_verify_marker.sh
 scripts/agent-hooks/run-hook.sh              :: test_run_hook.sh
-tools/backlog/next.sh                        :: test_backlog.sh
-tools/backlog/criteria-link.sh               :: test_backlog.sh
+tools/backlog/next.sh                        :: test_backlog_selection.sh
+tools/backlog/criteria-link.sh               :: test_backlog_criteria.sh
 tools/backlog/scope-check.sh                 :: test_backlog_scope.sh
 tools/architecture-check.sh                  :: test_architecture_capabilities.sh
 tools/agent-runner.sh                        :: test_agent_runner.sh
@@ -52,7 +52,7 @@ tools/drift-ratchet.sh                       :: test_ratchets.sh
 tools/secret-scan.sh                         :: test_secret_scan.sh
 tools/semgrep-scan.sh                        :: test_fail_closed.sh
 tools/mutation-score.sh                      :: test_fail_closed.sh
-tools/lesson-detector-link.sh                :: test_lessons.sh
+tools/lesson-detector-link.sh                :: test_lessons_detector_link.sh
 tools/findings/findings.sh                   :: test_findings_cli.sh
 tools/check-source-sets.sh                   :: test_source_sets.sh
 tools/check-finding-refs.sh                  :: test_finding_refs.sh

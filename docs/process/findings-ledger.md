@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **33** · Cerrados: 131 · Total: 164
+Abiertos: **34** · Cerrados: 131 · Total: 165
 
 ## Abiertos
 
@@ -41,6 +41,7 @@ Abiertos: **33** · Cerrados: 131 · Total: 164
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
+| `f-c59f9bf1` | low | auto-fix | `tools/lesson-detector-link.sh` | lesson-detector-link no ata las lineas de continuacion de Detector: a un archivo concreto |
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
 
 ## Cerrados

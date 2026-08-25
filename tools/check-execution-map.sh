@@ -230,7 +230,7 @@ echo "EXECUTION_MAP_SUMMARY stale=$STALE"
     printf '%s\n' "$DERIVABLES" | sed 's/^/     línea /'
     echo "   Sustituye el número por el comando que lo imprime (la suite:"
     echo "   \`bash tools/tests/run-tests.sh\` da el total al final; el contexto lo mide"
-    echo "   test_lessons.sh) o por evidencia commit+fecha SIN la forma 'N tests /"
+    echo "   test_lessons_presupuesto_contexto.sh) o por evidencia commit+fecha SIN la forma 'N tests /"
     echo "   N líneas'. Ver \`f-wf02-mapa-cifras-podridas\` en el ledger."
   fi
   if [ -n "$DETALLE" ]; then

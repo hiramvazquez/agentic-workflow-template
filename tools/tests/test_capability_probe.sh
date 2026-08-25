@@ -7,6 +7,10 @@ _probe_sandbox() {
   [ -f "$PROJECT_ROOT/tools/probe-capability.sh" ] && cp "$PROJECT_ROOT/tools/probe-capability.sh" "$d/tools/"
   cp "$PROJECT_ROOT/tools/semgrep-scan.sh" "$d/tools/"
   [ -f "$PROJECT_ROOT/tools/validate-harness.sh" ] && cp "$PROJECT_ROOT/tools/validate-harness.sh" "$d/tools/"
+  # el orquestador viaja con sus checks: sin las libs, validate-harness sale 3 a propósito
+  if ls "$PROJECT_ROOT"/tools/lib/validate-*.sh >/dev/null 2>&1; then
+    mkdir -p "$d/tools/lib" && cp "$PROJECT_ROOT"/tools/lib/validate-*.sh "$d/tools/lib/"
+  fi
   printf 'rules: []\n' > "$d/tools/semgrep/rules/dummy.yaml"
   printf 'print("fixture")\n' > "$d/tools/semgrep/fixtures/python-malo.py"
   (

@@ -12,13 +12,18 @@
   Ese bucle —el adoptante sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ y
   vuelve a bajar— es el flujo de trabajo actual, no una fase de pruebas.
 - **En curso:** **PRD 0005 (estabilización del harness)**, Approved. Entregadas 0a, 0b, 0c, 1a, 1b,
-  1c y 2b. La **fase 3 corrió parcialmente el 2026-08-24** —informe en
+  1c, 2b y **2a parcial (2026-08-25)**: las cuatro divisiones que estaban rescatadas en worktrees
+  (test_backlog, test_e2e_matrix, test_lessons y validate-harness → orquestador + libs en
+  `tools/lib/`) se integraron a main por orden del owner, con la suite completa verde, cero tests
+  perdidos (los nombres `test_*` de cada monolito y de su división coinciden exactamente) y las
+  citas `Detector:` del archivo de lecciones re-apuntadas + índice regenerado con el rotador.
+  La **fase 3 corrió parcialmente el 2026-08-24** —informe en
   `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`— y le falta una segunda pasada: lo
   primero que encontró fue que los gates **no registraban cuando bloquean**, así que no hay base
-  para decidir sobre los mecánicos hasta que la telemetría (ya arreglada) acumule ventana. Queda
-  también la **2a**: bajar del hard limit los archivos que lo exceden, con la restricción de
-  bootstrap; `f-wf04-archivos-sobre-el-limite` los lista y trae el comando que los recalcula — no
-  los cuentes desde aquí.
+  para decidir sobre los mecánicos hasta que la telemetría (ya arreglada) acumule ventana. De la
+  **2a queda su mitad de más riesgo**: `upgrade.sh` (restricción de bootstrap, PRD 0005 §6) y el
+  resto de archivos sobre el límite; `f-wf04-archivos-sobre-el-limite` los lista y trae el comando
+  que los recalcula — no los cuentes desde aquí.
 - **El diff de la fase 3 llegó a commiteable el 2026-08-24, en la cuarta ronda.** Venía de **tres
   rondas en RED**, todas por la misma causa: afirmar cobertura que no se verificó (`f-20ed9b44`,
   abierto — es owner-decision, la pregunta es qué cambio de proceso evita la cuarta). Cerrados
@@ -27,12 +32,17 @@
   del reviewer). Lo que cambió respecto de las tres rondas anteriores no es el parche: es que **la
   afirmación de cobertura pasó a ser un test** que relee `io.sh` y deriva las primitivas en vez de
   listarlas. Lección rotada al archivo con su detector.
-- **Sigue pendiente el `process-judge`**, que lee CÓMO se trabajó y no solo el diff. Es la única
-  defensa sin datos para decidir, y estas cuatro rondas son justo su materia prima.
-- **ORDEN, porque el mapa se contradecía a sí mismo y lo cazó un reviewer:** cola del
-  `process-judge` → **segunda pasada de la fase 3** → **fase 2a**. La fase 3 va antes que la 2a
-  porque el owner decidió el 2026-08-24 que el freeze sigue vigente: se cierra y se mide antes de
-  seguir tocando. Cualquier frase de este doc que sugiera lo contrario está obsoleta.
+- **El `process-judge` YA CORRIÓ (2026-08-25):** su cola se procesó y de ahí salieron los dos
+  commits de esa mañana — el contexto del juez dejó de fingir que miraba la trayectoria
+  (`2196f43`) y el nivel 1 dejó de ser ciego a lo que se escribe por Bash (`0072188`, motivado
+  por el dato del juez: casi todo el trabajo de una sesión medida entró por Bash y
+  `post-edit-verify` no corrió ni una vez). Abrió además `f-6d4e01b8` y `f-a5f3e17c`.
+- **ORDEN vigente:** ~~cola del `process-judge`~~ (hecha) → **segunda pasada de la fase 3**
+  (espera a que la telemetría de bloqueos acumule ventana; no es trabajo de máquina sino de
+  medición) → **resto de la fase 2a** (`upgrade.sh` y demás — la parte con restricción de
+  bootstrap). La integración parcial de 2a del 2026-08-25 fue orden explícita del owner sobre
+  trabajo ya escrito y verificado, no un adelanto de la fase congelada: no añade gates y el
+  freeze de gates nuevos sigue vigente.
 - **UN gate sigue abierto, y conviene separar sus dos mitades porque se confunden.** El gate de 0a
   pedía **30 corridas macOS seguidas sin rerun**. En CI no llegó a correr: los dos runs despachados
   (2026-08-19) murieron en 5s por presupuesto de Actions (`gh run list --workflow=gate-0a-macos.yml`).
@@ -56,9 +66,9 @@
   estados explícitos de las capacidades arquitectónicas; boundary portable `agent-runner` con
   backends intercambiables; eventos v2 y findings con lifecycle separado (detectar ≠ defecto);
   rotación de lecciones que dejó el contexto obligatorio dentro del límite que fija y mide
-  `test_contexto_vivo_obligatorio_cabe_en_250_lineas` (`tools/tests/test_lessons.sh`) — la
+  `test_contexto_vivo_obligatorio_cabe_en_250_lineas` (`tools/tests/test_lessons_presupuesto_contexto.sh`) — la
   cifra real la imprime ese test, no este doc; caché de Semgrep staged solo para verde.
-  **Fase 10 cerró el ciclo con la matriz E2E** (`tools/tests/test_e2e_matrix.sh`):
+  **Fase 10 cerró el ciclo con la matriz E2E** (hoy dividida en los `tools/tests/test_e2e_*.sh`):
   un test por escenario golden, atado al PRD por un test que falla si la lista y su demostración
   divergen. Al construirla salieron tres huecos que ninguna fase anterior podía ver —el Anillo 3
   no tenía test propio, `claude.sh` declaraba `read_only` sin demostrarlo y la promesa de ≥30% de
@@ -127,22 +137,22 @@
   telemetría arreglada. El informe declara su método de atribución y el error que cometió: la
   primera versión daba 5.0 al `design-reviewer` porque un clasificador por subcadenas se tragó una
   entrada de otra fecha y de otra fuente.
-- **Siguiente entrega: procesar la cola del `process-judge`.** Cuántas hay lo dice
-  `wc -l < .agents/state/judge-queue.txt`, no este doc: es un contador vivo que solo vacía el propio
-  `process-judge` al correr, así que un número escrito aquí nace caducado. Esta línea decía "3"
-  cuando ya había 5 — la misma cifra podrida de `f-wf02-mapa-cifras-podridas` que el bloque de «Salud», dos párrafos más
-  arriba, explica cómo evitar. Es la única defensa
-  que lee la TRAYECTORIA y no solo el diff, y la única sobre la que no hay datos para decidir.
-  Procesarlas es el experimento barato.
-- **Después: segunda pasada de la fase 3**, ya con la telemetría de bloqueos acumulando. Es lo que
-  cierra `f-wf09-ventana-de-valor`, y lo que falta para eso no es más maquinaria: es la medición.
-- **Después, y no antes: PRD 0005 fase 2a** — bajar del hard limit los archivos del harness que
-  lo exceden, sin debilitar nada. Cuáles son y cuántos, en `f-wf04-archivos-sobre-el-limite`,
-  que trae el comando que lo recalcula: ese finding ya congeló el conteo mal dos veces. Es la fase con más riesgo del programa y su
-  restricción de diseño está escrita en el PRD §6: la auto-actualización copia HOY solo
-  `upgrade.sh` a un temporal y hace `exec`, así que un orquestador que sourcee libs inexistentes
-  en el árbol del adoptante **rompe a todos los adoptantes en el salto de versión**. Léela antes
-  de tocar una línea. (La fase 3 va ANTES que ésta — ver el bloque de orden en «Estado actual».)
+- **HECHO 2026-08-25 — la cola del `process-judge` se procesó** (el contador vivo es
+  `wc -l < .agents/state/judge-queue.txt`; hoy imprime cero). Sus hallazgos ya son commits
+  (`2196f43`, `0072188`) y entradas del ledger. Con esto el juez deja de ser la defensa sin datos;
+  su rendimiento entra en la segunda pasada de la fase 3.
+- **Siguiente entrega: segunda pasada de la fase 3**, ya con la telemetría de bloqueos acumulando
+  (arreglada el 2026-08-24 — la ventana corre desde entonces). Es lo que cierra
+  `f-wf09-ventana-de-valor`, y lo que falta para eso no es más maquinaria: es la medición.
+  PRD 0004 §16 pide 2–4 semanas de datos antes de retirar o endurecer nada.
+- **Después: el RESTO de la fase 2a.** Las cuatro divisiones rescatadas de los worktrees ya están
+  en main (2026-08-25, orden del owner — ver «Estado actual»). Lo que queda es la mitad con más
+  riesgo: `upgrade.sh` y los demás archivos sobre el límite — cuáles son y cuántos, en
+  `f-wf04-archivos-sobre-el-limite`, que trae el comando que lo recalcula: ese finding ya congeló
+  el conteo mal tres veces. Su restricción de diseño está escrita en el PRD §6: la
+  auto-actualización copia HOY solo `upgrade.sh` a un temporal y hace `exec`, así que un
+  orquestador que sourcee libs inexistentes en el árbol del adoptante **rompe a todos los
+  adoptantes en el salto de versión**. Léela antes de tocar una línea.
 - **Handoff para el siguiente agente:** lee el PRD 0005 §5b, que dice fase por fase qué se
   entregó y qué gate sigue abierto. Queda UNO y no lo cierra quien implementó, a propósito: el
   30/30 de macOS de la fase 0a, que dio **29/30** en el bucle del Mac del owner — el gate literal no
@@ -153,7 +163,8 @@
   defensa, y endurecer sin ese dato es añadir ceremonia.
 - **Base verificada de fase 10:** sobre `61e3d06` (2026-08-12) la matriz E2E y la suite completa
   salieron verdes en macOS — las cifras exactas las imprimen `bash tools/tests/run-tests.sh
-  e2e_matrix` y la suite completa; no se copian aquí porque caducan. Cada test de la matriz se
+  golden` (la matriz vive dividida en los `test_e2e_*.sh` y sus demostraciones se llaman
+  `test_golden_*`) y la suite completa; no se copian aquí porque caducan. Cada test de la matriz se
   comprobó contra un mutante del script que dice cubrir (11 mutantes, cada uno rojo en su test y
   solo en el suyo). **Linux quedó verificado DESPUÉS de esa corrida:** el push de fase 10 dejó
   `ubuntu-latest` en rojo (`f-stat-f-orden-invertido`, arreglado en `4a6a775` el 2026-08-12) y la

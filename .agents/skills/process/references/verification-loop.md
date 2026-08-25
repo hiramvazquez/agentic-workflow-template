@@ -232,7 +232,7 @@ la demostración no: la casilla de "Done" sigue verde y ya no significa nada.
 
 La regla es la misma del campo `Detector:` de las lecciones, un nivel más arriba: **la
 enumeración es la fuente y algo mecánico la persigue.** En el harness lo hace
-`tools/tests/test_e2e_matrix.sh` — un `test_golden_NN_…` por escenario del PRD, y un test que
+`tools/tests/test_e2e_plataformas_y_vinculo.sh` — un `test_golden_NN_…` por escenario del PRD (repartidos en los `test_e2e_*.sh`), y un test que
 lee la lista del propio PRD y falla si aparece un escenario sin su test. Cuesta veinte líneas y
 convierte una afirmación de la DoD en un hecho comprobable.
 

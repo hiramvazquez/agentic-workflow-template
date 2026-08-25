@@ -62,7 +62,7 @@ Config útil: `BACKLOG_MAX_TURNS=40` acota el coste por historia ·
 ## Qué es esto y qué NO es (honestidad de nivel)
 
 **Sí estamos a este nivel** en lo mecánico: selección, ramas, estados, dependencias, scope y guards
-están implementados y testeados (`test_backlog.sh` + `test_backlog_scope.sh`). Y la pieza que hace viable lo
+están implementados y testeados (los `test_backlog_*.sh`: selección, criterios, cierre de run, aislamiento y scope). Y la pieza que hace viable lo
 no-atendido no es el runner: son los gates de dentro — el run headless hereda `settings.json`
 completo (permisos deny, hooks, el reviewer con VERDICT), así que "terminó" significa "pasó
 todo", no "el modelo dice que terminó".

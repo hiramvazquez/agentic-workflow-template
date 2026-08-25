@@ -251,8 +251,8 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 - [2026-08-19] Un rojo que tira el exit y el stderr convierte cualquier fallo en el fallo equivocado — `tools/tests/test_agent_runner.sh`
 - [2026-08-19] Un JSONL escrito con printf es un formato solo hasta el primer valor hostil — `tools/tests/test_review_history.sh`
 - [2026-08-19] El mapa canónico declaró conteos que un comando recalcula, y se pudrieron — `tools/tests/test_execution_map.sh`
-- [2026-08-19] Un generador de vista estable pero no canónico sedimenta formato hasta reventar su presupuesto — `tools/tests/test_lessons.sh`
-- [2026-08-09] Las lecciones no caducaban, y eso contradecía su propio mecanismo — `tools/tests/test_lessons.sh`
+- [2026-08-19] Un generador de vista estable pero no canónico sedimenta formato hasta reventar su presupuesto — `tools/tests/test_lessons_rotacion.sh`
+- [2026-08-09] Las lecciones no caducaban, y eso contradecía su propio mecanismo — `tools/tests/test_lessons_rotacion.sh`
 - [2026-08-14] El repo del harness eximía de review el 100% de su propio contenido — `tools/tests/test_review_marker_preset.sh`
 - [2026-08-14] La regla que protege el FILL vivía en uno de los dos caminos — `tools/tests/test_upgrade.sh`
 - [2026-08-14] El canal por el que llegan la mitad de los arreglos no tocaba el ledger — `tools/tests/test_upgrade.sh`
@@ -262,12 +262,12 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 - [2026-08-14] El harness modelaba un solo eje, y KMP tiene dos — `tools/tests/test_source_sets.sh`
 - [2026-08-14] El sistema guardaba QUÉ decidió el review y perdía QUÉ dijo — `tools/tests/test_verdict.sh`
 - [2026-08-13] El paso del workflow que nadie ejecutaba mentía en el arranque de cada sesión — `tools/tests/test_execution_map.sh`
-- [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás — `tools/tests/test_e2e_matrix.sh`
-- [2026-08-12] Una capacidad declarada no es una capacidad demostrada — `tools/tests/test_e2e_matrix.sh`
-- [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa — `tools/tests/test_e2e_matrix.sh`
+- [2026-08-12] El único entrypoint sin test propio era el que aprueba todo lo demás — `tools/tests/test_e2e_gates_anillo3.sh`
+- [2026-08-12] Una capacidad declarada no es una capacidad demostrada — `tools/tests/test_e2e_orquestador_backlog.sh`
+- [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa — `tools/tests/test_e2e_plataformas_y_vinculo.sh`
 - [2026-08-12] `stat -f` de GNU no falla, y el orden del fallback ERA el bug — `tools/tests/test_shell_hygiene.sh`
 - [2026-08-12] El programa embebido consumía el mismo stdin reservado para el payload — `tools/tests/test_gate_cache.sh`
-- [2026-08-12] Reconciliar un archivo exige identidad no ambigua y clasificación bidireccional — `tools/tests/test_lessons.sh`
+- [2026-08-12] Reconciliar un archivo exige identidad no ambigua y clasificación bidireccional — `tools/tests/test_lessons_rotacion.sh`
 - [2026-08-05] Un gate bloqueó editar la documentación de su propia área — `tools/tests/test_skill_reminder.sh`
 - [2026-08-05] La ausencia de una herramienta se contaba como deuda técnica — `tools/tests/test_drift_aggregation.sh`
 - [2026-08-05] El escape hatch de emergencia relajaba más de lo declarado — `tools/tests/test_ratchets.sh`
@@ -303,25 +303,25 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 - [2026-08-10] La herramienta que reparte los arreglos no puede parchearse a sí misma — `tools/tests/test_upgrade.sh`
 - [2026-08-10] Un marcador es una FORMA, no una palabra: `grep FILL` congeló media maquinaria — `tools/tests/test_upgrade.sh`
 - [2026-08-10] Un literal partido a propósito lleva escrito POR QUÉ, o el siguiente lo junta — `tools/tests/test_secret_scan.sh`
-- [2026-08-10] El filtro del propio verificador de lecciones se tragó una lección — `tools/tests/test_lessons.sh`
+- [2026-08-10] El filtro del propio verificador de lecciones se tragó una lección — `tools/tests/test_lessons_falsos_positivos.sh`
 - [2026-08-10] `.claude/settings.json` es maquinaria viviendo en una carpeta de contenido — `tools/tests/test_settings_merge.sh`
 - [2026-08-10] "Esto lo caza el test X" — y el test X no lo cazaba — `tools/tests/test_skill_matrix.sh`
 - [2026-08-10] Un manifiesto mantenido a mano no puede vigilarse a sí mismo — `tools/tests/test_meta_fp.sh`
 - [2026-08-10] Una regla de adopción que solo vive en un doc se descubre tarde — `tools/tests/test_layers.sh`
-- [2026-08-10] El estado real de una historia no vive donde el selector miraba — `tools/tests/test_backlog.sh`
+- [2026-08-10] El estado real de una historia no vive donde el selector miraba — `tools/tests/test_backlog_selection.sh`
 - [2026-08-10] Un `||` que no distingue "no pude mirar" de "encontré algo" — `tools/tests/test_secret_scan.sh`
 - [2026-08-10] Un gate en rojo perpetuo es peor que un gate ausente — `tools/tests/test_secret_scan.sh`
 - [2026-08-10] El guard colgaba del exit code de jq, y jq cambió de opinión entre versiones — `tools/tests/test_fail_closed.sh`
-- [2026-08-10] Un run puede salir con 0 y no haber terminado — `tools/tests/test_backlog.sh`
+- [2026-08-10] Un run puede salir con 0 y no haber terminado — `tools/tests/test_backlog_run_completion.sh`
 - [2026-08-10] Se arregló un caso del parser y no se buscó el hermano — `tools/tests/test_semgrep_rules.sh`
-- [2026-08-10] Un criterio de aceptación «verificado con un grep» es decoración — `tools/tests/test_backlog.sh`
+- [2026-08-10] Un criterio de aceptación «verificado con un grep» es decoración — `tools/tests/test_backlog_criteria.sh`
 - [2026-08-11] El informe de "no lo he traído" mentía, y empujaba justo al flujo que prohíbe — `tools/tests/test_upgrade.sh`
 - [2026-08-11] El invariante nº1 estaba aplicado al reviewer y no a los tests — `tools/tests/test_verify_marker.sh`
 - [2026-08-11] Un gate que lee TEXTO como si fuera sintaxis enseña a evadirlo — `tools/tests/test_bash_matrix.sh`
 - [2026-08-11] Un hook roto dejó al agente sin poder ni diagnosticarlo — `tools/tests/test_run_hook.sh`
 - [2026-08-11] Un piso de 0 no es un suelo: es una medición que nunca ocurrió — `tools/tests/test_ratchets.sh`
 - [2026-08-12] "Sin cablear" y "cableado, pero el runner no termina" no son el mismo estado — `tools/tests/test_ratchets.sh`
-- [2026-08-12] El archivo de tests existía; el test citado no — `tools/tests/test_lessons.sh`
+- [2026-08-12] El archivo de tests existía; el test citado no — `tools/tests/test_lessons_detector_link.sh`
 - [2026-08-12] El gestor de paquetes contesta a otra pregunta — `tools/tests/test_finding_refs.sh`
 - [2026-08-12] Un id de finding que no existe LEE COMO CERRADO — `tools/tests/test_finding_refs.sh`
 - [2026-08-12] La cuarta vez del mismo falso positivo no pide otra lección — `tools/tests/test_bash_matrix.sh`
@@ -338,4 +338,4 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 - [2026-08-12] Validar el prefijo de un timestamp no valida el instante — `tools/tests/test_metrics.sh`
 - [2026-08-12] Normalizar los datos a UTC no basta si la ventana sigue siendo local — `tools/tests/test_metrics.sh`
 - [2026-08-12] Cuantificar un descarte no reemplaza la señal de su causa — `tools/tests/test_metrics.sh`
-- [2026-08-12] Una vista generada no puede convertirse en entrada de su propio generador — `tools/tests/test_lessons.sh`
+- [2026-08-12] Una vista generada no puede convertirse en entrada de su propio generador — `tools/tests/test_lessons_rotacion.sh`

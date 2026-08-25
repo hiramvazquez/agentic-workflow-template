@@ -559,10 +559,10 @@
   cada pasada. El colapso solo toca FORMATO generado (separadores de cola); un `---` dentro de un
   bloque ``` es CONTENIDO y sobrevive; y un marcador se reconoce por su FORMA (comentario que
   abre la línea), no por su palabra — mencionarlo no es llevarlo.
-- **Detector:** tools/tests/test_lessons.sh::test_rotacion_dos_pasadas_bytes_identicos_y_forma_canonica
+- **Detector:** tools/tests/test_lessons_rotacion.sh::test_rotacion_dos_pasadas_bytes_identicos_y_forma_canonica
   + ::test_rotar_colapsa_separadores_huerfanos_a_uno_antes_del_indice
-  + ::test_documento_vivo_real_sin_separadores_huerfanos
-  + ::test_colapso_no_se_traga_contenido_ni_lecciones
+  + tools/tests/test_lessons_presupuesto_contexto.sh::test_documento_vivo_real_sin_separadores_huerfanos
+  + tools/tests/test_lessons_falsos_positivos.sh::test_colapso_no_se_traga_contenido_ni_lecciones
   + ::test_mencionar_keep_visible_en_prosa_no_veta_el_archivado
 - **Área:** tools/lessons-rotate.sh · docs/process/lessons_learned.md
 
@@ -675,7 +675,7 @@
   volumen no). Nunca se archivan las `n/a-manual` (ahí la prosa ES el mecanismo), ni las de
   garantía parcial, ni las marcadas `<!-- KEEP-VISIBLE -->`. El archivo se verifica igual que el
   doc vivo: si borras el test, la lección VUELVE al doc vivo.
-- **Detector:** tools/tests/test_lessons.sh (`test_rotacion_archiva_mecanizadas_y_respeta_manuales`,
+- **Detector:** tools/tests/test_lessons_rotacion.sh (`test_rotacion_archiva_mecanizadas_y_respeta_manuales`,
   `test_rotacion_deja_indice_de_una_linea`, `test_lecciones_archivadas_siguen_verificadas`)
 - **Área:** tools/lessons-rotate.sh · tools/lesson-detector-link.sh · docs/process/
 
@@ -1600,7 +1600,7 @@
 - **Regla:** si un script decide QUÉ se ejecuta, su lista de invocaciones es comportamiento y se
   fija con un test. Patrón barato: stubs que firman su paso, un caso con un gate en rojo y —el
   que de verdad importa— un caso con un gate AUSENTE, que nunca puede leerse como aprobado.
-- **Detector:** `tools/tests/test_e2e_matrix.sh` (`test_golden_09_preset_full_no_reduce_ningun_gate`)
+- **Detector:** `tools/tests/test_e2e_gates_anillo3.sh` (`test_golden_09_preset_full_no_reduce_ningun_gate`)
 - **Área:** ci/run-gates.sh
 
 ### [2026-08-12] Una capacidad declarada no es una capacidad demostrada
@@ -1614,7 +1614,7 @@
 - **Regla:** toda capacidad que un adapter declare necesita un test que observe el EFECTO, no la
   declaración. Para un CLI, el efecto observable más barato es su propio argv: un stub del
   binario que registre con qué lo llamaron.
-- **Detector:** `tools/tests/test_e2e_matrix.sh` (`test_golden_05_autonomia_completa_contra_cli_stub`)
+- **Detector:** `tools/tests/test_e2e_orquestador_backlog.sh` (`test_golden_05_autonomia_completa_contra_cli_stub`)
 - **Área:** tools/agent-backends/claude.sh · tools/agent-runner.sh
 
 ### [2026-08-12] Una lista de garantías sin vínculo mecánico a sus tests es prosa
@@ -1627,7 +1627,7 @@
 - **Regla:** cuando un documento enumera garantías, algo tiene que fallar si la enumeración crece
   sin su demostración. Aquí la lista es la fuente y el test la persigue: lee los escenarios del
   PRD y exige un `test_golden_NN_` por cada uno.
-- **Detector:** `tools/tests/test_e2e_matrix.sh` (`test_matriz_e2e_cubre_los_diez_escenarios_golden`)
+- **Detector:** `tools/tests/test_e2e_plataformas_y_vinculo.sh` (`test_matriz_e2e_cubre_los_diez_escenarios_golden`)
 - **Área:** docs/process/prds/0004-reconciliar-workflow-agentico.md · tools/tests/
 
 ### [2026-08-12] `stat -f` de GNU no falla, y el orden del fallback ERA el bug
@@ -1763,7 +1763,7 @@
 - **Regla:** combina ambas fuentes antes de escribir; un retry solo es duplicado si coincide el
   cuerpo completo, mientras identidad igual con cuerpo distinto falla cerrado. Reclasifica todo
   el corpus en cada corrida, de modo que perder una garantía devuelve la lección al tramo vivo.
-- **Detector:** tools/tests/test_lessons.sh::test_rotacion_no_deduplica_cuerpos_distintos_bajo_el_mismo_titulo
+- **Detector:** tools/tests/test_lessons_rotacion.sh::test_rotacion_no_deduplica_cuerpos_distintos_bajo_el_mismo_titulo
   + ::test_rotacion_reclasifica_archivada_si_su_test_desaparece
 - **Área:** tools/lessons-rotate.sh
 
@@ -2398,7 +2398,7 @@
   cierran en la misma línea. Y regla de diseño para cualquier máquina de estados que "salta"
   contenido: **prefiere el modo de fallo que muestra de más al que oculta de más** — de más se
   ve y se corrige; de menos se parece a que no había nada.
-- **Detector:** tools/tests/test_lessons.sh::test_mencionar_un_comentario_html_no_abre_un_comentario_html
+- **Detector:** tools/tests/test_lessons_falsos_positivos.sh::test_mencionar_un_comentario_html_no_abre_un_comentario_html
   (una lección que menciona un comentario HTML conserva su Detector Y no borra la siguiente)
 - **Área:** tools/lesson-detector-link.sh
 
@@ -2493,7 +2493,7 @@
   una historia cuyo run se cortó a medias. Hay que distinguir `in-review` (terminada → saltar y
   seguir con la siguiente) de cualquier otro estado (a medias → devolverla para retomar). Ante
   la duda, devolver: retomar es reversible; olvidar una historia, no.
-- **Detector:** tools/tests/test_backlog.sh::test_historia_terminada_en_rama_no_se_reofrece_y_avanza
+- **Detector:** tools/tests/test_backlog_selection.sh::test_historia_terminada_en_rama_no_se_reofrece_y_avanza
   + ::test_historia_a_medias_se_sigue_ofreciendo_para_retomarla (la otra cara)
   + ::test_mergeada_sin_marcar_done_se_avisa + ::test_sin_ramas_el_selector_no_cambia (FP guard)
 - **Área:** tools/backlog/next.sh
@@ -2579,7 +2579,7 @@
   `in-progress`, el run sale != 0 y lo pendiente se **respalda** en `.agents/state/` — la
   recuperación no puede depender de que nadie pode el worktree. Y al prompt del agente: no
   termines el turno con procesos en vuelo; "me avisará al acabar" no es un resultado.
-- **Detector:** tools/tests/test_backlog.sh::test_run_que_deja_trabajo_sin_commitear_no_cierra
+- **Detector:** tools/tests/test_backlog_run_completion.sh::test_run_que_deja_trabajo_sin_commitear_no_cierra
   + ::test_run_limpio_si_cierra_en_in_review (el guard de FP: quien hace las cosas bien sigue
   cerrando)
 - **Área:** tools/backlog/run.sh
@@ -2636,7 +2636,7 @@
   campo `Detector:` de las lecciones —incluida la excepción explícita `n/a-manual — <razón>`—
   y el runner lo comprueba antes de marcar `in-review`. Y como en las lecciones: el test citado
   tiene que EXISTIR; validar solo que el campo esté relleno deja pasar tests fantasma.
-- **Detector:** tools/backlog/criteria-link.sh + tools/tests/test_backlog.sh::test_criterio_sin_test_no_pasa
+- **Detector:** tools/backlog/criteria-link.sh + tools/tests/test_backlog_criteria.sh::test_criterio_sin_test_no_pasa
   + ::test_test_citado_inexistente_no_cuenta + ::test_listas_de_otras_secciones_no_cuentan_como_criterios (FP guard)
 - **Área:** tools/backlog/criteria-link.sh · backlog/_template.md
 
@@ -2800,8 +2800,8 @@
   funciones del archivo — la línea entera, no solo el primer token, porque una lección cita varios
   tests y basta uno inventado para que el respaldo sea ficticio.
 - **Detector:** tools/lesson-detector-link.sh, fijado por
-  tools/tests/test_lessons.sh::test_un_test_citado_que_no_existe_falla +
-  ::test_los_tests_que_existen_no_se_acusan +
+  tools/tests/test_lessons_detector_link.sh::test_un_test_citado_que_no_existe_falla +
+  tools/tests/test_lessons_falsos_positivos.sh::test_los_tests_que_existen_no_se_acusan +
   ::test_un_detector_que_no_es_un_test_sigue_valiendo (sin este último, exigir un `::` rechazaría
   detectores legítimos —semgrep, layers.conf, un hook— y el gate acabaría desactivado)
 - **Área:** tools/lesson-detector-link.sh
@@ -3170,5 +3170,5 @@
 - **Regla:** antes de clasificar, elimina todas las vistas generadas; al escribir, reconstruye
   archivo e índice desde el conjunto completo, deduplica por identidad estable y prueba la
   secuencia generar → agregar contenido posterior → regenerar → regenerar otra vez.
-- **Detector:** tools/tests/test_lessons.sh::test_rotacion_reconstruye_indice_si_hay_entradas_nuevas_despues
+- **Detector:** tools/tests/test_lessons_rotacion.sh::test_rotacion_reconstruye_indice_si_hay_entradas_nuevas_despues
 - **Área:** tools/lessons-rotate.sh · docs/process/lessons_*.md
