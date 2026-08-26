@@ -25,7 +25,10 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 MODE="${1:---staged}"
 TTL="${REVIEWER_MARKER_TTL:-3600}"
 MARKER=".agents/state/markers/reviewer_run.txt"
-# <!-- FILL: ajusta los globs de "NO es código de producto" a tu repo. -->
+# La lista de "NO es código de producto" se personaliza en tools/lib/scope.sh
+# (desde 206bc16), no aquí — esta cabecera llevaba un marcador FILL vestigial
+# que hacía que upgrade.sh tratara este GATE como propiedad del adoptante y lo
+# congelara para siempre en todos los repos por copia (f-5fc894be).
 # AGENTS.md/CLAUDE.md (raíz y por plataforma) son META-DOC, no producto: editarlos
 # ya tiene su gate humano (permissions.ask del Anillo 0). Sin esta exención, un
 # commit de solo-reglas exigía marker de review — falso positivo real cazado en

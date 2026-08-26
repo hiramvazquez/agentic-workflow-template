@@ -35,6 +35,23 @@
 > dice **qué niveles de la pirámide están MUDOS** en tu máquina. Confía en ese reporte, no en
 > tu memoria: un gate anunciado y no operativo es peor que uno ausente.
 
+### macOS: permisos de carpeta (léelo si tu repo vive en Escritorio/Documentos)
+
+macOS protege `~/Desktop`, `~/Documents` y `~/Downloads` a nivel de aplicación (TCC). Si el
+proyecto vive ahí y la app que corre tu agente no tiene permiso, el shell recibe
+`Operation not permitted` en TODO — hasta `ls` sobre su propio directorio — y el síntoma
+confunde a propósito: parece un sandbox del harness y no lo es (vivido el 2026-08-26,
+`f-237347df`). Tres cosas que saber:
+
+1. **Remedio:** Ajustes del Sistema → Privacidad y seguridad → *Acceso total al disco* (o
+   *Archivos y carpetas* → Escritorio) para la app del agente — y **reinicia la app**: los
+   cambios de TCC no aplican a procesos ya vivos.
+2. **Abrir la sesión directamente en la carpeta del proyecto** concede el permiso por el flujo
+   normal; un cambio de directorio en caliente hacia otra carpeta protegida NO dispara el
+   prompt del sistema y deja al shell ciego.
+3. La alternativa sin tocar permisos: mover el repo fuera de las carpetas protegidas
+   (p. ej. `~/code/`).
+
 ## 1. Traer el harness a tu proyecto
 
 **Elige tu caso — y ten claro qué implica cada uno para los upgrades futuros**, porque hasta

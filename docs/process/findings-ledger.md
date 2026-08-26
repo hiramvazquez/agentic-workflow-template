@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **51** · Cerrados: 144 · Total: 195
+Abiertos: **45** · Cerrados: 150 · Total: 195
 
 ## Abiertos
 
@@ -14,15 +14,12 @@ Abiertos: **51** · Cerrados: 144 · Total: 195
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-298e3cd2` | high | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
-| `f-5fc894be` | high | auto-fix | `tools/upgrade.sh (_propiedad_compartida, ~linea 251)` | La regla FILL de upgrade.sh congela gates para siempre aunque el adoptante nunca los tocara, mientras sincroniza sus tests |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
 | `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
-| `f-fa151ee4` | high | auto-fix | `tools/upgrade.sh (delta por ls-tree del remoto, ~linea 503)` | upgrade.sh no propaga borrados: los monolitos divididos en fase 2a quedan huerfanos en los adoptantes |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
-| `f-12b8155c` | medium | auto-fix | `tools/upgrade.sh + docs/process/prds/0005 §6` | upgrade.sh no crea tools/project.conf aunque PRD 0005 §6 lo promete |
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
@@ -45,17 +42,14 @@ Abiertos: **51** · Cerrados: 144 · Total: 195
 | `f-d3015816` | medium | owner-decision | `.github/workflows/harness-ci.yml (cabecera) + tools/verify-run.sh (marker sin plataforma)` | La cobertura macOS pasa a depender de una afirmacion sobre la maquina de quien publica, y ningun artefacto la registra |
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
-| `f-f238608c` | medium | auto-fix | `tools/upgrade.sh` | El re-run de upgrade.sh corto-circuita sin la verificacion que su propio aviso promete |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
-| `f-237347df` | low | auto-fix | `docs/ADOPTION.md` | ADOPTION.md no documenta los permisos de macOS que el harness necesita |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
-| `f-a656005d` | low | auto-fix | `tools/tests/run-tests.sh:154` | run-tests.sh lista los tests fallidos sin prefijo de archivo: los duplicados son indistinguibles |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 | `f-c59f9bf1` | low | auto-fix | `tools/lesson-detector-link.sh` | lesson-detector-link no ata las lineas de continuacion de Detector: a un archivo concreto |
@@ -209,3 +203,9 @@ Abiertos: **51** · Cerrados: 144 · Total: 195
 | `f-9855ecb` | fixed | PRD 0007 v2.3 (2026-08-25): §5 partido (verify/post-edit sin waiver, mutacion/ci difieren); §12 con  |
 | `f-e1fb4dd2` | fixed | PRD 0007 v2.4 (2026-08-25): §12 corregido (la puerta del registro, decisions/README.md, y modulo_ref |
 | `f-dc1e5406` | fixed | PRD 0007 v2.4 (2026-08-25): v2.4 — golden 1 sin contradiccion interna (el jsonl es registro de traba |
+| `f-12b8155c` | fixed | fix del ensayo Pelis (2026-08-26): upgrade.sh crea tools/project.conf con valor inferido (manifiesto |
+| `f-f238608c` | fixed | fix del ensayo Pelis (2026-08-26): el aviso post-sync ya no manda re-correr el script como via de ve |
+| `f-237347df` | fixed | fix del ensayo Pelis (2026-08-26): ADOPTION.md §0 gana la seccion de permisos macOS (TCC): sintoma,  |
+| `f-5fc894be` | fixed | fix del ensayo Pelis (2026-08-26): la regla FILL excluye ahora por DIVERGENCIA real (copia local vs  |
+| `f-fa151ee4` | fixed | fix del ensayo Pelis (2026-08-26): el pathspec del delta se construye con la UNION de los trees de b |
+| `f-a656005d` | fixed | fix del ensayo Pelis (2026-08-26): FAILED_NAMES acumula archivo::funcion; test_el_runner_nombra_el_a |

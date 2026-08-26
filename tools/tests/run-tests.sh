@@ -151,7 +151,7 @@ for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
     if [ $rc -eq 0 ]; then
       PASS=$((PASS+1)); printf '  ✅ %s\n' "$t"
     else
-      FAIL=$((FAIL+1)); FAILED_NAMES+=("$t"); printf '  ❌ %s\n' "$t"
+      FAIL=$((FAIL+1)); FAILED_NAMES+=("$BASE::$t"); printf '  ❌ %s\n' "$t"
       [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/     /'
     fi
     unset -f "$t"

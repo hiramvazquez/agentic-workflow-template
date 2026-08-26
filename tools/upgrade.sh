@@ -161,12 +161,16 @@ if [ "$MERGE_BASE_OK" = "1" ]; then
   NEW="$(git rev-list --count HEAD.."$REMOTE/$BRANCH" 2>/dev/null || echo 0)"
   if [ "${NEW:-0}" = "0" ]; then
     echo "✅ upgrade: ya estás al día con $REMOTE/$BRANCH."
+    echo "   (al-día NO re-verifica: si acabas de commitear un sync, la evidencia es"
+    echo "    bash tools/tests/run-tests.sh && bash tools/validate-harness.sh --selftest)"
     exit 0
   fi
 else
   _REC="$( [ -f "$SYNC_RECORD" ] && awk 'NR==1{print $1; exit}' "$SYNC_RECORD" 2>/dev/null || true)"
   if [ -n "$_REC" ] && [ "$_REC" = "$(git rev-parse "$REMOTE/$BRANCH" 2>/dev/null)" ]; then
     echo "✅ upgrade: ya estás al día con $REMOTE/$BRANCH (sync registrado: ${_REC:0:7})."
+    echo "   (al-día NO re-verifica: si acabas de commitear un sync, la evidencia es"
+    echo "    bash tools/tests/run-tests.sh && bash tools/validate-harness.sh --selftest)"
     exit 0
   fi
   NEW="$(git rev-list --count "${_REC:+$_REC..}$REMOTE/$BRANCH" 2>/dev/null || echo '?')"
@@ -245,12 +249,26 @@ FILL_MARKER='^[[:space:]]*([#;]|//|--)?[[:space:]]*<!--[[:space:]]*FILL'
 # al sitio equivocado, porque no es un arreglo local — es configuración que el
 # propio template pidió.
 #
-# La regla es la de siempre: si la versión del TEMPLATE trae un marcador FILL y
-# el archivo YA existe aquí, es de propiedad compartida y no se toca — ni se
-# pisa ni se parchea. Se reporta.
+# La regla, corregida por el primer sync real contra un adoptante (f-5fc894be):
+# el marcador FILL en el template solo dice "esto PUEDE personalizarse" — la
+# propiedad la decide la DIVERGENCIA REAL. Si la copia del adoptante es
+# byte-idéntica a la base registrada, nadie la personalizó nunca y se
+# sincroniza como cualquier maquinaria. La versión anterior excluía por la
+# mera presencia del marcador y congeló gates VÍRGENES para siempre
+# (check-review-marker sin el endurecimiento 206bc16, post-edit-verify ciego
+# a Bash) mientras sincronizaba los tests que exigían sus versiones nuevas:
+# 21 de los 24 rojos del adoptante. Sexta instancia del patrón
+# "la-superficie-se-exime" — esta vez vía el canal de sync.
+# Sin base registrada (primera sincronización) no hay con qué comparar y se
+# conserva el comportamiento conservador: existe + FILL ⇒ no se toca.
 _propiedad_compartida() { # _propiedad_compartida <path> → 0 si NO debe tocarse
   [ -f "$1" ] || return 1
-  git show "$REMOTE/$BRANCH:$1" 2>/dev/null | grep -qE "$FILL_MARKER"
+  git show "$REMOTE/$BRANCH:$1" 2>/dev/null | grep -qE "$FILL_MARKER" || return 1
+  if [ -n "${BASE_REC:-}" ] && git cat-file -e "$BASE_REC:$1" 2>/dev/null; then
+    # ¿la copia local difiere de la base? — si NO difiere, es virgen: se sincroniza
+    git diff --quiet "$BASE_REC" -- "$1" 2>/dev/null && return 1
+  fi
+  return 0
 }
 
 # Excluir sin decirlo dejaría al adoptante sin el arreglo Y sin saberlo, que es
@@ -499,8 +517,18 @@ else
     # Los de propiedad compartida se quedan FUERA del parche. Antes entraban y
     # chocaban en cada delta contra el relleno del adoptante.
     _DELTA_FILL=""
-    _DELTA_PATHS="$(git ls-tree -r --name-only "$REMOTE/$BRANCH" 2>/dev/null | while IFS= read -r _f; do
+    # UNIÓN de los trees de la base y de HEAD, no solo HEAD (f-fa151ee4): un
+    # archivo BORRADO en el template no está en el tree de HEAD, así que con
+    # solo ese tree su path jamás entraba al pathspec y el borrado no viajaba
+    # — el caso real dejó dos monolitos huérfanos y ~27 tests duplicados en el
+    # adoptante. Con el path en la unión, el diff BASE..HEAD trae el hunk de
+    # borrado y `apply --3way` lo ejecuta; si el adoptante lo había modificado,
+    # el 3way lo convierte en CONFLICTO visible en vez de borrado silencioso.
+    # Un path borrado en ambos lados (ya ausente aquí) se salta: nada que hacer.
+    _DELTA_PATHS="$( { git ls-tree -r --name-only "$REMOTE/$BRANCH" 2>/dev/null
+                       git ls-tree -r --name-only "$BASE_REC" 2>/dev/null; } | sort -u | while IFS= read -r _f; do
         _es_maquinaria "$_f" || continue
+        if ! git cat-file -e "$REMOTE/$BRANCH:$_f" 2>/dev/null && [ ! -f "$_f" ]; then continue; fi
         if _propiedad_compartida "$_f"; then printf 'FILL\t%s\n' "$_f"; else printf 'OK\t%s\n' "$_f"; fi
       done)"
     _DELTA_FILL="$(printf '%s\n' "$_DELTA_PATHS" | awk -F'\t' '$1=="FILL"{print $2}')"
@@ -614,6 +642,34 @@ else
     bash tools/render-capabilities.sh --install \
       || { echo "❌ upgrade: no pude fundir los bloques de capacidades en los docs locales." >&2; exit 1; }
   fi
+  # ── project.conf: crearlo con valor inferido si falta (f-12b8155c) ──
+  # WF-05 (PRD 0005 §6) lo prometía y no existía: el adoptante vivía con
+  # project_kind sin declarar, cayendo a la heurística sin enterarse. Se crea
+  # UNA vez, jamás se pisa (el conf es suyo y está fuera de SYNC_PATHS). La
+  # inferencia es deliberadamente simple y AVISADA en el propio archivo: un
+  # manifiesto de app en la raíz ⇒ application; si no, se deja `other` con la
+  # instrucción de revisarlo — inventar un default silencioso sería peor.
+  if [ ! -f tools/project.conf ]; then
+    _PK="other"
+    for _m in *.xcodeproj *.xcworkspace Package.swift package.json build.gradle build.gradle.kts pyproject.toml go.mod Cargo.toml pubspec.yaml; do
+      [ -e "$_m" ] && { _PK="application"; break; }
+    done
+    # Sin manifiesto, la evidencia de WF-05: fuentes de app fuera del harness.
+    if [ "$_PK" = "other" ] && find . \( -path ./tools -o -path ./scripts -o -path ./ci \
+         -o -path ./docs -o -path ./.agents -o -path ./.git -o -path ./enterprise \
+         -o -name fixtures \) -prune -o -type f \( -name '*.swift' -o -name '*.kt' \
+         -o -name '*.ts' -o -name '*.tsx' -o -name '*.py' -o -name '*.go' -o -name '*.rb' \
+         -o -name '*.cs' -o -name '*.rs' \) -print 2>/dev/null | head -1 | grep -q .; then
+      _PK="application"
+    fi
+    {
+      printf '# Creado por tools/upgrade.sh con valor INFERIDO (%s) — revísalo.\n' "$_PK"
+      printf '# harness = este repo ES el harness · application = producto con app · other = doc-only/otros\n'
+      printf '# Formato: `clave: valor`. Este archivo es TUYO: el sync jamás lo pisa.\n'
+      printf 'project_kind: %s\n' "$_PK"
+    } > tools/project.conf
+    echo "   ✓ tools/project.conf creado (project_kind: $_PK, inferido — revísalo)."
+  fi
   printf '%s  # SHA del template sincronizado por tools/upgrade.sh — no editar a mano\n' \
     "$(git rev-parse "$REMOTE/$BRANCH")" > "$SYNC_RECORD"
   git add -A -- $SYNC_PATHS tools .claude/settings.json "$SYNC_RECORD" 2>/dev/null
@@ -624,10 +680,13 @@ else
   echo ""
   echo "   Revísalos y commitea tú:  git commit -m \"chore(template): sync de maquinaria\""
   echo ""
-  echo "   ⚠️  LO QUE ACABAS DE TRAER NO ESTÁ VERIFICADO TODAVÍA. La suite y el"
-  echo "   selftest corren al FINAL del camino limpio, y esta salida se produce"
-  echo "   antes. Hasta que RE-CORRAS este script, lo único que sabes es que los"
-  echo "   archivos llegaron — no que funcionen."
+  echo "   ⚠️  LO QUE ACABAS DE TRAER NO ESTÁ VERIFICADO TODAVÍA. Esta salida se"
+  echo "   produce antes de cualquier verificación, y el camino al-día de este"
+  echo "   script NO la ejecuta (f-f238608c: una versión anterior de este aviso"
+  echo "   mandaba re-correr el script, y ese re-run decía 'al día' sin verificar"
+  echo "   nada — el adoptante que lo siguió tenía 24 tests en rojo). La evidencia"
+  echo "   la produces TÚ tras commitear:"
+  echo "      bash tools/tests/run-tests.sh && bash tools/validate-harness.sh --selftest"
   [ "${_SETTINGS_FAIL:-0}" = "1" ] && exit 1
   exit 2
 fi
