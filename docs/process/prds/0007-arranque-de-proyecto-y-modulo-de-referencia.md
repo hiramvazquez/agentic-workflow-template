@@ -1,7 +1,8 @@
 # PRD — El arranque real de un proyecto: decisiones, módulo de referencia y autonomía medida
 
-> **Tipo:** Forward · **Status:** **Approved ACOTADO a fases 0–1** (owner, 2026-08-25) — las
-> fases 2–3 siguen en **Draft** hasta que esta v2 pase re-review del `design-reviewer`
+> **Tipo:** Forward · **Status:** **Approved COMPLETO** (owner, 2026-08-25 — primero acotado a
+> fases 0–1 tras el RED de ronda 1; extendido a 2–3 el mismo día con la recomendación explícita
+> de la ronda 2 y N1 corregido)
 > **Autor:** agente del template · **Fecha:** 2026-08-24 · **Tracking:** pendiente
 > **Design-review:** ronda 1 el 2026-08-25 — **RED, 15 hallazgos** (reporte en
 > `.agents/state/reviews/e3b0c44298fc-design-reviewer.md`); la v2 los aplicó con las decisiones
@@ -348,8 +349,12 @@ camino más común, y hay que probarlo.
 - [x] **Q3 — ¿El registro de decisiones vive en `docs/process/decisions/` o dentro de la skill?**
       RESUELTA 2026-08-25: separado, y además **es el mismo artefacto que los ADRs existentes**
       (formato ampliado con campos opcionales, una sola numeración — F1). La skill lo cita.
-- [ ] **Q4 — Para el adoptante iOS actual, ¿se hace retroactivo?** Elegir un módulo existente como
-      referencia es la vía barata, pero puede consagrar deuda ya existente como si fuera el patrón.
+- [x] **Q4 — Para el adoptante iOS actual, ¿se hace retroactivo?** RESUELTA 2026-08-25 por el
+      owner: **se decide en la fase 0 de CADA proyecto** — es una decisión por-proyecto, no del
+      template. La entrevista de fase 0 la incluye con las dos vías y el riesgo escrito: coronar
+      un módulo existente es la vía barata, y para no consagrar deuda como patrón, el módulo
+      coronado pasa por design-review + `security-reviewer` ANTES de declararse canónico (el
+      mismo gate de 1c que tendría uno construido de cero).
 - [x] **Q5 — ¿Cuántos módulos autónomos hacen falta para declarar la autonomía?** RESUELTA
       2026-08-25: **dos consecutivos** con `ARCH_DEVIATIONS: 0` (§9 golden 1 ya lo dice igual —
       antes este doc decía dos cosas distintas sobre su propio criterio de salida).
@@ -362,9 +367,10 @@ camino más común, y hay que probarlo.
       `docs/ADOPTION.md` §4 sigue mandando sobre el orden de relleno y `/arrancar` lo cita.
 - [x] **Q10 — ¿La fase 1 se parte?** RESUELTA 2026-08-25: sí — 1a contrato, 1b lógica, 1c
       vertical (§5b), con `security-reviewer` en el gate de 1c.
-- [ ] **Q6 — ¿Cuál es el techo de intentos de la prueba de fuego?** Se propone **tres**: a partir
-      de ahí, en vez de seguir puliendo skills, hay que decidir si el problema es la doc o si esa
-      parte de la arquitectura simplemente no se delega (§7, edge cases).
+- [x] **Q6 — ¿Cuál es el techo de intentos de la prueba de fuego?** RESUELTA 2026-08-25 por el
+      owner: **tres**. A partir de ahí, en vez de seguir puliendo skills, se diagnostica si el
+      problema es la doc (se itera) o si esa parte de la arquitectura no se delega — hallazgo de
+      primer orden que se nombra (§7, edge cases).
 
 ## 15. Definition of Done
 

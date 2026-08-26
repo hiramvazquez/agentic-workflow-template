@@ -118,8 +118,12 @@
   construir a auditar. **No se añaden gates.** PRD 0006 (inversión a fail-closed de la superficie
   de enforcement) queda On hold pese a cerrar un agujero vivo, y sus vías 8 y 9 quedan como
   findings documentados.
-- **PRD 0007 — Approved ACOTADO a fases 0–1 (owner, 2026-08-25); fases 2–3 en Draft hasta
-  re-review de la v2.** El arranque real de un proyecto: decisiones de arquitectura escritas (como
+- **PRD 0007 — Approved COMPLETO (owner, 2026-08-25).** La ronda 1 del design-review dio RED (15
+  hallazgos) y acotó el Approved a las fases 0–1; la ronda 2 sobre la v2 dio AMBER, verificó los
+  tres bloqueantes cerrados y recomendó aprobar 2–3; la v2.1 aplicó su re-cosido (incluido N1: el
+  gate de fase 2 se cumplía solo) y el owner extendió el Approved el mismo día. Todas las Open
+  Questions resueltas — Q4 (retroactivo) se resuelve en la fase 0 de cada proyecto, Q6 (techo de
+  fuego) = tres. El arranque real de un proyecto: decisiones de arquitectura escritas (como
   ADRs ampliados), un módulo de referencia que las instancia (fase 1 partida en contrato→lógica→
   vertical, con `security-reviewer` en el gate), el harness cableado, y un criterio falsable de
   autonomía (procedimiento con `ARCH_DEVIATIONS:` parseable y N=2 — el detalle en §9 del PRD).
