@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **35** · Cerrados: 131 · Total: 166
+Abiertos: **41** · Cerrados: 131 · Total: 172
 
 ## Abiertos
 
@@ -14,12 +14,14 @@ Abiertos: **35** · Cerrados: 131 · Total: 166
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-298e3cd2` | high | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
+| `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
 | `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
+| `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
@@ -32,7 +34,11 @@ Abiertos: **35** · Cerrados: 131 · Total: 166
 | `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
+| `f-bedac76b` | medium | auto-fix | `tools/check-ring3.sh:63-80` | check-ring3 acepta un workflow manual-only como Anillo 3: hoy declara verde citando gate-0a-macos.yml |
+| `f-d13227b5` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh:22-27` | La trayectoria pierde el binario real tras un cd encadenado y no distingue coordinador de sub-agente: 98 de 257 eventos Bash dicen solo cd |
+| `f-d3015816` | medium | owner-decision | `.github/workflows/harness-ci.yml (cabecera) + tools/verify-run.sh (marker sin plataforma)` | La cobertura macOS pasa a depender de una afirmacion sobre la maquina de quien publica, y ningun artefacto la registra |
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
+| `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
