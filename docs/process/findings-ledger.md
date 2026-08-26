@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **44** · Cerrados: 142 · Total: 186
+Abiertos: **44** · Cerrados: 144 · Total: 188
 
 ## Abiertos
 
@@ -200,3 +200,5 @@ Abiertos: **44** · Cerrados: 142 · Total: 186
 | `f-260d1837` | fixed | PRD 0007 v2.3 (2026-08-25): la coronacion enumera su gate (todo 1c MAS review de arquitectura del re |
 | `f-f09c13f1` | fixed | PRD 0007 v2.3 (2026-08-25): el gate de fase 2 es lista ENUMERADA con el vocabulario real del instrum |
 | `f-9855ecb` | fixed | PRD 0007 v2.3 (2026-08-25): §5 partido (verify/post-edit sin waiver, mutacion/ci difieren); §12 con  |
+| `f-e1fb4dd2` | fixed | PRD 0007 v2.4 (2026-08-25): §12 corregido (la puerta del registro, decisions/README.md, y modulo_ref |
+| `f-dc1e5406` | fixed | PRD 0007 v2.4 (2026-08-25): v2.4 — golden 1 sin contradiccion interna (el jsonl es registro de traba |

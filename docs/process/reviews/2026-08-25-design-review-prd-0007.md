@@ -1,4 +1,4 @@
-# Design-review del PRD 0007 — las dos rondas (2026-08-25)
+# Design-review del PRD 0007 — las rondas del 2026-08-25
 
 > **Por qué existe este archivo:** los reportes originales del `design-reviewer` viven en
 > `.agents/state/reviews/`, que `.gitignore` excluye entero — no sobreviven a otro clon. Peor:
@@ -74,4 +74,8 @@ La auditoría externa del mismo día (`2026-08-25-auditoria-prd-0007-workflow.md
 dos fixes de estas rondas introdujeron problemas nuevos (la evidencia TDD imposible de 1b, el
 waiver `pending` demasiado ancho) y tres contradicciones residuales — confirmadas y atendidas
 en la v2.2 con sus entradas de ledger (`f-54470c4d`, `f-8928fa5b`, `f-2269e8b`, `f-61dcbb8b`,
-`f-f90ccab3`, `f-75d10804`, `f-35ef4b81`, `f-62d2ac5b`).
+`f-f90ccab3`, `f-75d10804`, `f-35ef4b81`, `f-62d2ac5b`). La **ronda 3** verificó la v2.2 contra
+el criterio de cierre de esa auditoría (AMBER, 12 hallazgos → la v2.3 los atendió) y su
+**delta-check final dio GREEN**: las siete condiciones satisfechas, auditoría declarada
+ATENDIDA, con seis residuos de higiene al ledger (`f-e1fb4dd2`, `f-dc1e5406`) cerrados en la
+misma pasada. El detalle de la ronda 3 vive en el change log del PRD y en esas entradas.
