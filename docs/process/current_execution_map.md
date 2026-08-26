@@ -126,8 +126,14 @@
   fuego) = tres. El arranque real de un proyecto: decisiones de arquitectura escritas (como
   ADRs ampliados), un módulo de referencia que las instancia (fase 1 partida en contrato→lógica→
   vertical, con `security-reviewer` en el gate), el harness cableado, y un criterio falsable de
-  autonomía (procedimiento con `ARCH_DEVIATIONS:` parseable y N=2 — el detalle en §9 del PRD).
-  El design-review dio RED con 15 hallazgos y la v2 los aplica con las decisiones del owner.
+  autonomía (dos verticales autónomas consecutivas con `ARCH_DEVIATIONS: 0`; cierre MANUAL
+  declarado hasta que el consumidor de esa línea exista — §9 del PRD). **v2.2 el mismo día:** una
+  auditoría externa (informe en `docs/process/reviews/2026-08-25-auditoria-prd-0007-workflow.md`)
+  confirmó que dos fixes de las rondas introdujeron problemas nuevos (la evidencia TDD imposible
+  de 1b y el waiver `pending` sin tipar) más tres contradicciones residuales; los ocho hallazgos
+  están en el ledger y la v2.2 cierra los seis del PRD. Las dos rondas de design-review tienen
+  copia durable en `docs/process/reviews/2026-08-25-design-review-prd-0007.md` (los reportes del
+  hook son gitignored — `f-35ef4b81`).
   **Corrección de este mapa (F3):** la frase que decía "no es un gate, no choca con el freeze" era
   mecánicamente falsa — `check-decision-coverage.sh` SÍ es un gate (el glob `tools/check-*.sh` lo
   clasifica) y queda **condicionado al levantamiento del freeze**; las fases 0–1 no lo necesitan.

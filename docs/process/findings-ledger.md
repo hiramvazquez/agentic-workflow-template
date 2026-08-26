@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **41** · Cerrados: 131 · Total: 172
+Abiertos: **43** · Cerrados: 137 · Total: 180
 
 ## Abiertos
 
@@ -21,10 +21,12 @@ Abiertos: **41** · Cerrados: 131 · Total: 172
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
+| `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
+| `f-62d2ac5b` | medium | auto-fix | `tools/semgrep-scan.sh:82` | semgrep-scan.sh puede morir con TARGETS[@] unbound bajo bash 3.2 cuando semgrep esta operativo |
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
@@ -186,3 +188,9 @@ Abiertos: **41** · Cerrados: 131 · Total: 172
 | `f-a6d21f84` | fixed | (1) El contrato pasa a estar escrito al reves de como estaba: la ruta SI puede traer tabuladores, lo |
 | `f-2e94db73` | fixed | (1) Dos tests end-to-end nuevos que pasan por los hooks REALES con un tabulador en el nombre: test_e |
 | `f-fb03e5d1` | fixed | writes_mark barre los temporales al dejar la marca, con 'find -mmin +10 -delete'. El umbral NO es co |
+| `f-54470c4d` | fixed | PRD 0007 v2.2 (2026-08-25): la evidencia TDD de 1b deja de exigir un commit rojo imposible — la veri |
+| `f-8928fa5b` | fixed | PRD 0007 v2.2 (2026-08-25): la fase 3 entrega DOS verticales autonomas consecutivas, el modulo de re |
+| `f-2269e8b` | fixed | PRD 0007 v2.2 (2026-08-25): consumidor futuro nombrado (verdict.sh + capture + review-history.jsonl, |
+| `f-61dcbb8b` | fixed | PRD 0007 v2.2 (2026-08-25): el rollout retroactivo es fase 0 → CORONACION (mismo gate de 1c: design- |
+| `f-f90ccab3` | fixed | PRD 0007 v2.2 (2026-08-25): avisos del gate de fase 2 tipados en §5b — hard-blockers sin waiver (SIN |
+| `f-75d10804` | fixed | PRD 0007 v2.2 (2026-08-25): AMBER-atendido = hallazgos en estado terminal en el ledger o re-review G |
