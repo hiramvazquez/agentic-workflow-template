@@ -118,12 +118,16 @@
   construir a auditar. **No se añaden gates.** PRD 0006 (inversión a fail-closed de la superficie
   de enforcement) queda On hold pese a cerrar un agujero vivo, y sus vías 8 y 9 quedan como
   findings documentados.
-- **PRD 0007 (Draft) — el arranque real de un proyecto.** Salido de una conversación de diseño con
-  el owner: decisiones de arquitectura tomadas y escritas, un módulo de referencia que las
-  instancia, el harness cableado a esa arquitectura, y un criterio FALSABLE de cuándo la IA puede
-  trabajar sola (el segundo módulo autónomo pasa el design-reviewer sin desviaciones). No choca con
-  el freeze —no es un gate, es una fase de arranque— y absorbe lo que hoy hace `/adoptar`. Pendiente
-  de design-review antes de `Approved`.
+- **PRD 0007 — Approved ACOTADO a fases 0–1 (owner, 2026-08-25); fases 2–3 en Draft hasta
+  re-review de la v2.** El arranque real de un proyecto: decisiones de arquitectura escritas (como
+  ADRs ampliados), un módulo de referencia que las instancia (fase 1 partida en contrato→lógica→
+  vertical, con `security-reviewer` en el gate), el harness cableado, y un criterio falsable de
+  autonomía (procedimiento con `ARCH_DEVIATIONS:` parseable y N=2 — el detalle en §9 del PRD).
+  El design-review dio RED con 15 hallazgos y la v2 los aplica con las decisiones del owner.
+  **Corrección de este mapa (F3):** la frase que decía "no es un gate, no choca con el freeze" era
+  mecánicamente falsa — `check-decision-coverage.sh` SÍ es un gate (el glob `tools/check-*.sh` lo
+  clasifica) y queda **condicionado al levantamiento del freeze**; las fases 0–1 no lo necesitan.
+  Absorbe `/adoptar` (queda como stub; `docs/ADOPTION.md` §4 sigue mandando el orden de relleno).
 - **FASE 3 EJECUTADA (parcial) 2026-08-24** — informe en
   `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`. Lo primero que encontró fue un agujero
   en su propio instrumento: los gates que BLOQUEAN no registraban nada, así que casi todos figuraban
