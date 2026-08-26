@@ -131,7 +131,10 @@
   auditoría externa (informe en `docs/process/reviews/2026-08-25-auditoria-prd-0007-workflow.md`)
   confirmó que dos fixes de las rondas introdujeron problemas nuevos (la evidencia TDD imposible
   de 1b y el waiver `pending` sin tipar) más tres contradicciones residuales; los ocho hallazgos
-  están en el ledger y la v2.2 cierra los seis del PRD. Las dos rondas de design-review tienen
+  están en el ledger y la v2.2 cerró los seis del PRD. La ronda 3 verificó la v2.2 contra el
+  criterio de cierre de la auditoría (cinco de siete condiciones) y la **v2.3** remató las dos
+  restantes con cuatro decisiones más del owner — Q8/§12 re-cosidos y la evidencia de fase 3
+  promovida a `docs/process/reviews/` fechado; el detalle, en el change log del PRD. Las dos rondas de design-review tienen
   copia durable en `docs/process/reviews/2026-08-25-design-review-prd-0007.md` (los reportes del
   hook son gitignored — `f-35ef4b81`).
   **Corrección de este mapa (F3):** la frase que decía "no es un gate, no choca con el freeze" era

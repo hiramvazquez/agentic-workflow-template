@@ -4,15 +4,16 @@
 > fases 0–1 tras el RED de ronda 1; extendido a 2–3 el mismo día con la recomendación explícita
 > de la ronda 2 y N1 corregido)
 > **Autor:** agente del template · **Fecha:** 2026-08-24 · **Tracking:** pendiente
-> **Design-review:** dos rondas el 2026-08-25 (RED de 15 → AMBER de 13), copia durable en
-> `docs/process/reviews/2026-08-25-design-review-prd-0007.md` — los reportes del hook viven en
-> `.agents/state/`, que está gitignored y no sobrevive a otro clon (`f-35ef4b81`); una versión
-> anterior de esta cabecera citaba ese path como si fuera evidencia persistente.
+> **Design-review:** tres rondas el 2026-08-25 (RED de 15 → AMBER de 13 → AMBER de 12), copia
+> durable de las dos primeras en `docs/process/reviews/2026-08-25-design-review-prd-0007.md`
+> (los reportes del hook viven en `.agents/state/`, gitignored — `f-35ef4b81`).
 > **Auditoría externa del mismo día** (`docs/process/reviews/2026-08-25-auditoria-prd-0007-workflow.md`,
-> AMBER): confirmó que dos fixes de las rondas introdujeron problemas nuevos y tres
-> contradicciones residuales. **Esta v2.2 los atiende** — el detalle en §17 — y sus hallazgos
-> están en el ledger con estado terminal. Contradicciones altas cerradas: puede arrancarse la
-> implementación de las fases.
+> AMBER): confirmó que dos fixes de las rondas introdujeron problemas nuevos; la v2.2 atendió
+> sus seis hallazgos del PRD. **La ronda 3 verificó la v2.2 contra el criterio de cierre §9 de
+> esa auditoría**: cinco de siete condiciones satisfechas, y las dos restantes (el waiver
+> universal vivo en Q8/§12; la persistencia de fase 3 sobre un archivo gitignored) las cierra
+> **esta v2.3** con cuatro decisiones más del owner (§17). Contradicciones altas cerradas:
+> puede arrancarse la implementación de las fases.
 
 ---
 
@@ -87,7 +88,8 @@ Que un proyecto nuevo llegue a su primera tarea delegada con: las decisiones de 
   seguridad cómo entran las llaves y qué no se loguea. Ninguna duplica código: **citan ruta y
   ancla** (símbolo o marcador `@decision:` — §6; por línea no: se desplaza con cualquier edición).
   Así la fuente sigue siendo una sola y el agente carga solo la rodaja de la capa que va a
-  tocar, que es lo que la matriz de `§11` ya hace hoy.
+  tocar, que es lo que la matriz de AGENTS.md §11 ya hace hoy (calificado: este PRD tiene su
+  propio §11, que es el Rollout — `f-9855ecb`).
 - **Y de ahí sale qué capas debe cruzar el módulo, sin adivinarlo:** las que tengan fila en
   `skill-matrix.conf` para este proyecto. Si una capa tiene skill y el módulo no la toca, esa skill
   se queda sin referencia que citar — y ahí es exactamente donde el agente empezará a inventar.
@@ -128,8 +130,11 @@ tools/project.conf                      ← gana `modulo_referencia: <ruta>` + l
                                           0005 §6). Principio para cualquier check que lo consuma:
                                           se lee del ÍNDICE, no del árbol — la misma fuente que el
                                           diff que juzga (scope.sh documenta el bypass contrario)
-tools/verify.conf · scripts/agent-hooks/post-edit-verify.sh · tools/mutation-score.sh · ci/
-                                        ← el cableado real que la fase 2 cierra o declara PENDIENTE (§5b)
+tools/verify.conf · scripts/agent-hooks/post-edit-verify.sh
+                                        ← el cableado que la fase 2 CIERRA, sin waiver: sin ellos
+                                          suena SIN COMPILADOR EN LOS GATES, hard-blocker (§5b)
+tools/mutation-score.sh · ci/           ← cableado que la fase 2 cierra O declara `pending` con
+                                          disparador (upstream puede bloquearlos — §5b)
 AGENTS.md                               ← §2 y §3 dejan de ser FILL; §11 acompaña a la poda del conf
 docs/process/current_execution_map.md   ← su línea sobre este PRD se corrige junto con el Approved
 ```
@@ -138,7 +143,7 @@ docs/process/current_execution_map.md   ← su línea sobre este PRD se corrige 
 
 ```text
 tools/lib/scope.sh · la superficie      ← PRD 0006, On hold
-ratchets                                ← §9
+ratchets                                ← AGENTS.md §9 (el §9 de ESTE PRD son los goldens)
 PRDs 0001-0006                          ← histórico
 ```
 
@@ -158,9 +163,9 @@ PRDs 0001-0006                          ← histórico
 |---|---|---|---|---|
 | 0 | **Decisiones.** Entrevista sobre las puertas de una sola dirección + investigación de lo que caduca (versiones, APIs, SPM propios leídos y documentados). Sale el registro en `docs/process/decisions/` con el porqué, y los pins con fecha. | — | el owner firma el registro y la firma DEJA ARTEFACTO: `arranque_fase0: <fecha>` en `tools/project.conf` (formato `clave: valor` del propio conf); lo pendiente está marcado `pending`, no como decidido | owner |
 | 1a | **El contrato.** Puerto + modelos request/response + fake, y la suite de conformidad que el fake comparte con el adapter real (`domain/SKILL.md`). | 0 | compila; la suite de conformidad pasa contra el fake | implementador + owner acepta |
-| 1b | **La lógica.** Validación y mapeo con TDD contra el fake (rojo-primero por comportamiento). | 1a | tests vistos en rojo primero; verde al cierre. **Honestidad del artefacto (`f-54470c4d`):** el harness NO captura hoy evidencia mecánica del rojo — y no puede exigirse "un commit rojo": `verify-run` solo firma corridas verdes y así debe seguir (una versión anterior de esta celda pedía exactamente ese commit imposible, empujando al override). El rojo-primero lo verifica el `reviewer` (su ítem TDD) y, cuando mida, el mutation score (nivel 4) | implementador + owner acepta |
+| 1b | **La lógica.** Validación y mapeo con TDD contra el fake (rojo-primero por comportamiento). | 1a | tests vistos en rojo primero; verde al cierre. **Honestidad del artefacto (`f-54470c4d`):** el harness NO captura hoy evidencia mecánica del rojo — y no puede exigirse "un commit rojo": `verify-run` solo firma corridas verdes y así debe seguir (una versión anterior de esta celda pedía exactamente ese commit imposible, empujando al override). **Artefacto elegido (owner, 2026-08-25):** el implementador adjunta al cierre de 1b la SALIDA LITERAL del test nuevo fallando contra el código pre-fix — capturada al momento, compatible con commits verdes, `verify-run` intacto. El `reviewer` pondera ese artefacto (su ítem TDD) en vez de una afirmación. La mutación (nivel 4) lo reforzará solo si algún día mide — hoy no tiene plan (`f-mutation-score-nunca-medido`, §16 la saca de scope): "cuando mida" no es una fecha | implementador + owner acepta |
 | 1c | **La vertical completa.** Orquestador + vista + navegación + camino de error. | 1b | compila, sus tests pasan, **`security-reviewer` GREEN o AMBER-atendido** (es authn/PII: el patrón que todos copiarán — decisión del owner 2026-08-25) — y **"atendido" tiene artefacto** (`f-75d10804`): todos los hallazgos del AMBER en estado terminal en el ledger (fixed / accepted con razón), o una re-review GREEN sobre el diff corregido; sin eso, "atendido" es juicio retrospectivo. Cerrado el gate, el owner lo declara canónico dejando artefacto: `modulo_referencia: <ruta>` en `tools/project.conf` | implementador + owner |
-| 2 | **Extracción y cableado.** Las skills citan el código real; `layers.conf` ampliado y `skill-matrix.conf` podado (con AGENTS.md §11 en el mismo commit); suite de conformidad de fakes; FILL de `AGENTS.md` cerrados; `verify.conf` con el build+tests REAL del proyecto; `post-edit-verify` con su lint/typecheck. | 1c | **Conjunción** (decisión del owner 2026-08-25; reescrita en v2.1 — la versión anterior nombraba "niveles {0,1,3}" que el instrumento no emite y se cumplía sola): cobertura de decisiones verificada (con `check-decision-coverage.sh` si el freeze ya se levantó; a mano contra el registro si no, declarándolo manual) **Y** `bash scripts/agent-hooks/session-start.sh --report` **sin ningún `⚠️`** — donde los avisos van TIPADOS (`f-f90ccab3`: la versión anterior permitía diferir cualquiera como `pending`, incluidos los que §14.4 hace obligatorios): **hard-blockers, sin waiver posible** — `SIN COMPILADOR EN LOS GATES`, `ANILLO 3 AUSENTE`/caído y `ANILLO 1 DORMIDO` en preset `full`; **diferibles** con decisión `pending` + disparador — nivel 4 mudo y capacidades de entorno rotas (semgrep `broken`), porque su arreglo puede ser upstream; **informativos** — los FILL que esta misma fase cierra. Se usa el instrumento tal como habla (por avisos, no por números de nivel) | implementador + verificación del adoptante |
+| 2 | **Extracción y cableado.** Las skills citan el código real; `layers.conf` ampliado y `skill-matrix.conf` podado (con AGENTS.md §11 en el mismo commit); suite de conformidad de fakes; FILL de `AGENTS.md` cerrados; `verify.conf` con el build+tests REAL del proyecto; `post-edit-verify` con su lint/typecheck. | 1c | **Conjunción** (decisión del owner 2026-08-25; reescrita en v2.1 — la versión anterior nombraba "niveles {0,1,3}" que el instrumento no emite y se cumplía sola): cobertura de decisiones verificada (con `check-decision-coverage.sh` si el freeze ya se levantó; a mano contra el registro si no, declarándolo manual) **Y** la LISTA ENUMERADA Y TIPADA de avisos de `session-start --report` resuelta (`f-f90ccab3` mató el waiver universal; `f-f09c13f1` mató el "sin ningún ⚠️" a secas — era rojo perpetuo para un adoptante KMP o Python, "peor que un gate ausente"). El tipado, con el vocabulario REAL del instrumento: **hard-blockers, sin waiver** — `SIN COMPILADOR EN LOS GATES` y `ANILLO 3 AUSENTE`/caído (§14.4; ojo: su emisor tiene un falso verde conocido y abierto, `f-bedac76b` — acredita workflows manual-only) y `ANILLO 1 DORMIDO`, en preset `full`. **Diferibles** con decisión `pending` + disparador — los cuatro avisos de nivel 4 (sin cablear · cableado sin veredicto · nunca medido · score 0) y las capacidades de entorno en cualquiera de sus estados (`broken`/ausente/`DESCONOCIDO`): upstream puede bloquearlos. **Informativos, no bloquean** — los FILL que esta misma fase cierra, la cobertura de la matriz, `project_kind`, y los avisos que el adoptante NO puede apagar sin divergir del template (hoy: `Sin carpetas de código`, hardcodeado a ios/android/web/src — `f-1cafb3a8`). **Un aviso que no esté en esta lista es hard-blocker hasta que se tipifique** (fail-closed) | implementador + verificación del adoptante |
 | 3 | **La prueba de fuego.** **DOS verticales consecutivas** construidas por la IA sola con las skills puestas (`f-8928fa5b`: la versión anterior entregaba "el segundo módulo" en singular mientras el gate exigía N=2 — la fase podía entregar y no cerrar jamás). El módulo de referencia NO cuenta: no es una observación autónoma. El techo de tres intentos (Q6) aplica POR módulo. | 2 | el procedimiento de §9 golden 1 — mecánica primero, juicio después, `ARCH_DEVIATIONS: 0` en las dos consecutivas | owner |
 
 ## 6. Modelo de datos
@@ -200,7 +205,9 @@ está mirando la cosa.
 El patrón es el de `lesson-detector-link.sh` — toda decisión exige referencia — **con su defecto
 conocido comprado a la vista**: ese precedente tiene `f-74be77fe` (high) abierto porque verifica que
 el destino EXISTA, no que CUBRA. Aquí igual: el check no puede saber si el símbolo citado de verdad
-instancia la decisión — eso lo mira el design-review del módulo, y decirlo es parte del contrato.
+instancia la decisión — eso lo mira quien revisa el módulo (la aceptación por archivo del owner
+en 1c; la review de arquitectura del `reviewer` en la coronación — §11), y decirlo es parte del
+contrato.
 Las excepciones se declaran explícitas (patrón `tools/backlog/criteria-link.sh`): un check
 ineludible acaba desactivado.
 
@@ -281,9 +288,17 @@ ineludible acaba desactivado.
      §5 gana también `scripts/agent-hooks/lib/verdict.sh` + `capture-review-verdict.sh`
      (extraer el campo y persistirlo en `review-history.jsonl`, donde el N=2 se comprueba
      sobre historial y no sobre memoria) — instrumentación de una fase aprobada, no un gate
-     nuevo: no bloquea nada que hoy pase. **Hasta que ese consumidor exista, el cierre de la
-     fase 3 es MANUAL y se declara como tal**: el owner lee los dos reportes persistidos en
-     `docs/process/reviews/` y deja la decisión en el change log de este PRD.
+     nuevo: no bloquea nada que hoy pase.
+   - **Dónde vive la evidencia durable, y quién la pone ahí** (`f-636333e3` — la versión
+     anterior mandaba comprobar el N=2 sobre `review-history.jsonl`, que es gitignored: el
+     mismo defecto de durabilidad que esta v2 acababa de arreglar, una capa más adentro):
+     el hook escribe los reportes en `.agents/state/reviews/` (local, no viaja). **Al cerrar
+     cada corrida de la prueba de fuego, quien la cierra PROMUEVE el reporte** a
+     `docs/process/reviews/` con nombre fechado (`AAAA-MM-DD-fuego-<modulo>-N.md`, decisión
+     del owner 2026-08-25), y el N=2 se comprueba sobre esas copias trackeadas — el jsonl
+     local es registro de trabajo, nunca la fuente durable. **Hasta que el consumidor mecánico
+     exista, el cierre de la fase 3 es MANUAL y se declara como tal**: el owner lee esas dos
+     copias promovidas y deja la decisión en el change log de este PRD.
    - **Criterio:** `ARCH_DEVIATIONS: 0` en **DOS módulos consecutivos** (Q5 resuelta: N=1 sobre un
      instrumento de varianza medida 4.0–9.0 es suerte, no señal).
    - Si el juez encuentra que la validación acabó en el sitio equivocado o que se inventó un
@@ -314,7 +329,9 @@ ineludible acaba desactivado.
 ## 10. Métricas de éxito
 
 - **Desviaciones de arquitectura** (`ARCH_DEVIATIONS:` del juez de §9 golden 1) en el módulo N:
-  debe **bajar** con N. Si el tercero tiene tantas como el segundo, las skills no están sirviendo.
+  debe **bajar** con N — donde N cuenta MÓDULOS AUTÓNOMOS (el de referencia no es el nº1: no es
+  una observación). Si el segundo autónomo tiene tantas como el primero, las skills no están
+  sirviendo.
 - **Preguntas del agente que la doc no responde**, por módulo: cada una es un agujero de fase 2 y se
   cierra ahí, no se resuelve improvisando.
 - **Tiempo hasta la primera tarea delegable.** Se mide una vez para saber cuánto cuesta de verdad
@@ -326,32 +343,41 @@ ineludible acaba desactivado.
 `/arrancar` absorbe `/adoptar`. Para un proyecto ya en marcha con el template, el camino
 retroactivo es **fase 0 → CORONACIÓN → fase 2** — probablemente el más común, y hay que probarlo.
 La coronación NO es gratis (`f-61dcbb8b`: este párrafo decía "fases 0 y 2" a secas y se leía como
-bypass del gate de 1c): el módulo existente que se elige pasa por el **mismo gate que uno
-construido de cero** — design-review + `security-reviewer` GREEN/AMBER-atendido + aceptación
-explícita del owner + `modulo_referencia:` en `project.conf` (Q4). Lo que ya existe de 1a/1b
+bypass del gate de 1c). Su gate, ENUMERADO (`f-260d1837`: antes decía "el mismo gate de 1c"
+incluyendo un design-review que 1c no tiene): **todo el gate de 1c** — compila, tests,
+`security-reviewer` GREEN/AMBER-atendido, aceptación explícita del owner, `modulo_referencia:`
+en `project.conf` — **MÁS una review de arquitectura que 1c no necesita**: el módulo coronado
+nunca tuvo revisión de diseño al nacer (en 1c la suple la aceptación por archivo del owner), y
+la hace el **`reviewer` en contexto limpio con lente de arquitectura** — agente nombrado a
+propósito: su reporte queda capturado y persistible; un agente fuera de la allowlist del hook
+no deja rastro (decisión del owner 2026-08-25). Lo que ya existe de 1a/1b
 (contrato, fakes, tests) se **audita contra ese gate, no se re-ejecuta**: si falta la suite de
 conformidad o los tests, eso se construye antes de coronar, porque un patrón sin tests es
 exactamente lo que ningún módulo posterior debe copiar.
 
 ## 12. Riesgos
 
-- **El más probable: el arranque se vuelve tan largo que nadie lo hace.** Mitigación: las fases 0 y 1
-  son las caras y son las que dan el valor; la 2 se puede hacer incremental. Y §10 mide el tiempo
+- **El más probable: el arranque se vuelve tan largo que nadie lo hace.** Y con N=2 el coste real
+  incluye la fase 3: hasta SEIS verticales autónomas en el peor caso (dos módulos × techo de tres
+  intentos), cada intento con su review en contexto limpio — decirlo aquí y no descubrirlo en el
+  presupuesto (`f-9855ecb`). Mitigación: las fases 0 y 1 dan el valor aunque la 3 se demore; la 2
+  se puede hacer incremental. Y §10 mide el tiempo
   real para poder ajustarlo con dato en vez de con opinión.
 - **Decidir de más en fase 0** y escribir en una skill una decisión que resulta mala. Mitigación:
   la clasificación puerta-una-dirección / doble-sentido, y que lo pendiente se declare pendiente.
 - **Que la fase 2 se quede en documentos.** Es el riesgo con precedente en este repo. Mitigación:
   el gate de cierre de la fase 2 es la **conjunción de §5b** — cobertura de decisiones verificada
-  (mecánica si el freeze ya se levantó; manual y declarada como manual si no) Y `session-start
-  --report` sin avisos ni niveles mudos sin declarar — más el hook de la matriz bloqueando de
-  verdad (golden 4). No se cita aquí un detector que puede no existir cuando la fase cierre.
+  (mecánica si el freeze ya se levantó; manual y declarada como manual si no) Y la lista tipada
+  de avisos de §5b resuelta: hard-blockers cerrados, diferibles como `pending` con disparador —
+  más el hook de la matriz bloqueando de verdad (golden 4). No se cita aquí un detector que puede
+  no existir cuando la fase cierre.
 - **Que el módulo de referencia envejezca** y las skills citen código que ya no representa la
   arquitectura. Mitigación con mecanismo (F13): la fila de `skill-matrix.conf` sobre
   `MODULO_REFERENCIA` hace que el `skill-reminder` existente bloquee editarlo sin haber leído la
   skill y el registro; el design-review previo queda como recomendación declarada como tal.
 - **Riesgo heredado del patrón de `Referencia:`** (F4): el precedente que copiamos
   (`lesson-detector-link.sh`) tiene `f-74be77fe` abierto — el check verifica que el ancla EXISTA,
-  no que CUBRA la decisión. La cobertura semántica la mira el design-review del módulo; el check
+  no que CUBRA la decisión. La cobertura semántica la mira quien revisa el módulo (§11); el check
   solo garantiza que la cita no apunte al vacío.
 
 ## 13. Open Questions
@@ -375,16 +401,20 @@ exactamente lo que ningún módulo posterior debe copiar.
       owner: **se decide en la fase 0 de CADA proyecto** — es una decisión por-proyecto, no del
       template. La entrevista de fase 0 la incluye con las dos vías y el riesgo escrito: coronar
       un módulo existente es la vía barata, y para no consagrar deuda como patrón, el módulo
-      coronado pasa por design-review + `security-reviewer` ANTES de declararse canónico (el
-      mismo gate de 1c que tendría uno construido de cero).
+      coronado pasa por el gate de coronación de §11 — todo el gate de 1c MÁS la review de
+      arquitectura del `reviewer` en contexto limpio — ANTES de declararse canónico.
 - [x] **Q5 — ¿Cuántos módulos autónomos hacen falta para declarar la autonomía?** RESUELTA
       2026-08-25: **dos consecutivos** con `ARCH_DEVIATIONS: 0` (§9 golden 1 ya lo dice igual —
       antes este doc decía dos cosas distintas sobre su propio criterio de salida).
 - [x] **Q7 — ¿Quién juzga la prueba de fuego y con qué contrato?** RESUELTA 2026-08-25: mecánica
       primero, luego reviewer de código en contexto limpio con línea parseable `ARCH_DEVIATIONS:`
       (§9 golden 1). Ni el design-reviewer actual (contrato de PRDs) ni el juicio a mano.
-- [x] **Q8 — ¿Puede cerrar la fase 2 con niveles de la pirámide mudos?** RESUELTA 2026-08-25: no,
-      salvo declarados como decisión `pending` con disparador (§5b, gate de conjunción).
+- [x] **Q8 — ¿Puede cerrar la fase 2 con niveles de la pirámide mudos?** RESUELTA 2026-08-25, y
+      **corregida en v2.3** (`f-9f28fa98`: esta respuesta conservó el waiver universal que §5b ya
+      había tipado — la sede de la pregunta contradecía al gate): **no** para los avisos
+      hard-blocker de la lista de §5b (compilador, Anillo 3, Anillo 1), que **no admiten
+      `pending`**; solo los tipados como diferibles se declaran `pending` con disparador; los
+      informativos no bloquean. Un aviso que no esté en la lista es hard-blocker hasta tipificarse.
 - [x] **Q9 — ¿Qué pasa con `/adoptar`?** RESUELTA 2026-08-25: stub de redirección;
       `docs/ADOPTION.md` §4 sigue mandando sobre el orden de relleno y `/arrancar` lo cita.
 - [x] **Q10 — ¿La fase 1 se parte?** RESUELTA 2026-08-25: sí — 1a contrato, 1b lógica, 1c
@@ -430,6 +460,7 @@ exactamente lo que ningún módulo posterior debe copiar.
 | Fecha | Cambio | Quién |
 |---|---|---|
 | 2026-08-24 | Draft, salido de una conversación de diseño con el owner sobre por qué los agentes producen artefactos localmente correctos y globalmente equivocados. La aportación central es suya: su práctica de construir un "módulo vanguardia" antes de meter IA en un proyecto. Este PRD la formaliza y le añade un criterio de salida falsable | agente del template |
+| 2026-08-25 | **v2.3 tras la ronda 3 del design-review** (AMBER, 12 hallazgos sobre la v2.2: cinco de las siete condiciones de cierre de la auditoría satisfechas; la 6 fallaba porque Q8 y §12 conservaban el waiver universal — tercera repetición del parche-sin-recoser — y la 3 cerraba sobre persistencia gitignored). Con las 4 decisiones del owner: 1b gana ARTEFACTO del rojo (la salida literal del test fallando, adjunta al cierre — OQ-A, refuerza `f-54470c4d`) · la evidencia durable de la fase 3 vive en `docs/process/reviews/` fechado y quien cierra la corrida PROMUEVE el reporte (OQ-B, cierra `f-636333e3`) · la coronación = gate de 1c MÁS review de arquitectura del `reviewer` en contexto limpio, y 1c no la necesita (OQ-C, cierra `f-260d1837`) · el gate de fase 2 es lista ENUMERADA y tipada con fail-closed para avisos nuevos (OQ-D, cierra `f-f09c13f1`; el aviso de carpetas hardcodeadas queda informativo y abierto como `f-1cafb3a8`). Q8 y §12 re-cosidos (cierra `f-9f28fa98`, hijo del prematuramente cerrado `f-f90ccab3`); §5 partido (verify/post-edit sin waiver; mutación/ci difieren); coste con N=2 y numeración de módulos autónomos; refs §N calificadas; provenance pegada en la copia durable (cierra `f-9855ecb`) | agente del template + owner |
 | 2026-08-25 | **v2.2 tras la auditoría externa** (`docs/process/reviews/2026-08-25-auditoria-prd-0007-workflow.md`, AMBER — 5 hallazgos demostrados + 5 riesgos, confirmados por verificación independiente y registrados en el ledger). Cierra: `f-54470c4d` (1b exigía un commit rojo que `verify-run` no firma — la evidencia TDD pasa al reviewer/mutación, declarada honesta) · `f-8928fa5b` (la fase 3 entrega DOS verticales autónomas; el módulo de referencia no cuenta) · `f-2269e8b` (`ARCH_DEVIATIONS` sin consumidor: se nombra el consumidor futuro y el cierre es MANUAL declarado hasta que exista) · `f-61dcbb8b` (rollout retroactivo con gate de coronación explícito) · `f-f90ccab3` (avisos del gate de fase 2 tipados: hard-blocker / diferible / informativo) · `f-75d10804` ("AMBER-atendido" con artefacto terminal; la ref de la matriz es `decisions/README.md`, estática). Quedan abiertos en el harness: `f-35ef4b81` (evidencia de review no durable + identidad sha-de-vacío) y `f-62d2ac5b` (`TARGETS[@]` latente en semgrep-scan). También registra la fila que faltaba del evento **Approved COMPLETO** (el commit `a20be1c` resolvió Q4/Q6 y extendió el Approved sin dejar fila aquí — AUD-R4) y se de-duplicó la mención del RED en el mapa (AUD-R5) | agente del template + auditoría externa |
 | 2026-08-25 | **v2.1 tras la re-review (AMBER, 13 hallazgos)**: N1 —el gate de fase 2 nombraba niveles que `session-start` no emite y se cumplía solo— reescrito sobre los avisos reales del instrumento; residuos de F4 (§4/§7/§8 aún decían "línea") y F12 (§9 aún decía `decidida`/`PENDIENTE`) re-cosidos; juez de golden 1 nombrado (`reviewer`, por la allowlist de captura); exclusión de `_template.md`/`README.md` por construcción; interacción `Status:`↔`state:` declarada (Reemplazado exime); firmas en formato `clave: valor` del conf y lectura desde el índice; grep de la DoD delimitado; golden 4 declara preset; nota de alcanzabilidad bajo freeze. Equivalencia de numeración con el reporte de ronda 1: su Q7→Q3, Q8→Q7, Q9→Q8, Q10→Q9, Q11→Q10 de este doc | agente del template |
 | 2026-08-25 | **v2 tras el design-review (RED, 15 hallazgos — copia durable en `docs/process/reviews/2026-08-25-design-review-prd-0007.md`; esta fila citaba el reporte del hook en `.agents/state/`, que es gitignored y no viaja — `f-35ef4b81`)**, con las 8 decisiones del owner del mismo día: registro=ADR ampliado (F1) · criterio de autonomía como procedimiento con `ARCH_DEVIATIONS:` parseable, contexto limpio y N=2 (F2) · el detector reconocido como gate y condicionado al freeze (F3) · ancla por símbolo, no línea (F4) · gate de fase 2 en conjunción con la pirámide (F5) · `/adoptar` a stub con ADOPTION.md §4 al mando (F6) · `security-reviewer` en el gate de 1c (F7) · columna Responsable + firmas con artefacto en `project.conf` (F8) · NO-TOUCH corregido (F9) · fase 1 partida en 1a/1b/1c (F10) · layers se amplía / matrix se poda con §11 (F11) · campos de máquina en ASCII (F12) · mitigación de envejecimiento con mecanismo (F13) · `Caduca:` declarado informativo y §10 con registro (F14) · el flujo de commit se cita, no se copia (F15). **Status: Approved ACOTADO a fases 0–1 por el owner; fases 2–3 en Draft hasta re-review de esta v2** | agente del template + owner |

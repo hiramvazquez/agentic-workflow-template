@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **43** · Cerrados: 137 · Total: 180
+Abiertos: **44** · Cerrados: 142 · Total: 186
 
 ## Abiertos
 
@@ -20,6 +20,7 @@ Abiertos: **43** · Cerrados: 137 · Total: 180
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
+| `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
@@ -194,3 +195,8 @@ Abiertos: **43** · Cerrados: 137 · Total: 180
 | `f-61dcbb8b` | fixed | PRD 0007 v2.2 (2026-08-25): el rollout retroactivo es fase 0 → CORONACION (mismo gate de 1c: design- |
 | `f-f90ccab3` | fixed | PRD 0007 v2.2 (2026-08-25): avisos del gate de fase 2 tipados en §5b — hard-blockers sin waiver (SIN |
 | `f-75d10804` | fixed | PRD 0007 v2.2 (2026-08-25): AMBER-atendido = hallazgos en estado terminal en el ledger o re-review G |
+| `f-9f28fa98` | fixed | PRD 0007 v2.3 (2026-08-25): Q8 reescrita sobre la lista tipada (hard-blockers sin pending) y §12 cit |
+| `f-636333e3` | fixed | PRD 0007 v2.3 (2026-08-25): la evidencia durable de la fase 3 vive en docs/process/reviews/ fechado; |
+| `f-260d1837` | fixed | PRD 0007 v2.3 (2026-08-25): la coronacion enumera su gate (todo 1c MAS review de arquitectura del re |
+| `f-f09c13f1` | fixed | PRD 0007 v2.3 (2026-08-25): el gate de fase 2 es lista ENUMERADA con el vocabulario real del instrum |
+| `f-9855ecb` | fixed | PRD 0007 v2.3 (2026-08-25): §5 partido (verify/post-edit sin waiver, mutacion/ci difieren); §12 con  |

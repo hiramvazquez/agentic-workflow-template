@@ -6,8 +6,13 @@
 > (`e3b0c44298fc` = sha256 de la cadena vacía) y se acumularon en el mismo archivo local
 > (`f-35ef4b81` registra la mitad harness de ese problema). Este documento es la copia durable
 > que el PRD cita: condensada de los reportes reales del mismo día, suficiente para revalidar
-> cada hallazgo. Provenance: sub-agente `design-reviewer`, dos invocaciones, registradas en
-> `review-history.jsonl` (RED y AMBER).
+> cada hallazgo. Provenance (campos pegados aquí porque `review-history.jsonl` es gitignored y
+> no puede comprobarse desde otro clon — `f-9855ecb`): sub-agente `design-reviewer` ·
+> ronda 1 `ts=2026-08-26T01:35:34Z head=db371f2 verdict=RED findings=15` ·
+> ronda 2 `ts=2026-08-26T02:17:24Z head=b5a41bb verdict=AMBER findings=13` ·
+> (ronda 3, posterior a este doc: `ts=2026-08-26T05:34:53Z head=d847c76 verdict=AMBER
+> findings=12`, sobre la v2.2 — sus hallazgos NEW-1..12 están en el ledger y los cierra la
+> v2.3). Las tres comparten `staged_sha=e3b0c44298fc…` (el sha de vacío — `f-35ef4b81`).
 
 ---
 
