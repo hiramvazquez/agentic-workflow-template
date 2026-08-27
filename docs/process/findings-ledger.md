@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **49** · Cerrados: 155 · Total: 204
+Abiertos: **50** · Cerrados: 156 · Total: 206
 
 ## Abiertos
 
@@ -46,6 +46,7 @@ Abiertos: **49** · Cerrados: 155 · Total: 204
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
+| `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
@@ -218,3 +219,4 @@ Abiertos: **49** · Cerrados: 155 · Total: 204
 | `f-82c39f32` | fixed | los cuatro sandboxes declaran project_kind: harness; template 654/654 y el adoptante deja de tener r |
 | `f-67755604` | fixed | sandbox blindado con env -u; verificado que pasa con y sin GATES_SKIP_TESTS en el entorno |
 | `f-1656e8db` | fixed | saneo en run-tests.sh con test propio y mutante verificado; scope_kind pasa 26/26 con REVIEWER_OVERR |
+| `f-c4e45fca` | fixed | HEAD como ultimo recurso en _resolver_rango, con test y mutante verificado |
