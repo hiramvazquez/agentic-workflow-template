@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **46** · Cerrados: 150 · Total: 196
+Abiertos: **48** · Cerrados: 150 · Total: 198
 
 ## Abiertos
 
@@ -20,6 +20,7 @@ Abiertos: **46** · Cerrados: 150 · Total: 196
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
+| `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
@@ -52,6 +53,7 @@ Abiertos: **46** · Cerrados: 150 · Total: 196
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
+| `f-ab5aeae0` | low | auto-fix | `scripts/agent-hooks/session-start.sh (Nivel 1 PARCIAL)` | El diagnostico de nivel 1 confunde queda un FILL con no esta cableado |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 | `f-c59f9bf1` | low | auto-fix | `tools/lesson-detector-link.sh` | lesson-detector-link no ata las lineas de continuacion de Detector: a un archivo concreto |
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
