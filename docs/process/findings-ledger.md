@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **48** · Cerrados: 151 · Total: 199
+Abiertos: **48** · Cerrados: 152 · Total: 200
 
 ## Abiertos
 
@@ -213,3 +213,4 @@ Abiertos: **48** · Cerrados: 151 · Total: 199
 | `f-fa151ee4` | fixed | fix del ensayo Pelis (2026-08-26): el pathspec del delta se construye con la UNION de los trees de b |
 | `f-a656005d` | fixed | fix del ensayo Pelis (2026-08-26): FAILED_NAMES acumula archivo::funcion; test_el_runner_nombra_el_a |
 | `f-70a98683` | fixed | el test consulta project_kind y no aplica a adoptantes; en el harness la proteccion sigue intacta (m |
+| `f-82feb15b` | fixed | golden 10 partido: la mitad de los workflows del harness se exime por project_kind (helper compartid |
