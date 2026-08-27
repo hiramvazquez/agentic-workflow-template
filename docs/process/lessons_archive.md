@@ -11,6 +11,27 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-27] Un ejemplo de CI copiado cinco veces, roto en las cinco
+- **Qué pasó:** el estreno del Anillo 3 en el primer proyecto adoptante murió con
+  `gzip: stdin: not in gzip format`. La causa estaba a tres pasos de distancia: la URL
+  `releases/latest/download/gitleaks_linux_x64.tar.gz` pide un asset que no existe —el nombre
+  real lleva la versión dentro (`gitleaks_8.30.1_linux_x64.tar.gz`)—, GitHub respondía un 404
+  en HTML y `curl -sSL`, sin `--fail`, lo entregaba con exit 0 como si fuera el tarball.
+- **Causa raíz:** dos fallos que se tapan entre sí. El primero es la duplicación: la misma
+  línea estaba copiada en los cinco ejemplos de CI (seis veces en total), así que el bug se
+  repartió a cualquiera que adoptara el harness con cualquier CI. El segundo es el `curl` sin
+  `--fail`: convierte un error de red en un archivo corrupto, y el mensaje que llega al
+  adoptante no menciona ni la URL ni el 404. Nadie lo detectó en el template porque los
+  ejemplos de CI **no los ejecuta nadie hasta que un adoptante los usa**.
+- **Regla:** un instalador de herramienta en CI vive en UN script (`ci/install-gitleaks.sh`),
+  con versión fijada y checksum verificado, y descarga siempre con `--fail`. Fijar la versión
+  no es rigidez: `latest` en un gate de seguridad hace que una release ajena ponga tu CI en
+  rojo sin que nadie tocara el repo, y además impide verificar el checksum.
+- **Detector:** `tools/tests/test_install_gitleaks.sh` — fija que ningún ejemplo de CI baje
+  gitleaks por su cuenta (la duplicación que causó el bug) y que una descarga o un checksum
+  fallidos den exit 3 sin instalar nada, nunca 0.
+- **Área:** `ci/examples/**`, `ci/install-gitleaks.sh`
+
 ### [2026-08-25] El gate de mayor ROI llevaba una sesión entera mudo, por el matcher
 - **Qué pasó:** `post-edit-verify` —el nivel 1, lint in-loop— colgaba de `PostToolUse Edit|Write`.
   Una sesión escribió **533 líneas de shell** haciendo 589 de sus 609 tool-calls por `Bash` y

@@ -239,6 +239,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-27] Un ejemplo de CI copiado cinco veces, roto en las cinco — `tools/tests/test_install_gitleaks.sh`
 - [2026-08-25] El gate de mayor ROI llevaba una sesión entera mudo, por el matcher — `tools/tests/test_bash_writes.sh`
 - [2026-08-24] Un comentario que afirma cobertura es la afirmación MÁS peligrosa del repo — `tools/tests/test_metrics.sh`
 - [2026-08-24] Cuando una lista se queda corta seis veces, el defecto es que sea una lista — `tools/tests/test_scope_superficie.sh`
