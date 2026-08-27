@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **49** · Cerrados: 154 · Total: 203
+Abiertos: **49** · Cerrados: 155 · Total: 204
 
 ## Abiertos
 
@@ -217,3 +217,4 @@ Abiertos: **49** · Cerrados: 154 · Total: 203
 | `f-82feb15b` | fixed | golden 10 partido: la mitad de los workflows del harness se exime por project_kind (helper compartid |
 | `f-82c39f32` | fixed | los cuatro sandboxes declaran project_kind: harness; template 654/654 y el adoptante deja de tener r |
 | `f-67755604` | fixed | sandbox blindado con env -u; verificado que pasa con y sin GATES_SKIP_TESTS en el entorno |
+| `f-1656e8db` | fixed | saneo en run-tests.sh con test propio y mutante verificado; scope_kind pasa 26/26 con REVIEWER_OVERR |
