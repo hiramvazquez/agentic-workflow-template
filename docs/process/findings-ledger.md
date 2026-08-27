@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **48** · Cerrados: 152 · Total: 200
+Abiertos: **49** · Cerrados: 153 · Total: 202
 
 ## Abiertos
 
@@ -30,6 +30,7 @@ Abiertos: **48** · Cerrados: 152 · Total: 200
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
 | `f-62d2ac5b` | medium | auto-fix | `tools/semgrep-scan.sh:82` | semgrep-scan.sh puede morir con TARGETS[@] unbound bajo bash 3.2 cuando semgrep esta operativo |
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
+| `f-7256d194` | medium | auto-fix | `tools/tests/test_e2e_*.sh` | _e2e_repo duplicado en cuatro archivos: cada fix del sandbox se aplica x4 a mano |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
@@ -214,3 +215,4 @@ Abiertos: **48** · Cerrados: 152 · Total: 200
 | `f-a656005d` | fixed | fix del ensayo Pelis (2026-08-26): FAILED_NAMES acumula archivo::funcion; test_el_runner_nombra_el_a |
 | `f-70a98683` | fixed | el test consulta project_kind y no aplica a adoptantes; en el harness la proteccion sigue intacta (m |
 | `f-82feb15b` | fixed | golden 10 partido: la mitad de los workflows del harness se exime por project_kind (helper compartid |
+| `f-82c39f32` | fixed | los cuatro sandboxes declaran project_kind: harness; template 654/654 y el adoptante deja de tener r |

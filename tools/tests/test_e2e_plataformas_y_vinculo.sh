@@ -213,6 +213,11 @@ test_la_exencion_no_se_lleva_por_delante_el_smoke_de_capacidades() {
   mkdir -p "$sb/tools/lib" "$sb/tools/tests"
   cp "$PROJECT_ROOT/tools/lib/scope.sh" "$sb/tools/lib/scope.sh"
   printf 'project_kind: application\n' > "$sb/tools/project.conf"
+  # Con una fuente de app de verdad: `application` declarado y CERO fuentes es
+  # una CONTRADICCIÓN que scope.sh reporta con exit 3 bajo CI=true, y entonces
+  # el kind no se lee, no se exime, y el test mediría otra cosa. Un adoptante
+  # real tiene código; el sandbox también debe tenerlo.
+  mkdir -p "$sb/Sources" && printf 'struct App {}\n' > "$sb/Sources/App.swift"
   # `scope.sh` lee la declaración a través de git (del índice), así que el
   # sandbox tiene que ser un repo de verdad: sin esto el kind sale vacío, NO se
   # exime, y el golden muere en la rama estricta antes de llegar al smoke —
