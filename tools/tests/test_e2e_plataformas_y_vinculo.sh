@@ -83,9 +83,43 @@ test_golden_10_dos_plataformas_y_smoke_sin_falso_verde() {
 # fijo: un vínculo que solo mirara `test_e2e_matrix.sh` habría quedado
 # pasando en falso —0 tests golden encontrados, o peor, el test ni se habría
 # corrido— en el momento mismo en que la propia división lo movió.
+# ¿Este repo queda EXENTO del vínculo? → 0 (sí, e imprime el motivo) · 1 (no).
+#
+# Vive fuera de los tests a propósito: es la ÚNICA ruta por la que se decide la
+# exención, y así el test de regresión de abajo ejerce exactamente el mismo
+# código que el vínculo real. La primera versión de aquel test sourceaba
+# `scope.sh` por su cuenta y quedaba en verde contra un mutante que reinstalaba
+# el parseo roto — probaba la librería, no la decisión. Lo cazó el reviewer con
+# ese mutante, y es la definición de test decorativo (AGENTS.md §5).
+#
+# Se reusa `_scope_project_kind`, que valida contra el enum: un typo (`harnes`)
+# devuelve vacío y NO exime — la autoprotección del harness cae fail-closed.
+_e2e_vinculo_exime_por_kind() { # $1 = raíz del repo
+  local raiz="$1" kind=""
+  # shellcheck source=/dev/null
+  [ -f "$raiz/tools/lib/scope.sh" ] \
+    && kind="$( cd "$raiz" 2>/dev/null && . tools/lib/scope.sh >/dev/null 2>&1; _scope_project_kind 2>/dev/null )"
+  case "$kind" in
+    application|other)
+      printf 'project_kind=%s — los PRDs del template no son historia del adoptante' "$kind"
+      return 0 ;;
+  esac
+  return 1
+}
+
 test_matriz_e2e_cubre_los_diez_escenarios_golden() {
   local prd="$PROJECT_ROOT/docs/process/prds/0004-reconciliar-workflow-agentico.md"
   local archivos=("$PROJECT_ROOT"/tools/tests/test_e2e_*.sh)
+  # Este vínculo es del HARNESS sobre su propia trazabilidad: cuadra los goldens
+  # contra el PRD que los enumera. En un ADOPTANTE ese PRD no existe —ni debe:
+  # es historia del template, no suya (f-12096526)— y exigirlo dejaba la suite
+  # en 651/652 nada más adoptar, con un rojo que el adoptante no puede arreglar
+  # salvo heredando documentación ajena. La declaración manda (WF-05).
+  local motivo
+  if motivo="$(_e2e_vinculo_exime_por_kind "$PROJECT_ROOT")"; then
+    echo "    (no aplica: $motivo)"
+    return 0
+  fi
   [ -f "$prd" ] || { echo "    falta el PRD 0004: la matriz no tiene contra qué cuadrar"; return 1; }
   local total
   total="$(awk '/^## 9\. Escenarios golden/{s=1;next} /^## 10\./{s=0} s && /^[0-9]+\./{n++} END{print n+0}' "$prd")"
@@ -105,4 +139,47 @@ test_matriz_e2e_cubre_los_diez_escenarios_golden() {
   nfiles="${#archivos[@]}"
   [ "$tiene" = "$total" ] \
     || { echo "    la matriz declara $tiene tests golden repartidos en $nfiles archivos y el PRD $total escenarios"; return 1; }
+}
+
+# ════════════════════════════════════════════════════════════════════
+# La exención por project_kind, en sus TRES ramas
+# ════════════════════════════════════════════════════════════════════
+# El vínculo de arriba se salta en adoptantes (sus PRDs no son los del
+# template) pero DEBE seguir exigiéndolo en el harness. Un parseo ad hoc hacía
+# que un typo en `project_kind` desactivara la autoprotección en silencio; se
+# reusó `_scope_project_kind`, que valida contra el enum. Esto lo fija.
+test_la_exencion_del_vinculo_distingue_harness_de_adoptante() {
+  local sb; sb="$(mktemp -d)"
+  mkdir -p "$sb/tools/lib"
+  cp "$PROJECT_ROOT/tools/lib/scope.sh" "$sb/tools/lib/scope.sh"
+  ( cd "$sb" && git init -q . 2>/dev/null )
+
+  # Se ejerce EL HELPER REAL (`_e2e_vinculo_exime_por_kind`), el mismo que usa
+  # el vínculo: si alguien reinstala un parseo propio ahí dentro, esto se pone
+  # rojo. Sourcear `scope.sh` por separado aquí dejaba pasar ese mutante.
+  _exime_con() { # $1 = contenido de project.conf → 0 si exime, 1 si no
+    printf '%s\n' "$1" > "$sb/tools/project.conf"
+    _e2e_vinculo_exime_por_kind "$sb" >/dev/null 2>&1
+  }
+
+  local rc=0
+  _exime_con 'project_kind: application' \
+    || { echo "    un adoptante (application) NO quedó exento: el vínculo le exigiría PRDs ajenos"; rc=1; }
+  _exime_con 'project_kind: other' \
+    || { echo "    un repo declarado 'other' tampoco quedó exento"; rc=1; }
+  ! _exime_con 'project_kind: harness' \
+    || { echo "    el HARNESS quedó exento de su propio vínculo: la autoprotección se apagó"; rc=1; }
+  # El typo es el caso que motivó reusar el parser canónico: no puede leerse
+  # como "adoptante", porque eso desactivaría el self-check sin que nadie lo vea.
+  ! _exime_con 'project_kind: harnes' \
+    || { echo "    un TYPO en project_kind eximió al harness — fail-open silencioso"; rc=1; }
+  # Comentario en línea: el parseo por campos de la lib lo tolera.
+  ! _exime_con 'project_kind: harness  # el repo del harness' \
+    || { echo "    un comentario en línea rompió el parseo y eximió al harness"; rc=1; }
+  # Sin conf declarado → fail-closed (no exime).
+  rm -f "$sb/tools/project.conf"
+  ! _e2e_vinculo_exime_por_kind "$sb" >/dev/null 2>&1 \
+    || { echo "    sin project.conf declarado la exención se activó sola (debe ser fail-closed)"; rc=1; }
+
+  rm -rf "$sb"; return $rc
 }
