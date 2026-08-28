@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **51** · Cerrados: 156 · Total: 207
+Abiertos: **51** · Cerrados: 157 · Total: 208
 
 ## Abiertos
 
@@ -31,7 +31,6 @@ Abiertos: **51** · Cerrados: 156 · Total: 207
 | `f-62d2ac5b` | medium | auto-fix | `tools/semgrep-scan.sh:82` | semgrep-scan.sh puede morir con TARGETS[@] unbound bajo bash 3.2 cuando semgrep esta operativo |
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
 | `f-7256d194` | medium | auto-fix | `tools/tests/test_e2e_*.sh` | _e2e_repo duplicado en cuatro archivos: cada fix del sandbox se aplica x4 a mano |
-| `f-72c1dc64` | medium | owner-decision | `tools/tests/test_source_sets.sh` | Dos tests de source-sets dependen de que semgrep se atragante: rojos en Linux, verdes en macOS |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
@@ -54,6 +53,7 @@ Abiertos: **51** · Cerrados: 156 · Total: 207
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
+| `f-97021ca1` | low | owner-decision | `tools/check-drift.sh` | El limite de tamano de §4 no se mide en los .sh del propio harness |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-ab5aeae0` | low | auto-fix | `scripts/agent-hooks/session-start.sh (Nivel 1 PARCIAL)` | El diagnostico de nivel 1 confunde queda un FILL con no esta cableado |
@@ -221,3 +221,4 @@ Abiertos: **51** · Cerrados: 156 · Total: 207
 | `f-67755604` | fixed | sandbox blindado con env -u; verificado que pasa con y sin GATES_SKIP_TESTS en el entorno |
 | `f-1656e8db` | fixed | saneo en run-tests.sh con test propio y mutante verificado; scope_kind pasa 26/26 con REVIEWER_OVERR |
 | `f-c4e45fca` | fixed | HEAD como ultimo recurso en _resolver_rango, con test y mutante verificado |
+| `f-72c1dc64` | fixed | Resuelto en este mismo cambio: los dos tests dejan de provocar el escenario a traves de semgrep y pa |

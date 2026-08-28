@@ -11,6 +11,30 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-27] Un test que dependía de con qué se atraganta semgrep: verde en macOS, rojo en CI
+- **Qué pasó:** el estreno del Anillo 3 en el primer adoptante dejó el job de Linux en rojo por
+  dos tests de source-sets que en macOS pasaban. Los dos montaban un `.kt` deliberadamente roto y
+  confiaban en que semgrep **no pudiera parsearlo**, para así ejercitar el fallback textual. La
+  versión de semgrep del runner Linux sí lo digería, así que el fallback no se activaba y las
+  aserciones fallaban. El adoptante veía su CI rojo por un área (KMP) que su proyecto ni usa.
+- **Causa raíz:** el escenario se provocaba a través de una herramienta de terceros en vez de
+  construirse. Con qué se atraganta un parser es un detalle de implementación de ESA herramienta,
+  no un contrato: cambia entre versiones y entre plataformas. El propio comentario del test ya
+  avisaba de que la posición del `import` alteraba el resultado — la señal estaba escrita y no se
+  leyó como lo que era. Un test así no verifica el harness: verifica la versión de semgrep de la
+  máquina donde corre.
+- **Regla:** cuando un detector consume la salida de una herramienta externa, el test controla
+  **esa salida**, no intenta provocarla. Aquí el detector lee el JSON de semgrep
+  (`results` = hits, `errors[].path` = saltados), así que un stub de cuatro líneas en el `PATH`
+  reproduce cualquier escenario de forma exacta y determinista — el patrón ya existía en este
+  mismo archivo (`_case_un_sigterm_lo_mata_de_verdad`), solo que no se había aplicado aquí.
+- **Detector:** `tools/tests/test_source_sets_fallback.sh` — `_ss_stub_semgrep` y los dos tests
+  reescritos sobre él; ambos con su mutante verificado (quitar el fallback por grep mata uno,
+  quitar el dedupe por `archivo:línea` mata el otro, y quitar el override del `PATH` mata los
+  dos). Viven en archivo propio porque la reescritura empujó `test_source_sets.sh` sobre el hard
+  limit de §4, igual que ya había pasado una vez con `test_source_sets_prefijos.sh`.
+- **Área:** `tools/tests/test_source_sets_fallback.sh`, `tools/check-source-sets.sh`
+
 ### [2026-08-27] El canal de sync le mandaba al adoptante la CI del propio template
 - **Qué pasó:** al sincronizar el harness en el primer proyecto adoptante, el sync trajo
   `harness-ci.yml`, `harness-ci-macos.yml` y `gate-0a-macos.yml` — los tres workflows de este
