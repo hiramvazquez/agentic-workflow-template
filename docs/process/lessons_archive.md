@@ -11,6 +11,30 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-27] `grep -r` sobre UN archivo: BSD dice el nombre, GNU no
+- **Qué pasó:** tras arreglar los dos tests de source-sets para que no dependieran de semgrep,
+  el CI de Linux **siguió rojo con los mismos dos síntomas**: "no nombró el archivo saltado" y
+  `violaciones=2` donde debía haber 1. Con el escenario ya controlado por un stub, la única
+  variable que quedaba era la plataforma. Y no era el test: era el detector.
+- **Causa raíz:** `_grep_en` invocaba `grep -rnE ... "$@"`, y el fallback por archivo saltado le
+  pasa **un solo archivo**. BSD grep (macOS) imprime el nombre del archivo siempre que se recorre
+  con `-r`; **GNU grep lo omite** cuando el argumento es un único archivo explícito. En Linux la
+  violación salía como `2:import android.net.Uri` — sin decir en qué archivo—, y como el dedupe
+  del detector casa por `archivo:línea`, las claves del hit de semgrep (`Roto.kt:2`) y del grep
+  (`2:import…`) no coincidían: la misma violación se contaba dos veces y `violaciones=N` mentía.
+  Dos bugs de producción, invisibles en la máquina donde se escribió el código.
+- **Regla:** en cualquier `grep` cuya salida se PARSEE por `archivo:línea`, `-H` es obligatorio y
+  no es redundante con `-r`. Más en general: las diferencias BSD/GNU no se descubren leyendo, se
+  descubren ejecutando en las dos — y el harness ya tenía una lección de esta familia
+  (`stat -f/-c`). Que la suite corra en Linux **y** macOS es un detector en sí mismo, y este es el
+  segundo bug real que caza.
+- **Detector:** `tools/tests/test_source_sets_fallback.sh` — `test_el_fallback_nombra_el_archivo_siempre`
+  (comportamiento; **solo muerde en Linux**, comprobado: sin `-H` sigue verde en macOS) y
+  `test_el_grep_del_fallback_pide_el_nombre_del_archivo` (guard estructural sobre la invocación,
+  que muerde en cualquier plataforma). Los dos existen porque uno solo no basta: el de
+  comportamiento es ciego en la máquina de quien escribe, y el estructural no prueba el efecto.
+- **Área:** `tools/check-source-sets.sh`
+
 ### [2026-08-27] Un test que dependía de con qué se atraganta semgrep: verde en macOS, rojo en CI
 - **Qué pasó:** el estreno del Anillo 3 en el primer adoptante dejó el job de Linux en rojo por
   dos tests de source-sets que en macOS pasaban. Los dos montaban un `.kt` deliberadamente roto y

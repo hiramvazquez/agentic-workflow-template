@@ -111,3 +111,62 @@ _case_partial_parsing_no_cuenta_dos_veces() {
 }
 test_una_violacion_en_un_kt_parseado_a_medias_se_cuenta_una_vez() {
   _ssf_repo _case_partial_parsing_no_cuenta_dos_veces; }
+
+# ── El fallback SIEMPRE dice en que archivo ─────────────────────────
+# Este test existe por un bug que solo se veia en Linux y que llego a CI: BSD
+# grep (macOS) imprime el nombre del archivo cuando se recorre con -r, pero GNU
+# grep lo OMITE si se le pasa un solo archivo explicito — que es justo lo que
+# hace el fallback por archivo saltado. En Linux la violacion salia como
+# `2:import android.net.Uri`, sin decir donde, y ademas el dedupe por
+# `archivo:linea` no podia casar contra el hit de semgrep, asi que la misma
+# violacion se contaba dos veces.
+#
+# Se prueba sobre UN solo archivo a proposito: con dos o mas, ambos greps
+# imprimen el nombre y el bug es invisible.
+#
+# ⚠️ HONESTIDAD SOBRE SU ALCANCE: este test **no puede fallar en macOS**. Se
+# comprobo quitando el `-H`: BSD grep sigue imprimiendo el nombre y el test
+# sigue verde. Solo muerde en Linux, o sea en CI. Por eso existe ademas el
+# guard estructural de abajo, que si muerde en cualquier plataforma. Un test
+# que en tu maquina no puede ponerse rojo no es inutil —cubre el CI— pero
+# decir que te protege en local seria mentir.
+_case_el_fallback_nombra_el_archivo_siempre() {
+  _ssf_common 'package dominio' 'class Repo'
+  printf '%s\n' 'package dominio' 'import android.net.Uri' \
+    > shared/src/commonMain/kotlin/Roto.kt
+
+  # Sin semgrep: el detector cae al fallback textual entero.
+  stub bin/semgrep '#!/bin/sh\nexit 127\n'
+  local out
+  out="$(PATH="$PWD/bin:$PATH" bash tools/check-source-sets.sh 2>&1)"
+
+  printf '%s' "$out" | grep -qE 'Roto\.kt:[0-9]+' || {
+    echo "    el fallback no dijo en QUE archivo esta la violacion."
+    echo "    (GNU grep omite el nombre con un solo archivo si falta -H;"
+    echo "     el usuario recibe una violacion que no puede localizar)"
+    printf '%s\n' "$out" | sed 's/^/      /' | head -6
+    return 1; }
+}
+test_el_fallback_nombra_el_archivo_siempre() {
+  _ssf_repo _case_el_fallback_nombra_el_archivo_siempre; }
+
+# El guard que SI muerde en cualquier plataforma. El test de arriba comprueba
+# el comportamiento —lo correcto— pero es ciego en macOS; este fija la causa:
+# que la invocacion lleve `-H`. Es un test de implementacion, y se acepta a
+# sabiendas porque la alternativa es que el unico aviso llegue desde un runner
+# de Linux, veinte minutos despues del push. Mismo patron que
+# `test_sync_paths_cabe_en_una_linea_como_asume_su_parser`.
+test_el_grep_del_fallback_pide_el_nombre_del_archivo() {
+  local linea
+  linea="$(grep -nE '^\s*grep -[a-zA-Z]*E ' "$PROJECT_ROOT/tools/check-source-sets.sh" | head -1)"
+  [ -n "$linea" ] || { echo "    no encontre la invocacion de grep en _grep_en"; return 1; }
+  case "$linea" in
+    *-r*H*E*|*-H*|*grep\ -rHnE*) ;;
+    *) echo "    _grep_en invoca grep SIN -H:"
+       echo "      $linea"
+       echo "    GNU grep omite el nombre del archivo con un solo argumento,"
+       echo "    asi que en Linux la violacion sale sin decir donde esta y el"
+       echo "    dedupe por archivo:linea deja de casar. En macOS no se nota."
+       return 1 ;;
+  esac
+}

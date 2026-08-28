@@ -239,6 +239,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-08-27] `grep -r` sobre UN archivo: BSD dice el nombre, GNU no — `tools/tests/test_source_sets_fallback.sh`
 - [2026-08-27] Un test que dependía de con qué se atraganta semgrep: verde en macOS, rojo en CI — `tools/tests/test_source_sets_fallback.sh`
 - [2026-08-27] El canal de sync le mandaba al adoptante la CI del propio template — `tools/tests/test_upgrade.sh`
 - [2026-08-27] Un ejemplo de CI copiado cinco veces, roto en las cinco — `tools/tests/test_install_gitleaks.sh`
