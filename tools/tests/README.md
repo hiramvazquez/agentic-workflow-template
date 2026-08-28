@@ -3,7 +3,10 @@
 > Los gates son código, y código con lógica de decisión sin test es deuda (AGENTS.md §5).
 > Esta suite (`bash tools/tests/run-tests.sh` imprime el conteo real — no lo hardcodees aquí,
 > ya se pudrió dos veces) fija el COMPORTAMIENTO de los gates. Corre en cada push vía
-> `.github/workflows/harness-ci.yml` en Linux **y** macOS — la diferencia de OS es un
+> el workflow de CI del repo (aqui `harness-ci.yml`; en un proyecto que adopto el harness,
+> el suyo) en Linux **y** macOS — el nombre no se fija aqui a proposito: este README viaja
+> por el canal de sync y nombrar un workflow concreto le pisaba al adoptante el nombre del
+> suyo con uno que en su repo no existe. La diferencia de OS es un
 > detector en sí misma (cazó el bug de `stat -f/-c` que rechazaba markers válidos en CI):
 > corre los scripts reales en repos git desechables y verifica exit codes, salidas y archivos
 > producidos — nunca detalles de implementación.

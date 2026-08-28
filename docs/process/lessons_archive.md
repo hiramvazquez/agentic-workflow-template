@@ -11,6 +11,48 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-08-27] El canal de sync le mandaba al adoptante la CI del propio template
+- **Qué pasó:** al sincronizar el harness en el primer proyecto adoptante, el sync trajo
+  `harness-ci.yml`, `harness-ci-macos.yml` y `gate-0a-macos.yml` — los tres workflows de este
+  repo, que corren la suite del harness, `validate-harness` y un gate de una fase del PRD 0005.
+  Ninguno compila ni prueba la app de nadie. El adoptante se habría encontrado la CI del
+  template disparándose en cada push suyo, además de la propia: cupo de Actions quemado y un
+  gate que referencia un PRD que su repo no tiene. En el mismo sync, `tools/tests/README.md`
+  pisó una corrección del adoptante y dejó su documentación nombrando un workflow inexistente.
+- **Causa raíz:** `.github/workflows` estaba entero en `SYNC_PATHS`, bajo la idea de que "el CI
+  es maquinaria". Lo es — pero el CI de ESTE repo prueba ESTE repo. Lo que le corresponde a un
+  adoptante son los ejemplos de `ci/examples/`, que se copian una vez al adoptar y desde ahí son
+  suyos. Es la séptima instancia del mismo patrón: **el template le exige (o le entrega) al
+  adoptante artefactos que son del template**, y aparece cada vez por un canal distinto —los
+  goldens, el ledger, las citas, los PRDs, el `project_kind` de los sandboxes, el rango del
+  primer push, y ahora el sync—.
+- **Regla:** lo que viaja por el canal de sync tiene que ser cierto en el repo de DESTINO, no
+  solo en el de origen. Un archivo del template que nombra un artefacto propio (un workflow, un
+  PRD, una ruta) o no viaja, o se escribe de forma que siga siendo cierto en el otro lado.
+- **Y el fix a medias que casi se cuela:** sacar la ruta de `SYNC_PATHS` solo protege a quien
+  adopta DESDE CERO. Al adoptante que ya los recibió no le pasa nada — el `_es_maquinaria ||
+  continue` los descarta antes de clasificarlos, así que ni se actualizan, ni se borran, ni se
+  mencionan: se quedan corriendo en su CI para siempre y en silencio. Lo cazó el reviewer
+  reproduciendo el camino de delta, no leyendo el diff. `upgrade.sh` ahora los NOMBRA (no los
+  borra: si el adoptante los adaptó, son suyos). Un arreglo que no alcanza a quien ya sufrió el
+  problema, anunciado como si alcanzara a todos, es la misma familia de defecto que la lección
+  del gate anunciado y no implementado.
+- **Y el aviso, a su vez, nació ruidoso.** El primer intento recorría el árbol entero del
+  `BASE_REC` y nombraba todo lo que hoy no fuera maquinaria; en una adopción por copia eso es el
+  repo casi completo (`AGENTS.md`, `README.md`, las skills, los PRDs — que nunca fueron
+  maquinaria, no "dejaron de serlo"). El reviewer lo midió corriéndolo: cinco entradas en un
+  sandbox mínimo, decenas en un repo real. La ley del 10% (§14.2) aplica igual a un aviso que a
+  un detector — el ruido no lo debilita, lo anula—, así que la comparación pasó a ser entre la
+  definición VIEJA de `SYNC_PATHS` (leída del `upgrade.sh` que el adoptante usó, en su
+  `BASE_REC`) y la de hoy: solo se nombra lo que estaba en la lista y ya no está. El test afirma
+  ahora las dos mitades: que nombra el huérfano y que NO nombra lo que nunca fue maquinaria.
+- **Detector:** `tools/tests/test_upgrade.sh` — `test_sync_no_manda_el_ci_del_template` fija que
+  un sync no traiga los workflows del template ni toque el del adoptante, con la contraprueba de
+  que la maquinaria de verdad sí viaja (o el test pasaría con un sync que no sincroniza nada); y
+  `test_sync_avisa_de_lo_que_dejo_de_ser_maquinaria` cubre el camino de delta, que es donde vive
+  el adoptante real.
+- **Área:** `tools/upgrade.sh`, `.github/workflows/**`
+
 ### [2026-08-27] Un ejemplo de CI copiado cinco veces, roto en las cinco
 - **Qué pasó:** el estreno del Anillo 3 en el primer proyecto adoptante murió con
   `gzip: stdin: not in gzip format`. La causa estaba a tres pasos de distancia: la URL
