@@ -109,7 +109,19 @@ case "$(bash tools/mutation-score.sh --state 2>/dev/null || echo sin-cablear)" i
   *)
     echo "⚠️  NIVEL 4 NUNCA MEDIDO: el runner corre, pero nadie ha fijado el piso. Mide una vez (\`bash tools/mutation-score.sh --update\`) y a partir de ahí solo sube."; _health=0 ;;
 esac
-grep -qE 'Plataformas:\*\* <!-- FILL' AGENTS.md 2>/dev/null && { echo "⚠️  AGENTS.md §2 (Stack) SIN rellenar — build/test/lenguaje desconocidos."; _health=0; }
+# El delimitador tras FILL no es cosmetico. Con el prefijo abierto (`<!-- FILL`
+# a secas) estos dos avisos casaban tambien `<!-- FILL-HECHO: ... -->`, que es
+# el marcador de los huecos ya RESUELTOS: un adoptante que cerrara el hueco con
+# esa convencion seguia leyendo "SIN rellenar" en CADA arranque, sobre trabajo
+# que ya hizo. Un aviso que no se puede apagar haciendo lo correcto ensena a
+# ignorar los avisos, y este es el banner de arranque — el sitio de maxima
+# autoridad del harness.
+# ⚠️ El atajo de meter el guion en la clase (`[[:space:]:>-]`) NO vale: se come
+# `<!-- FILL-->` (guion pegado), que SI es un hueco pendiente. Por eso `-->` va
+# como alternativa explicita. Mismo delimitador que skill-reminder.sh:109 y
+# harness-report.sh:67, para no tener tres formas de lo mismo.
+_SST_FILL_ERE='<!--[[:space:]]*FILL([[:space:]:>]|-->|$)'
+grep -qE "Plataformas:\*\*[[:space:]]*$_SST_FILL_ERE" AGENTS.md 2>/dev/null && { echo "⚠️  AGENTS.md §2 (Stack) SIN rellenar — build/test/lenguaje desconocidos."; _health=0; }
 _src=0; for d in ios android web src; do [ -d "$d" ] && _src=1; done
 [ "$_src" = "0" ] && { echo "⚠️  Sin carpetas de código (ios/android/web/src) — check-drift inactivo."; _health=0; }
 # La matriz path→skill vive en tools/skill-matrix.conf (fuente única).
@@ -158,7 +170,7 @@ if [ -x tools/probe-capability.sh ]; then
 else
   echo "⚠️  Nivel 2 DESCONOCIDO: falta tools/probe-capability.sh; presencia no demuestra operación."; _health=0
 fi
-grep -q '<!-- FILL' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
+grep -qE "$_SST_FILL_ERE" scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && grep -qE '^\s*\*\)\s*:\s*;;' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && { echo "⚠️  Nivel 1 PARCIAL: post-edit-verify sin lint/typecheck de tu stack (§FILL) — el agente no recibe señal in-loop."; _health=0; }
 grep -q '"min_score": 0' tools/mutation-ratchet.json 2>/dev/null \
