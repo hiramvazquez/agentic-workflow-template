@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **55** · Cerrados: 157 · Total: 212
+Abiertos: **57** · Cerrados: 158 · Total: 215
 
 ## Abiertos
 
@@ -40,7 +40,6 @@ Abiertos: **55** · Cerrados: 157 · Total: 212
 | `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
-| `f-bedac76b` | medium | auto-fix | `tools/check-ring3.sh:63-80` | check-ring3 acepta un workflow manual-only como Anillo 3: hoy declara verde citando gate-0a-macos.yml |
 | `f-d13227b5` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh:22-27` | La trayectoria pierde el binario real tras un cd encadenado y no distingue coordinador de sub-agente: 98 de 257 eventos Bash dicen solo cd |
 | `f-d3015816` | medium | owner-decision | `.github/workflows/harness-ci.yml (cabecera) + tools/verify-run.sh (marker sin plataforma)` | La cobertura macOS pasa a depender de una afirmacion sobre la maquina de quien publica, y ningun artefacto la registra |
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
@@ -51,8 +50,10 @@ Abiertos: **55** · Cerrados: 157 · Total: 212
 | `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
+| `f-41445734` | low | owner-decision | `tools/check-ring3.sh (_con_limite/_vivo) vs tools/tests/run-tests.sh (_run_test)` | Dos watchdogs portatiles independientes en tools/: _con_limite y _run_test resuelven el mismo problema con garantias distintas |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
 | `f-61c4b04b` | low | owner-decision | `tools/upgrade.sh:224 (SYNC_PATHS)` | Un comando nuevo del template no llega NUNCA a un adoptante ya existente, y nadie lo declara |
+| `f-6e236c11` | low | auto-fix | `scripts/agent-hooks/session-start.sh (sed del bloque de check-ring3)` | El banner de sesion aplana la indentacion del diagnostico del Anillo 3 y pierde la jerarquia del remedio |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-88348888` | low | owner-decision | `CLAUDE.md:19 (Maquinaria exclusiva de Claude Code)` | CLAUDE.md anuncia solo /goal y ya hay 5 comandos: los otros 4 son indescubribles |
@@ -64,6 +65,7 @@ Abiertos: **55** · Cerrados: 157 · Total: 212
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 | `f-c59f9bf1` | low | auto-fix | `tools/lesson-detector-link.sh` | lesson-detector-link no ata las lineas de continuacion de Detector: a un archivo concreto |
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
+| `f-cbf21371` | low | owner-decision | `scripts/agent-hooks/session-start.sh:112 y :161` | Los dos greps de FILL de session-start.sh casan por prefijo: un hueco ya cerrado con FILL-HECHO sigue saliendo pendiente |
 
 ## Cerrados
 
@@ -200,6 +202,7 @@ Abiertos: **55** · Cerrados: 157 · Total: 212
 | `f-a6d21f84` | fixed | (1) El contrato pasa a estar escrito al reves de como estaba: la ruta SI puede traer tabuladores, lo |
 | `f-2e94db73` | fixed | (1) Dos tests end-to-end nuevos que pasan por los hooks REALES con un tabulador en el nombre: test_e |
 | `f-fb03e5d1` | fixed | writes_mark barre los temporales al dejar la marca, con 'find -mmin +10 -delete'. El umbral NO es co |
+| `f-bedac76b` | fixed | Arreglado en el mismo cambio. check-ring3.sh ya no acepta un workflow manual-only: exige disparador  |
 | `f-54470c4d` | fixed | PRD 0007 v2.2 (2026-08-25): la evidencia TDD de 1b deja de exigir un commit rojo imposible — la veri |
 | `f-8928fa5b` | fixed | PRD 0007 v2.2 (2026-08-25): la fase 3 entrega DOS verticales autonomas consecutivas, el modulo de re |
 | `f-2269e8b` | fixed | PRD 0007 v2.2 (2026-08-25): consumidor futuro nombrado (verdict.sh + capture + review-history.jsonl, |
