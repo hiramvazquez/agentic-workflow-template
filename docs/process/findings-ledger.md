@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **60** · Cerrados: 158 · Total: 218
+Abiertos: **61** · Cerrados: 158 · Total: 219
 
 ## Abiertos
 
@@ -63,6 +63,7 @@ Abiertos: **60** · Cerrados: 158 · Total: 218
 | `f-9b078b03` | low | owner-decision | `tools/check-prd-tree.sh` | check-prd-tree no compara el bloque NO-TOUCH ni los PRDs Shipped: dos citas ya podridas quedan fuera de alcance |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
 | `f-a6e7b6cd` | low | owner-decision | `tools/tests/test_execution_map.sh` | test_execution_map.sh pasa de 590 a 794 lineas: engordo un fichero que YA estaba al doble de su hard limit |
+| `f-a8cf6f5b` | low | owner-decision | `tools/check-execution-map.sh` | check-execution-map: 'No es lo unico que queda' dispara, y se ACEPTA a proposito |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-ab5aeae0` | low | auto-fix | `scripts/agent-hooks/session-start.sh (Nivel 1 PARCIAL)` | El diagnostico de nivel 1 confunde queda un FILL con no esta cableado |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
