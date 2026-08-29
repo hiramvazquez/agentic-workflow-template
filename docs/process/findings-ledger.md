@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **61** · Cerrados: 158 · Total: 219
+Abiertos: **62** · Cerrados: 159 · Total: 221
 
 ## Abiertos
 
@@ -52,12 +52,14 @@ Abiertos: **61** · Cerrados: 158 · Total: 219
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-41445734` | low | owner-decision | `tools/check-ring3.sh (_con_limite/_vivo) vs tools/tests/run-tests.sh (_run_test)` | Dos watchdogs portatiles independientes en tools/: _con_limite y _run_test resuelven el mismo problema con garantias distintas |
+| `f-589f151f` | low | owner-decision | `scripts/agent-hooks/session-start.sh (los dos checks de FILL)` | Los checks de FILL de session-start no quitan los backticks: documentar el patron dentro del fichero vigilado lo volveria a romper |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
 | `f-61c4b04b` | low | owner-decision | `tools/upgrade.sh:224 (SYNC_PATHS)` | Un comando nuevo del template no llega NUNCA a un adoptante ya existente, y nadie lo declara |
 | `f-6e236c11` | low | auto-fix | `scripts/agent-hooks/session-start.sh (sed del bloque de check-ring3)` | El banner de sesion aplana la indentacion del diagnostico del Anillo 3 y pierde la jerarquia del remedio |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-88348888` | low | owner-decision | `CLAUDE.md:19 (Maquinaria exclusiva de Claude Code)` | CLAUDE.md anuncia solo /goal y ya hay 5 comandos: los otros 4 son indescubribles |
+| `f-89015e28` | low | owner-decision | `scripts/agent-hooks/session-start.sh + skill-reminder.sh + tools/harness-report.sh` | El literal de la ERE de FILL esta copiado en tres ficheros sin fuente compartida |
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
 | `f-97021ca1` | low | owner-decision | `tools/check-drift.sh` | El limite de tamano de §4 no se mide en los .sh del propio harness |
 | `f-9b078b03` | low | owner-decision | `tools/check-prd-tree.sh` | check-prd-tree no compara el bloque NO-TOUCH ni los PRDs Shipped: dos citas ya podridas quedan fuera de alcance |
@@ -69,7 +71,6 @@ Abiertos: **61** · Cerrados: 158 · Total: 219
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 | `f-c59f9bf1` | low | auto-fix | `tools/lesson-detector-link.sh` | lesson-detector-link no ata las lineas de continuacion de Detector: a un archivo concreto |
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
-| `f-cbf21371` | low | owner-decision | `scripts/agent-hooks/session-start.sh:112 y :161` | Los dos greps de FILL de session-start.sh casan por prefijo: un hueco ya cerrado con FILL-HECHO sigue saliendo pendiente |
 
 ## Cerrados
 
@@ -233,3 +234,4 @@ Abiertos: **61** · Cerrados: 158 · Total: 219
 | `f-1656e8db` | fixed | saneo en run-tests.sh con test propio y mutante verificado; scope_kind pasa 26/26 con REVIEWER_OVERR |
 | `f-c4e45fca` | fixed | HEAD como ultimo recurso en _resolver_rango, con test y mutante verificado |
 | `f-72c1dc64` | fixed | Resuelto en este mismo cambio: los dos tests dejan de provocar el escenario a traves de semgrep y pa |
+| `f-cbf21371` | fixed | Arreglado en d98d0a8. Los dos avisos usan ahora _SST_FILL_ERE='<!--[[:space:]]*FILL([[:space:]:>]|-- |
