@@ -97,7 +97,7 @@ Que un proyecto nuevo llegue a su primera tarea delegada con: las decisiones de 
 ## 5. Estructura de archivos a crear / tocar
 
 ```
-.claude/commands/arrancar.md            ← NUEVO: conduce las cuatro fases (absorbe /adoptar)
+.claude/commands/arrancar.md            ← [SLICE-FUTURO] NUEVO: conduce las cuatro fases (absorbe /adoptar)
 .claude/commands/adoptar.md             ← queda en STUB de ~3 líneas que redirige a /arrancar
 docs/ADOPTION.md                        ← §4 SIGUE siendo el dueño del ORDEN de relleno; /arrancar
                                           lo cita, no lo copia (el §4 de ADOPTION —donde vive el
@@ -111,13 +111,13 @@ docs/process/decisions/README.md        ← SE AMPLÍA (el directorio NO es nuev
                                           numeración NNNN): el formato ADR existente gana los campos
                                           de §6 como OPCIONALES. Un artefacto, una numeración, un
                                           formato — decisión del owner 2026-08-25 (F1)
-docs/process/decisions/_template.md     ← NUEVO, instancia del formato ampliado
-tools/check-decision-coverage.sh        ← NUEVO y CONDICIONADO AL FREEZE (Q1 resuelta): su nombre lo
+docs/process/decisions/_template.md     ← [SLICE-FUTURO] NUEVO, instancia del formato ampliado
+tools/check-decision-coverage.sh        ← [SLICE-FUTURO] NUEVO y CONDICIONADO AL FREEZE (Q1 resuelta): su nombre lo
                                           clasifica como detector (el glob de test_meta_fp.sh) y por
                                           tanto ES un gate nuevo. Se entrega cuando el freeze se
                                           levante; cubre los goldens 2, 3, 6 y 7 (un solo detector
                                           con tres comprobaciones, no tres detectores)
-tools/tests/test_decision_coverage.sh   ← ídem + guards de FP
+tools/tests/test_decision_coverage.sh   ← [SLICE-FUTURO] ídem + guards de FP
 tools/tests/test_meta_fp.sh             ← el manifiesto gana la fila del detector nuevo (su glob
                                           recorre tools/check-*.sh y falla si falta)
 tools/layers.conf                       ← se AMPLÍA con las capas reales — los globs universales se

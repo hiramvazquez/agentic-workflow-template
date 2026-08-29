@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **57** · Cerrados: 158 · Total: 215
+Abiertos: **60** · Cerrados: 158 · Total: 218
 
 ## Abiertos
 
@@ -41,6 +41,7 @@ Abiertos: **57** · Cerrados: 158 · Total: 215
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
 | `f-d13227b5` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh:22-27` | La trayectoria pierde el binario real tras un cd encadenado y no distingue coordinador de sub-agente: 98 de 257 eventos Bash dicen solo cd |
+| `f-d179c95d` | medium | owner-decision | `gobierno del harness` | check-prd-tree.sh entra cableado al Anillo 3 como EXCEPCION DECLARADA al freeze de gates nuevos |
 | `f-d3015816` | medium | owner-decision | `.github/workflows/harness-ci.yml (cabecera) + tools/verify-run.sh (marker sin plataforma)` | La cobertura macOS pasa a depender de una afirmacion sobre la maquina de quien publica, y ningun artefacto la registra |
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
@@ -59,7 +60,9 @@ Abiertos: **57** · Cerrados: 158 · Total: 215
 | `f-88348888` | low | owner-decision | `CLAUDE.md:19 (Maquinaria exclusiva de Claude Code)` | CLAUDE.md anuncia solo /goal y ya hay 5 comandos: los otros 4 son indescubribles |
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
 | `f-97021ca1` | low | owner-decision | `tools/check-drift.sh` | El limite de tamano de §4 no se mide en los .sh del propio harness |
+| `f-9b078b03` | low | owner-decision | `tools/check-prd-tree.sh` | check-prd-tree no compara el bloque NO-TOUCH ni los PRDs Shipped: dos citas ya podridas quedan fuera de alcance |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
+| `f-a6e7b6cd` | low | owner-decision | `tools/tests/test_execution_map.sh` | test_execution_map.sh pasa de 590 a 794 lineas: engordo un fichero que YA estaba al doble de su hard limit |
 | `f-aaa2fb66` | low | owner-decision | `tools/lib/scope.sh + tools/tests/test_review_marker_preset.sh` | Decision revertida: .github/workflows deja de ser meta-doc exento y pasa a exigir review |
 | `f-ab5aeae0` | low | auto-fix | `scripts/agent-hooks/session-start.sh (Nivel 1 PARCIAL)` | El diagnostico de nivel 1 confunde queda un FILL con no esta cableado |
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
