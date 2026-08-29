@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **52** · Cerrados: 157 · Total: 209
+Abiertos: **54** · Cerrados: 157 · Total: 211
 
 ## Abiertos
 
@@ -51,8 +51,10 @@ Abiertos: **52** · Cerrados: 157 · Total: 209
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
+| `f-61c4b04b` | low | owner-decision | `tools/upgrade.sh:224 (SYNC_PATHS)` | Un comando nuevo del template no llega NUNCA a un adoptante ya existente, y nadie lo declara |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
+| `f-88348888` | low | owner-decision | `CLAUDE.md:19 (Maquinaria exclusiva de Claude Code)` | CLAUDE.md anuncia solo /goal y ya hay 5 comandos: los otros 4 son indescubribles |
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
 | `f-97021ca1` | low | owner-decision | `tools/check-drift.sh` | El limite de tamano de §4 no se mide en los .sh del propio harness |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
