@@ -831,3 +831,404 @@ _case_sigue_sin_de_verdad_si_dispara() {
 test_sigue_sin_al_principio_de_palabra_si_dispara() {
   _em_repo _case_sigue_sin_de_verdad_si_dispara
 }
+
+# ════════════════════════════════════════════════════════════════════
+# La evidencia tiene que ser un COMANDO, no cualquier cosa entrecomillada
+# ════════════════════════════════════════════════════════════════════
+# Falso NEGATIVO encontrado en la primera pasada del detector sobre un repo
+# adoptante real, y reproducido por tres sesiones distintas. `EVIDENCIA_ERE`
+# aceptaba cualquier `` `...` ``, así que un identificador que hablaba de OTRA
+# cosa excusaba la afirmación vecina. En el mapa real eso dejó pasar la MISMA
+# frase falsa que sí se cazó doce líneas más abajo: el gate quedó
+# probabilístico, que es peor que ausente — da sensación de cobertura donde no
+# la hay, y es literalmente «un gate que no corrió pareciendo uno que pasó».
+#
+# No viola la ley del 10% (es falso negativo, no positivo), pero sí rompe la
+# intención declarada en la cabecera del script: lo que redime una afirmación
+# es «un COMANDO que quien lo lea puede recomprobar en 2 segundos».
+#
+# ⚠️ El arreglo evidente NO funciona, y hay un test para ello: exigir el
+# backtick en la MISMA línea deja pasar el caso `gates.yml`, que es la forma
+# más natural de escribir la frase. Lo que hay que mirar es el CONTENIDO.
+
+_case_backtick_ajeno_en_la_vecina_no_redime() {
+  # EL CASO REAL. El backtick de la línea de arriba habla del rango del scan de
+  # secretos, no de la afirmación de abajo.
+  _em_mapa '# Mapa
+## Estado actual
+- El rango sale de `github.event.before`, no de `origin/main`.
+- **Anillo 3:** gates.yml aún no ha corrido nunca contra un push real.'
+  git add -A && _em_commit "docs: backtick ajeno en la linea vecina" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    un backtick que habla de OTRA cosa redimió la afirmación (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_backtick_ajeno_no_cuenta_como_evidencia() {
+  _em_repo _case_backtick_ajeno_en_la_vecina_no_redime
+}
+
+_case_nombre_de_fichero_en_la_misma_linea_no_redime() {
+  # EL CASO QUE MATA EL ARREGLO SIMPLE. Aquí el backtick está en la MISMA
+  # línea, así que exigir "misma línea" no lo cazaría — y `gates.yml` no es
+  # algo que nadie pueda ejecutar para comprobar nada.
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca el workflow `gates.yml` sobre este repo.'
+  git add -A && _em_commit "docs: nombre de fichero como falsa evidencia" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    un nombre de fichero entre backticks se contó como evidencia (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_nombre_de_fichero_no_cuenta_como_evidencia() {
+  _em_repo _case_nombre_de_fichero_en_la_misma_linea_no_redime
+}
+
+_case_ruta_sin_comando_no_redime() {
+  # El falso positivo que acecha al apretar: `tools/` como prefijo permitido
+  # casaría `tools/preset`, que es un ARCHIVO DE CONFIGURACIÓN, no un comando.
+  _em_mapa '# Mapa
+## Estado actual
+- **Preset:** el modo estricto aún no ha entrado, según `tools/preset`.'
+  git add -A && _em_commit "docs: ruta de config como falsa evidencia" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    una ruta de configuración se contó como comando (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_una_ruta_de_config_no_cuenta_como_comando() {
+  _em_repo _case_ruta_sin_comando_no_redime
+}
+
+_case_palabra_que_empieza_por_gh_no_redime() {
+  # El otro falso positivo del apretón: `gh` como prefijo casa `ghost`.
+  _em_mapa '# Mapa
+## Estado actual
+- **Modo:** el proceso aún no ha corrido nunca en modo `ghost`.'
+  git add -A && _em_commit "docs: palabra que empieza por gh" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    'ghost' se contó como el comando 'gh' (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_una_palabra_que_empieza_por_gh_no_es_el_comando_gh() {
+  _em_repo _case_palabra_que_empieza_por_gh_no_redime
+}
+
+_case_comando_de_una_sola_palabra_con_sh_redime() {
+  # La otra mitad: un script invocable SÍ es evidencia aunque no lleve espacio.
+  # Sin este test, apretar hasta "exigir un espacio" rompería un caso legítimo.
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; lo comprueba `tools/check-ring3.sh`.'
+  git add -A && _em_commit "docs: script invocable como evidencia" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: un script .sh invocable no contó como evidencia (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_un_script_sh_sin_espacios_sigue_siendo_evidencia() {
+  _em_repo _case_comando_de_una_sola_palabra_con_sh_redime
+}
+
+_case_prosa_entre_backticks_no_es_comando() {
+  # LO QUE SE ME ESCAPÓ EN LA PRIMERA VERSIÓN, y lo cazó el reviewer. La regla
+  # era "que lleve un espacio", así que cualquier frase entrecomillada contaba.
+  # El caso que lo retrata: una cita que dice literalmente "sin verificar aún"
+  # se aceptaba como su propia evidencia. Mis cuatro casos de prueba eran todos
+  # de UNA palabra, así que ninguno tocaba esta variante.
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca (`sin verificar aun`).'
+  git add -A && _em_commit "docs: prosa entre backticks como falsa evidencia" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    una frase de prosa entre backticks se contó como comando (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_prosa_entre_backticks_no_es_evidencia() {
+  _em_repo _case_prosa_entre_backticks_no_es_comando
+}
+
+_case_nombre_propio_entre_backticks_no_es_comando() {
+  # La otra forma del mismo FN: una atribución a una persona. Lleva espacios y
+  # comas, y no es nada que nadie pueda ejecutar.
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca, según `Juan Perez, el owner`.'
+  git add -A && _em_commit "docs: atribucion como falsa evidencia" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    una atribución a una persona se contó como comando (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_una_atribucion_a_una_persona_no_es_evidencia() {
+  _em_repo _case_nombre_propio_entre_backticks_no_es_comando
+}
+
+_case_comando_con_flags_sigue_siendo_evidencia() {
+  # La otra mitad, para que apretar no rompa lo legítimo: un comando de verdad
+  # con flags, cuyo primer token es un programa conocido y NO acaba en .sh.
+  _em_mapa '# Mapa
+## Estado actual
+- **CI:** aún no ha corrido nunca; el estado real sale de `gh run list --limit 5`.'
+  git add -A && _em_commit "docs: comando con flags como evidencia" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: un comando real con flags no contó como evidencia (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_un_comando_con_flags_sigue_siendo_evidencia() {
+  _em_repo _case_comando_con_flags_sigue_siendo_evidencia
+}
+
+_case_palabra_espanola_que_es_binario_no_cuela() {
+  # SEGUNDA LECCIÓN del reviewer sobre el mismo bug. Media lista de programas
+  # son palabras corrientes en español: `cargo`, `task`, `make`, `just`, `go`.
+  # Mirar solo el primer token dejaba pasar `cargo de responsabilidad` como si
+  # fuera Rust. Por eso además se exige forma de invocación (`/`, `.` o `-`).
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; es `cargo de responsabilidad` del owner.'
+  git add -A && _em_commit "docs: palabra espanola que coincide con un binario" 100
+
+  local out rc; out="$(_em_run)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    'cargo de responsabilidad' se contó como el comando de Rust (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_una_palabra_espanola_que_coincide_con_un_binario_no_es_comando() {
+  _em_repo _case_palabra_espanola_que_es_binario_no_cuela
+}
+
+_case_comandos_de_entorno_se_suman_no_sustituyen() {
+  # `EXECUTION_MAP_COMANDOS` AMPLÍA la lista de fábrica. La primera versión
+  # usaba `${VAR:-default}` y la sustituía: un adoptante que añadiera su
+  # lanzador perdía `bash`, `git`, `gh`… en silencio, y toda su evidencia
+  # legítima pasaba a marcarse. El comentario prometía lo contrario del código.
+  _em_mapa '# Mapa
+## Estado actual
+- **CI:** aún no ha corrido nunca; se comprueba con `gh run list --limit 5`.'
+  git add -A && _em_commit "docs: evidencia con un comando de fabrica" 100
+
+  local rc
+  EXECUTION_MAP_PROD_DIRS="src/domain" EXECUTION_MAP_COMANDOS="lein" \
+    bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    añadir un lanzador propio DESACTIVÓ los de fábrica (exit $rc)"; return 1; }
+}
+test_los_comandos_de_entorno_amplian_la_lista_de_fabrica() {
+  _em_repo _case_comandos_de_entorno_se_suman_no_sustituyen
+}
+
+_case_un_sh_inventado_cuenta_igual() {
+  # LÍMITE DECLARADO, con test para que esté escrito y no se descubra por
+  # sorpresa: un token que acaba en `.sh` cuenta como evidencia SIN comprobar
+  # que el script exista. Requiere inventarse un nombre a propósito —no es una
+  # colisión accidental como los casos de arriba— y comprobar la existencia
+  # obligaría a resolver rutas relativas al repo, que rompería las citas a
+  # scripts de otros repos. Si algún día se aprieta, este test debe caer con su
+  # justificación al lado.
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; lo mira `guion-que-no-existe.sh`.'
+  git add -A && _em_commit "docs: script inexistente como evidencia" 100
+
+  local rc; _em_run >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    el límite declarado cambió: un .sh inexistente ya NO cuenta (exit $rc)"; return 1; }
+}
+test_un_script_sh_inexistente_cuenta_a_proposito() {
+  _em_repo _case_un_sh_inventado_cuenta_igual
+}
+
+_case_prosa_con_puntuacion_suelta_no_cuela() {
+  # LOS CUATRO REPROS DE LA TERCERA PASADA. La versión anterior exigía `/`, `.`
+  # o `-` en el SPAN ENTERO, así que cualquier puntuación en cualquier parte de
+  # la frase la redimía: bastaba un "de-facto" o un "v2.0". Ahora se miran los
+  # ARGUMENTOS: un comando trae una ruta o un flag; una frase trae preposiciones.
+  local frases='cargo de la tarea de-facto listo|task de v2.0 pendiente|just revisando el punto 4.1|make del reporte semanal, ver 2.1'
+  local IFS='|' frase
+  for frase in $frases; do
+    _em_mapa "# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; \`$frase\`."
+    git add -A >/dev/null 2>&1
+    _em_commit "docs: prosa con puntuacion suelta" 100 >/dev/null 2>&1
+
+    local rc; _em_run >/dev/null 2>&1; rc=$?
+    [ "$rc" = "1" ] \
+      || { echo "    '$frase' se contó como comando (exit $rc)"; return 1; }
+  done
+}
+test_prosa_con_puntuacion_suelta_no_es_comando() {
+  _em_repo _case_prosa_con_puntuacion_suelta_no_cuela
+}
+
+_case_comando_pelado_si_cuenta_ahora() {
+  # ESTE TEST CAMBIÓ DE SIGNO, y queda la razón escrita porque la versión
+  # anterior afirmaba lo contrario.
+  #
+  # Cuando la regla exigía "programa conocido + un argumento con forma de ruta o
+  # flag", un `make` pelado no contaba, y eso se declaró como límite aceptado.
+  # Esa regla se cayó: la puntuación que usaba para decidir aparece en prosa
+  # técnica constantemente (`cargo asignado el 12/03` colaba por la fecha).
+  #
+  # La regla nueva detecta PROSA por sus palabras función en vez de detectar
+  # comandos por su puntuación, y con ella un programa pelado ya no se distingue
+  # de `git status` — que el reviewer señaló, con razón, que estaba siendo
+  # rechazado siendo evidencia legítima.
+  #
+  # Se acepta el cambio a sabiendas: `make` a secas es evidencia DÉBIL (no dice
+  # qué comprobar), pero rechazarlo exigía la regla que ya falló dos veces. Se
+  # prefiere una regla simple y sin fugas a una precisa y porosa.
+  _em_mapa '# Mapa
+## Estado actual
+- **Build:** aún no ha corrido nunca; se lanza con `make`.'
+  git add -A && _em_commit "docs: comando pelado" 100
+
+  local rc; _em_run >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    un programa conocido pelado dejó de contar como evidencia (exit $rc)"; return 1; }
+}
+test_un_comando_pelado_cuenta_como_evidencia() {
+  _em_repo _case_comando_pelado_si_cuenta_ahora
+}
+
+_case_espacios_iniciales_fallan_cerrado() {
+  # LÍMITE DECLARADO (H4 de la segunda pasada). `${1%% *}` con un espacio
+  # inicial deja el primer token VACÍO, así que el span no casa nada y no cuenta
+  # como evidencia. Falla cerrado, que es la dirección segura — pero estaba solo
+  # dicho en prosa y §10 pide que un límite conocido esté fijado o registrado,
+  # no mencionado. Aquí queda fijado.
+  _em_mapa '# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; ver ` bash tools/check-ring3.sh`.'
+  git add -A && _em_commit "docs: evidencia con espacio inicial" 100
+
+  local rc; _em_run >/dev/null 2>&1; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    un span con espacio inicial dejó de fallar cerrado (exit $rc)"; return 1; }
+}
+test_un_span_con_espacio_inicial_falla_cerrado() {
+  _em_repo _case_espacios_iniciales_fallan_cerrado
+}
+
+_case_repros_de_la_cuarta_pasada() {
+  # Los cuatro casos que tumbaron la v4: prosa con fecha, versión, guion suelto
+  # y palabra compuesta. Todos empiezan por un binario de la lista y todos
+  # traían la puntuación que la v4 usaba para redimir.
+  local frases='cargo asignado el 12/03, aun pendiente|task pendiente para el 12/03 revisar|go y venga sin problema -especial|make -alguna nota rara sobre esto'
+  local IFS='|' frase
+  for frase in $frases; do
+    _em_mapa "# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; \`$frase\`."
+    git add -A >/dev/null 2>&1
+    _em_commit "docs: repro de la cuarta pasada" 100 >/dev/null 2>&1
+    local rc; _em_run >/dev/null 2>&1; rc=$?
+    [ "$rc" = "1" ] || { echo "    '$frase' se contó como comando (exit $rc)"; return 1; }
+  done
+}
+test_los_repros_de_la_cuarta_pasada_no_cuelan() {
+  _em_repo _case_repros_de_la_cuarta_pasada
+}
+
+_case_comando_con_argumento_simple_cuenta() {
+  # El falso POSITIVO que señaló el reviewer en la v4: `git status` y compañía
+  # eran evidencia legítima y quedaban rechazados por no traer ruta ni flag.
+  _em_mapa '# Mapa
+## Estado actual
+- **Árbol:** aún no ha corrido nunca la limpieza; se ve con `git status`.'
+  git add -A && _em_commit "docs: comando con argumento simple" 100
+  local rc; _em_run >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: 'git status' no contó como evidencia (exit $rc)"; return 1; }
+}
+test_fp_un_comando_con_argumento_simple_cuenta() {
+  _em_repo _case_comando_con_argumento_simple_cuenta
+}
+
+_case_prosa_con_tildes_correctas_no_cuela() {
+  # EL SEXTO AGUJERO, y el más vergonzoso porque el arreglo ya estaba escrito 80
+  # líneas más arriba: `STATE_ERE` duplica cada literal acentuado con su gemelo
+  # sin tilde porque la suite corre en locale C y `tr` no toca diacríticos. La
+  # lista de palabras función nació solo con las formas SIN tilde —o sea, las
+  # incorrectas— así que una frase escrita en español correcto no traía ninguna
+  # palabra "reconocida" y pasaba entera como comando.
+  local frases='cargo revision pendiente aún|task de más adelante según el owner|make revisión todavía sin cerrar'
+  local IFS='|' frase
+  for frase in $frases; do
+    _em_mapa "# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; \`$frase\`."
+    git add -A >/dev/null 2>&1
+    _em_commit "docs: prosa con tildes correctas" 100 >/dev/null 2>&1
+    local rc; _em_run >/dev/null 2>&1; rc=$?
+    [ "$rc" = "1" ] || { echo "    '$frase' coló por llevar la tilde correcta (exit $rc)"; return 1; }
+  done
+}
+test_la_prosa_con_tildes_correctas_no_cuela() {
+  _em_repo _case_prosa_con_tildes_correctas_no_cuela
+}
+
+_case_valores_y_subcomandos_no_son_prosa() {
+  # LA CARA OPUESTA, también del reviewer: `no`, `es` y `ver` son palabras
+  # función Y valores reales de comandos. Estaban en la lista y rechazaban
+  # evidencia legítima. Se sacaron a sabiendas; esto lo fija.
+  local frases='git config core.autocrlf no|npm run ver|git checkout es'
+  local IFS='|' frase
+  for frase in $frases; do
+    _em_mapa "# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; se ve con \`$frase\`."
+    git add -A >/dev/null 2>&1
+    _em_commit "docs: comando con valor que parece palabra funcion" 100 >/dev/null 2>&1
+    local rc; _em_run >/dev/null 2>&1; rc=$?
+    [ "$rc" = "0" ] || { echo "    FALSO POSITIVO: '$frase' se rechazó como prosa (exit $rc)"; return 1; }
+  done
+}
+test_fp_valores_de_comando_que_parecen_palabras_funcion() {
+  _em_repo _case_valores_y_subcomandos_no_son_prosa
+}
+
+_case_estar_delata_prosa() {
+  # El olvido más caro posible en un detector de afirmaciones de ESTADO: la
+  # primera lista llevaba el demostrativo `esta` pero ninguna forma del verbo
+  # ESTAR. Y "X está pendiente / estaba sin cerrar" es literalmente cómo este
+  # mapa describe lo que le falta.
+  local frases='cargo está pendiente|git están fallando|npm estaba roto|cargo estará listo'
+  local IFS='|' frase
+  for frase in $frases; do
+    _em_mapa "# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; \`$frase\`."
+    git add -A >/dev/null 2>&1
+    _em_commit "docs: prosa con el verbo estar" 100 >/dev/null 2>&1
+    local rc; _em_run >/dev/null 2>&1; rc=$?
+    [ "$rc" = "1" ] || { echo "    '$frase' coló: el verbo estar no delata prosa (exit $rc)"; return 1; }
+  done
+}
+test_el_verbo_estar_delata_prosa() {
+  _em_repo _case_estar_delata_prosa
+}
+
+_case_ambiguas_en_medio_son_prosa() {
+  # "comando + no + participio" es exactamente cómo se describe algo pendiente,
+  # y quitar `no` de la lista lo reabrió entero. Vuelve, pero solo cuenta como
+  # prosa si NO es el token final — que es donde va un valor de comando.
+  local frases='git no inicializado|docker no configurado|make se detuvo|cargo es provisional'
+  local IFS='|' frase
+  for frase in $frases; do
+    _em_mapa "# Mapa
+## Estado actual
+- **Anillo 3:** aún no ha corrido nunca; \`$frase\`."
+    git add -A >/dev/null 2>&1
+    _em_commit "docs: ambigua en medio de la frase" 100 >/dev/null 2>&1
+    local rc; _em_run >/dev/null 2>&1; rc=$?
+    [ "$rc" = "1" ] || { echo "    '$frase' coló como comando (exit $rc)"; return 1; }
+  done
+}
+test_una_ambigua_en_medio_delata_prosa() {
+  _em_repo _case_ambiguas_en_medio_son_prosa
+}

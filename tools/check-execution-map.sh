@@ -276,7 +276,143 @@ STATE_ERE="${EXECUTION_MAP_STATE_ERE:-nunca ha|aún no|aun no|todavía no|todavi
 # La evidencia que redime una afirmación de estado: un COMANDO entre backticks
 # (quien lo lea puede recomprobarlo en 2 segundos) o un marcador explícito
 # `<!-- verificado: ... -->` para lo que ningún comando resuelve.
-EVIDENCIA_ERE='`[^`]+`|<!--[[:space:]]*verificado:'
+#
+# ── Por qué se mira el CONTENIDO y no basta con que haya backticks ──
+# La primera versión aceptaba cualquier `` `...` ``, y eso convirtió el gate en
+# probabilístico: un identificador que hablaba de OTRA cosa excusaba la
+# afirmación vecina. Cazado en la primera pasada sobre un repo adoptante, donde
+# dejó pasar la MISMA frase falsa que sí bloqueó doce líneas más abajo — la
+# única diferencia era un `github.event.before` en la línea de al lado.
+#
+# Es falso NEGATIVO, así que no viola la ley del 10%; viola algo peor, que es
+# la intención declarada tres líneas más arriba: lo que redime una afirmación
+# es el COMANDO que la comprueba, no una ruta mencionada de paso.
+#
+# ⚠️ El arreglo evidente NO sirve, y hay un test que lo fija: exigir el backtick
+# en la MISMA línea deja pasar `aún no ha corrido nunca el workflow
+# \`gates.yml\``, que es la forma más natural de escribir la frase. Y apretar
+# por prefijos tampoco: `tools/` casaría `tools/preset` (un archivo de config) y
+# `gh` casaría `ghost`. Ambos tienen su test de falso positivo.
+#
+# La regla que queda mira el PRIMER TOKEN del span, que es lo que decide si
+# alguien puede ejecutarlo: o es un programa conocido, o es un script invocable
+# (acaba en `.sh`).
+#
+# La version anterior de esta linea solo exigia "que lleve un espacio", y el
+# reviewer la tumbo con un caso que da vergüenza: `` `sin verificar aun` ``
+# contaba como su propia evidencia. Mis cuatro casos de prueba eran todos de
+# UNA palabra, asi que ninguno tocaba la prosa multi-palabra. Por token no pasa:
+# `sin`, `el`, `Juan` no son programas.
+#
+# Se comparan TOKENS COMPLETOS y no prefijos, que es lo que evita el FP que ya
+# aviso otra sesion: con prefijos, `gh` casaba `ghost`; como token, no.
+#
+# La lista es corta y se AMPLIA por entorno: `EXECUTION_MAP_COMANDOS` se SUMA a
+# la de fabrica, no la sustituye. La primera version usaba `${VAR:-default}` y
+# el reviewer la tumbo: un adoptante que fijara la variable para "anadir" su
+# lanzador perdia `bash git gh npm...` en silencio, y toda su evidencia
+# legitima pasaba a marcarse. O sea que el comentario prometia lo contrario de
+# lo que hacia el codigo — una lista incompleta produce falsos POSITIVOS, que
+# es la direccion peligrosa de §14.2.
+COMANDOS="bash sh zsh gh git make npm npx pnpm yarn python3 python swift swiftc"
+COMANDOS="$COMANDOS xcodebuild xcodegen xcrun cargo go deno node docker just task rake"
+COMANDOS="$COMANDOS ${EXECUTION_MAP_COMANDOS:-}"
+
+# Se extraen los spans con `grep -o` y se evalúan UNO A UNO, en vez de lanzar
+# una sola regex contra la línea entera. No es cosmético: con dos spans en la
+# misma línea, una regex suelta casa el TEXTO QUE HAY ENTRE ELLOS —que lleva
+# espacios— y vuelve a dar por buena cualquier línea con dos backticks. `grep -o`
+# consume los pares de izquierda a derecha, que es el emparejamiento correcto.
+# QUINTA version, y las cuatro anteriores estan resumidas aqui porque cada una
+# parecia razonable hasta que un caso la tumbo. Todas compartian el mismo error:
+# buscar la FORMA de un comando en la puntuacion.
+#
+#   v1 "lleva un espacio"          → `sin verificar aun` era su propia evidencia.
+#   v2 "+ primer token conocido"   → `cargo de responsabilidad`, `just in case`.
+#   v3 "+ el span trae / . o -"    → `cargo ... de-facto ...` colaba por el guion.
+#   v4 "+ un argumento con / o -"  → `cargo asignado el 12/03` colaba por la fecha.
+#
+# El problema de fondo: la puntuacion aparece en prosa tecnica constantemente
+# —fechas, versiones, rangos, palabras compuestas— y este repo escribe `29/30` y
+# `654/654` en su propio mapa. No hay forma de un comando que la prosa no imite.
+#
+# Asi que se invierte la pregunta: en vez de detectar comandos, se detecta
+# PROSA, que es una senal mucho mas fiable. Los articulos y preposiciones son un
+# conjunto CERRADO, corto, y no aparecen jamas en una invocacion.
+#
+#   `cargo asignado el 12/03, aun pendiente` → "el", "aun"   → prosa   ✗
+#   `cargo de la tarea de-facto listo`       → "de", "la"    → prosa   ✗
+#   `gh run list --limit 5`                  → ninguna       → comando ✅
+#   `git status` · `npm test` · `cargo build`→ ninguna       → comando ✅
+#
+# De paso cierra el limite que la v4 tenia sin declarar: un comando con un
+# argumento simple (`git status`) vuelve a contar como evidencia.
+#
+# RIESGO RESIDUAL, DECLARADO: sigue siendo una heuristica sobre prosa, y una
+# frase sin palabras funcion que empiece por un binario (`cargo build pendiente`)
+# colaria. La salida duradera es exigir el marcador explicito
+# `<!-- verificado: ... -->` y dejar de inferir de los backticks; eso romperia
+# todas las citas de evidencia que hoy los usan, asi que es decision del owner y
+# esta registrada en el ledger, no escondida aqui.
+# ⚠️ CADA FORMA ACENTUADA VA DUPLICADA con su gemela sin tilde, y no es
+# redundancia: `tr` no toca diacriticos, asi que `aún` y `aun` son cadenas
+# DISTINTAS. La primera version solo llevaba las formas sin tilde —o sea, las
+# INCORRECTAS— y `cargo revision pendiente aún` colaba entero por eso. Es el
+# mismo patron que STATE_ERE ya usa 80 lineas mas arriba por la misma razon
+# (la suite corre en locale C); no seguirlo aqui fue un agujero propio.
+#
+# El verbo ESTAR va entero y con sus tildes. Se olvido en la primera lista —solo
+# estaba el demostrativo `esta`— y es el peor olvido posible en un detector de
+# afirmaciones de ESTADO: "X esta pendiente / esta roto / estaba sin cerrar" es
+# literalmente la forma en que este mapa describe lo que le falta.
+PALABRAS_FUNCION="de del la el los las un una unos unas en con por para sin
+sobre que aun aún todavia todavía era fue hay segun según este esta está ese esa
+estan están estaba estaban estara estará estuvo esten estén
+cuando donde como mas más pero nunca ya muy tras entre hasta desde antes despues
+después mientras aunque porque tambien también solo sólo cada otro otra"
+
+# AMBIGUAS: son palabras funcion Y valores de comando a la vez. `no` aparece en
+# `git config core.autocrlf no` y en `git no inicializado`; `ver` en `npm run
+# ver` y en "queda por ver". Quitarlas de la lista (lo que hice primero) reabria
+# una fuga ancha —"comando + no + participio" es justo como se describe algo
+# pendiente—; dejarlas rechazaba evidencia legitima.
+#
+# El discriminador es la POSICION: en una invocacion, un valor asi va AL FINAL
+# (`... --autocrlf no`); en prosa va en medio, seguido de lo que niega o
+# describe (`no inicializado`). Asi que cuentan como prosa salvo que sean el
+# ultimo token del span.
+PALABRAS_AMBIGUAS="no si es ver y o se su sus lo al"
+
+_es_comando() { # <contenido-del-span>
+  local primero="${1%% *}"
+  # Puerta 1: un script invocable se cita solo, sin argumentos.
+  case "$primero" in *.sh) return 0 ;; esac
+  # Puerta 2: programa conocido Y ninguna palabra funcion en TODO el span.
+  local c encontrado=1
+  for c in $COMANDOS; do [ "$primero" = "$c" ] && { encontrado=0; break; }; done
+  [ "$encontrado" = "0" ] || return 1
+  local tok w ultimo="${1##* }"
+  ultimo="$(printf '%s' "$ultimo" | tr -d '.,;:()' | tr '[:upper:]' '[:lower:]')"
+  for tok in $1; do
+    tok="$(printf '%s' "$tok" | tr -d '.,;:()' | tr '[:upper:]' '[:lower:]')"
+    for w in $PALABRAS_FUNCION; do [ "$tok" = "$w" ] && return 1; done
+    # Las ambiguas solo delatan prosa si NO son el valor final del comando.
+    [ "$tok" = "$ultimo" ] && continue
+    for w in $PALABRAS_AMBIGUAS; do [ "$tok" = "$w" ] && return 1; done
+  done
+  return 0
+}
+_hay_evidencia() { # <texto-de-la-ventana>
+  printf '%s\n' "$1" | grep -qE '<!--[[:space:]]*verificado:' && return 0
+  local span
+  while IFS= read -r span; do
+    [ -n "$span" ] || continue
+    _es_comando "$span" && return 0
+  done <<EOFSPANS
+$(printf '%s\n' "$1" | grep -oE '`[^`]+`' | sed 's/^`//; s/`$//')
+EOFSPANS
+  return 1
+}
 
 # Ventana de ±1 línea, y no "la misma línea", porque este mapa es markdown que
 # ENVUELVE: el claim cae en una línea y el comando que lo respalda en la
@@ -288,7 +424,7 @@ SIN_EVIDENCIA=""
 while IFS= read -r _n; do
   [ -z "$_n" ] && continue
   _ctx="$(sed -n "$((_n > 1 ? _n - 1 : 1)),$((_n + 1))p" "$MAP" 2>/dev/null)"
-  printf '%s\n' "$_ctx" | grep -qE "$EVIDENCIA_ERE" && continue
+  _hay_evidencia "$_ctx" && continue
   SIN_EVIDENCIA="${SIN_EVIDENCIA}     línea ${_n}: $(sed -n "${_n}p" "$MAP")"$'\n'
 done <<< "$(grep -inE "$STATE_ERE" "$MAP" 2>/dev/null | cut -d: -f1)"
 [ -n "$SIN_EVIDENCIA" ] && STALE=1

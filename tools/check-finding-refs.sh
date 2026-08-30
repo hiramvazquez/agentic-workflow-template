@@ -61,6 +61,7 @@ import json, os, re, sys
 ledger = os.environ["CFR_LEDGER"]
 
 ids = set()
+prosa = []          # (id_del_finding, campo, texto)
 malas = 0
 with open(ledger, encoding="utf-8") as f:
     for n, linea in enumerate(f, 1):
@@ -74,6 +75,16 @@ with open(ledger, encoding="utf-8") as f:
             continue
         if isinstance(d, dict) and d.get("id"):
             ids.add(str(d["id"]))
+            # Los campos de texto LIBRE del ledger: es donde los agentes
+            # escriben prosa citando otros findings, y hasta hoy no los leia
+            # nadie (el render no los vuelca al .md, que es lo unico que se
+            # recorria mas abajo).
+            # SOLO `source`, y la restriccion es el resultado de medirlo.
+            # Ver el bloque largo mas abajo antes de ampliarlo.
+            for campo in ("source",):
+                v = d.get(campo)
+                if isinstance(v, str) and v:
+                    prosa.append((str(d["id"]), campo, v))
 
 if malas:
     # Un ledger con líneas rotas haría este check MENTIR hacia el rojo (ids
@@ -121,6 +132,71 @@ for ruta in archivos:
             total += 1
             if fid not in ids:
                 fantasma.append((ruta, fid))
+
+# ── `source` del ledger: SOLO los ids que NO resuelven ──────────────
+#
+# POR QUE SOLO `source` Y NO TAMBIEN `detail`/`resolution`. Se probo con los
+# tres y se midio sobre este ledger (319 citas):
+#     detail+source+resolution → 3 reportes, 0 defectos, 100% FP
+#     detail+source            → 2 reportes, 0 defectos, 100% FP
+#     source                   → 0 reportes, 0 FP
+# Los tres falsos positivos eran findings que DOCUMENTAN un incidente de id
+# fantasma y por tanto tienen que nombrar el id invalido ("f346baf cita
+# 'f-9f39759f', un id que nunca existio"). No es una categoria rara: cada vez
+# que este harness convierte una leccion en finding, crea otro. Escanear los
+# campos narrativos es reintroducir la ley de la cabecera —«si un detector
+# puede dispararse con el texto que HABLA de la cosa, no esta mirando la
+# cosa»— en el sitio donde mas prosa sobre findings se escribe.
+#
+# `source` es distinto por su FUNCION, no por conveniencia: registra la
+# PROCEDENCIA ("reviewer del sync 2026-08-27", "auditoria de navegacion"). No
+# es donde se discuten otros findings; es donde se dice de donde salio este. Un
+# id que no resuelve ahi significa "este hallazgo dice venir del analisis de
+# algo que no existe", y eso es un defecto siempre.
+#
+# LIMITE DECLARADO, no oculto: un id fantasma que viva SOLO en `detail` no se
+# caza. Se acepta a sabiendas — la alternativa medida era 100% de FP, y un
+# detector ruidoso no se tolera: se desactiva entero, y con el se pierde
+# tambien esta deteccion. El incidente que motivo todo esto SI se habria
+# cazado: tenia el id inventado en el `source` de f-a3b6dafc.
+#
+# ── Los ids que NO resuelven ────────────────────────────────────────
+# Aqui NO se exigen acentos graves, y la excepcion esta acotada a proposito.
+# El backtick existe para distinguir CITAR de HABLAR DE, y esa distincion solo
+# importa para ids REALES: mencionar `f-abc123` en prosa es legitimo y
+# frecuente. Pero un `f-` que no resuelve contra NADA es un defecto lo
+# escribas como cita o como mencion — no hay motivo legitimo para nombrar algo
+# que no existe. Por eso reportar solo los fantasma mantiene los falsos
+# positivos en ~0 sin tocar la exencion.
+#
+# La frontera por delante no es opcional: sin ella, `f-nature` casa dentro de
+# `check-diff-nature.sh` y el detector vuelve a dispararse con el texto que
+# HABLA de un archivo — el fallo que ya mato a check-version-claims.sh.
+CITA_PROSA = re.compile(r"(?<![0-9A-Za-z_-])(f-[0-9a-z][0-9a-z-]*)")
+
+# Una ABREVIATURA de un id real no es un fantasma. Los ids con slug
+# (`f-wf04-archivos-sobre-el-limite`) se escriben en prosa por su prefijo
+# (`f-wf04`), y eso es legitimo y frecuentisimo: medido sobre este ledger, 5 de
+# los 9 primeros reportes eran justo eso. Contarlos habria puesto el detector
+# al 78% de falsos positivos — el mismo numero con el que murio
+# check-version-claims.sh. Se resuelve por prefijo antes de acusar.
+def resuelve(fid):
+    if fid in ids:
+        return True
+    return any(real.startswith(fid + "-") for real in ids)
+
+for fid_origen, campo, texto in prosa:
+    for fid in sorted(set(CITA_PROSA.findall(texto))):
+        if PLACEHOLDER.match(fid):
+            continue
+        # Se cuenta ANTES de decidir: `citas` es "cuantas referencias mire",
+        # no "cuantas estaban bien". Sin esto el resumen podia decir
+        # `citas=0 fantasma=1`, que se contradice a si mismo — el contrato de
+        # stdout de la cabecera sugiere `fantasma` como subconjunto de `citas`.
+        total += 1
+        if resuelve(fid):
+            continue
+        fantasma.append((f"{ledger} ({fid_origen}.{campo})", fid))
 
 print(f"FINDING_REFS citas={total} fantasma={len(fantasma)}")
 

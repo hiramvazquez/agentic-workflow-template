@@ -275,3 +275,168 @@ test_una_afirmacion_de_version_citada_como_ejemplo_sigue_disparando() {
          return 1; }
   return 0
 }
+
+# ════════════════════════════════════════════════════════════════════
+# El ledger cita en PROSA, y esa prosa no la miraba nadie
+# ════════════════════════════════════════════════════════════════════
+# Incidente real: un id inventado (`f-1a1cbb7f`) vivió DOS HORAS commiteado en
+# los campos `detail` y `source` de dos findings, se propagó entre tres agentes
+# y ninguno lo detectó. Este check daba `citas=79 fantasma=0` todo el tiempo.
+#
+# No fallaba por descuido: fallaba por DOS filtros independientes, y el primero
+# basta para explicarlo.
+#   1. Solo recorre ficheros `.md`, y el render del ledger NO vuelca `detail`
+#      ni `source` al markdown. El texto nunca llegaba a la superficie mirada.
+#   2. Y exige backticks, que es deliberado (ver cabecera): es lo que distingue
+#      CITAR de HABLAR DE, y evita el modo de fallo que ya mató a
+#      `check-version-claims.sh` al 67% de FP.
+#
+# Por eso el arreglo NO es "escanear detail/source buscando ids". Eso
+# reintroduciría el filtro 2 justo donde más prosa sobre findings se escribe:
+# un `detail` que discute legítimamente otro finding empezaría a disparar.
+#
+# Lo que se hace es más estrecho y no toca esa exención: en `detail`/`source`
+# se reportan SOLO los ids que NO RESUELVEN. La distinción citar/mencionar solo
+# importa para ids REALES — un `f-` que no existe es un defecto lo escribas
+# como cita o como mención, porque no hay motivo legítimo para nombrar algo que
+# no existe. Falsos positivos ~0 por construcción.
+
+_case_detail_no_se_escanea_y_es_deliberado() {
+  # EL LIMITE DECLARADO. `detail` NO se escanea, y este test existe para que
+  # ese limite este ESCRITO y no se descubra por sorpresa.
+  #
+  # Se probo escanearlo y se midio: sobre el ledger real daba 3 reportes, 0
+  # defectos, 100% de falsos positivos. Los tres eran findings que DOCUMENTAN
+  # un incidente de id fantasma, y para documentarlo tienen que nombrar el id
+  # invalido. No es una categoria rara: cada leccion que este harness convierte
+  # en finding crea otra. Escanear los campos narrativos es reintroducir la ley
+  # de la cabecera —«si un detector puede dispararse con el texto que HABLA de
+  # la cosa, no esta mirando la cosa»— justo donde mas prosa hay.
+  #
+  # Se acepta a sabiendas: un detector ruidoso no se tolera, se desactiva
+  # entero, y con el se perderia tambien la deteccion en `source` que SI es
+  # precisa. Si algun dia se amplia, este test debe caer con su justificacion.
+  _led "$(_j f-existe t 'CAUSA RAIZ de f-1a1cbb7f: el modulo no usa Coordinator.')"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    detail dejo de ser terreno neutral: un id no resuelto ahi bloqueo (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_un_id_no_resuelto_en_detail_no_bloquea_a_proposito() {
+  _fr_sandbox _case_detail_no_se_escanea_y_es_deliberado
+}
+
+_case_abreviatura_de_id_real_no_es_fantasma() {
+  # Los ids con slug se citan en prosa por su prefijo (`f-wf04` en vez de
+  # `f-wf04-archivos-sobre-el-limite`). Medido: 5 de los 9 primeros reportes
+  # del escaneo eran justo eso — un 78% de FP, el mismo numero con el que murio
+  # check-version-claims.sh. Se resuelven por prefijo antes de acusar.
+  _led "$(_j f-existe t '' 'analisis derivado de f-wf04, owner')" \
+       "$(_j f-wf04-archivos-sobre-el-limite)"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: una abreviatura de un id REAL se conto como fantasma (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_una_abreviatura_de_id_real_no_es_fantasma() {
+  _fr_sandbox _case_abreviatura_de_id_real_no_es_fantasma
+}
+
+_case_id_fantasma_en_source_se_caza() {
+  _led "$(_j f-existe t '' 'analisis de causa raiz de f-1a1cbb7f, owner')"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    un id fantasma en el source del ledger NO bloqueó (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_un_id_fantasma_en_el_source_del_ledger_bloquea() {
+  _fr_sandbox _case_id_fantasma_en_source_se_caza
+}
+
+_case_mencion_a_id_real_en_prosa_no_dispara() {
+  # LA EXENCIÓN QUE NO SE PUEDE PERDER. Un `detail` que menciona otro finding
+  # REAL, sin backticks, es prosa legítima y frecuentísima — es como se escriben
+  # los findings de este repo. Si esto disparase, el check se volvería ruidoso
+  # exactamente donde más se escribe, y un detector ruidoso se desactiva entero.
+  _led "$(_j f-existe t '' 'derivado de f-otro-real, ver su resolucion')" \
+       "$(_j f-otro-real)"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: mencionar un id REAL en prosa disparó (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_mencionar_un_id_real_en_prosa_no_dispara() {
+  _fr_sandbox _case_mencion_a_id_real_en_prosa_no_dispara
+}
+
+_case_subcadena_en_prosa_del_ledger_no_dispara() {
+  # El mismo falso positivo que ya mató a check-version-claims, pero en el
+  # campo nuevo: `f-nature` vive dentro de `check-diff-nature.sh`. Si el
+  # escaneo de prosa no exige frontera, el detector vuelve a dispararse con el
+  # texto que HABLA de un archivo.
+  _led "$(_j f-existe t '' 'Reportado por check-diff-nature.sh sobre el diff staged')"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: una subcadena dentro de un nombre de archivo disparó (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_subcadena_en_la_prosa_del_ledger_no_dispara() {
+  _fr_sandbox _case_subcadena_en_prosa_del_ledger_no_dispara
+}
+
+_case_prefijo_exige_frontera_de_guion() {
+  # Sin el guion en `real.startswith(fid + "-")`, `f-abc` resolvería contra
+  # `f-abcdef12` —otro finding DISTINTO— y un id inventado quedaría absuelto
+  # por parecerse al principio de uno real. El reviewer cazó que esa frontera
+  # estaba declarada en comentario pero no la mataba ningún test.
+  _led "$(_j f-abcdef12 t '' 'derivado de f-abc, owner')"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] \
+    || { echo "    'f-abc' se absolvió por parecerse al principio de 'f-abcdef12' (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_el_prefijo_exige_frontera_de_guion() {
+  _fr_sandbox _case_prefijo_exige_frontera_de_guion
+}
+
+_case_placeholder_tambien_exento_en_source() {
+  # La exención de placeholders existe para los ejemplos de uso. Aplicaba a los
+  # `.md` desde siempre, pero al campo nuevo no la cubría ningún test: quitarla
+  # dejaba los 19 en verde.
+  _led "$(_j f-existe t '' 'ejemplo de uso: findings.sh close f-xxxx --resolution ...')"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    FALSO POSITIVO: un placeholder en source se contó como fantasma (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_fp_un_placeholder_en_source_no_es_fantasma() {
+  _fr_sandbox _case_placeholder_tambien_exento_en_source
+}
+
+_case_el_contrato_mantiene_fantasma_dentro_de_citas() {
+  # `fantasma ⊆ citas` es la relación que el contrato de stdout sugiere. El
+  # loop nuevo sumaba a `fantasma` sin sumar a `citas`, así que un ledger con
+  # un fantasma y sin ningún .md imprimía `citas=0 fantasma=1` — un resumen que
+  # se contradice a sí mismo.
+  _led "$(_j f-existe t '' 'derivado de f-no-existe-jamas, owner')"
+  local out; out="$(bash tools/check-finding-refs.sh 2>&1)"
+  local citas fantasma
+  citas="$(printf '%s' "$out" | sed -n 's/.*citas=\([0-9]*\).*/\1/p' | head -1)"
+  fantasma="$(printf '%s' "$out" | sed -n 's/.*fantasma=\([0-9]*\).*/\1/p' | head -1)"
+  [ "${citas:-0}" -ge "${fantasma:-0}" ] \
+    || { echo "    el resumen se contradice: citas=$citas fantasma=$fantasma"; return 1; }
+}
+test_el_resumen_nunca_reporta_mas_fantasmas_que_citas() {
+  _fr_sandbox _case_el_contrato_mantiene_fantasma_dentro_de_citas
+}
+
+_case_resolution_tampoco_se_escanea() {
+  # LÍMITE DECLARADO, gemelo del de `detail`. `resolution` es campo NARRATIVO:
+  # ahí se explica cómo se cerró un finding, y citar el id inválido que motivó
+  # el cierre es legítimo. De hecho el FP medido que descartó escanear los tres
+  # campos vivía justo aquí (`f-id-de-finding-fantasma.resolution` nombrando
+  # `f-nature` como ejemplo).
+  #
+  # Estaba declarado en comentario pero sin test, así que nada impedía que
+  # alguien lo ampliara "ya que detail se mide". Ahora hay un rojo que lo para.
+  _led "$(_j f-existe t '' '' 'cerrado; era el mismo caso que f-1a1cbb7f, que nunca existio')"
+  local out rc; out="$(bash tools/check-finding-refs.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] \
+    || { echo "    resolution dejó de ser terreno neutral (exit $rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+}
+test_un_id_no_resuelto_en_resolution_no_bloquea_a_proposito() {
+  _fr_sandbox _case_resolution_tampoco_se_escanea
+}
