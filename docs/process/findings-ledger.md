@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **65** · Cerrados: 159 · Total: 224
+Abiertos: **67** · Cerrados: 159 · Total: 226
 
 ## Abiertos
 
@@ -11,6 +11,7 @@ Abiertos: **65** · Cerrados: 159 · Total: 224
 |---|---|---|---|---|
 | `f-12fcc211` | high | auto-fix | `tools/agent-prompts/review.md + tools/agent-runner.sh + tools/agent-backends/` | El prompt del reviewer de IA es editable sin review: el archivo de mas leverage del repo esta exento |
 | `f-1ae68da7` | high | owner-decision | `tools/upgrade.sh + lefthook.yml` | lefthook.yml esta congelado para adoptantes por copia: ninguna mejora del Anillo 1 les llega |
+| `f-1caf51c6` | high | owner-decision | `tools/check-ring3.sh:169 (rama timeout) + tools/tests/test_ring3.sh` | check-ring3: _con_limite bifurca por plataforma y la rama de CI no escala a KILL, asi que el limite no limita en Linux |
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-298e3cd2` | high | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
@@ -35,6 +36,7 @@ Abiertos: **65** · Cerrados: 159 · Total: 224
 | `f-7498dab2` | medium | owner-decision | `tools/check-execution-map.sh (_es_comando / EVIDENCIA)` | La evidencia del mapa se INFIERE de los backticks, y cinco heuristicas seguidas han tenido fuga |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
+| `f-89ef31c4` | medium | owner-decision | `tools/lessons-rotate.sh (criterio de archivado) + docs/process/lessons_archive.md` | El rotador archiva lecciones alegando que su detector corre en el Anillo 3, y en ESTE repo el Anillo 3 no corre |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
 | `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |
