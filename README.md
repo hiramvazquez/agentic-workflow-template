@@ -54,7 +54,8 @@ defensa en capas, y lo hace **compatible con los tres clientes que usan los devs
    de revisión humana decrece en vez de mantenerse plana.
 6. **Una fuente de verdad, muchos clientes.** `AGENTS.md` es canónico; cada cliente tiene un
    adaptador delgado. Nada se duplica.
-7. **El que toca, cierra.** Si tocas un módulo con findings abiertos, los resuelves o los registras.
+7. **El que toca, cierra lo que bloquea.** Si tocas un módulo con findings abiertos, los `high`
+   de tu scope los resuelves; el resto se registra y no bloquea (`AGENTS.md` §10).
 8. **Open Question > suposición silenciosa.** Si el agente no sabe, pregunta; no inventa un default.
 
 ## La pirámide de verificación

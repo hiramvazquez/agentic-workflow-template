@@ -23,7 +23,7 @@
 
 1. **Detectar no basta — CERRAR.** Cada hallazgo llega a estado terminal y visible (`tools/findings/`).
 2. **Defensa en capas.** Detector mecánico + design-review + reviewer + juez + lecciones. Ninguno solo basta.
-3. **El que toca, cierra.** Tocas un módulo con findings abiertos → los arreglas o los registras, en el mismo PR.
+3. **El que toca, cierra lo que bloquea.** Tocas un módulo con findings abiertos → los `high` de tu scope los arreglas en el mismo PR; el resto se registra y NO bloquea (§10).
 4. **Open Question > suposición silenciosa.** Si no sabes (una columna, un catálogo, un contrato), preguntas; no inventas un default.
 5. **Scope = lo explícitamente pedido.** Nada de "aprovechar el viaje" para refactorizar lo de al lado (§8).
 
@@ -140,9 +140,31 @@ meta-doc (este archivo, `.agents/skills/**`, `_template.md`), o refactorizar arc
 
 ## 10. Cero-deuda-nueva (ownership de findings)
 
-"No es mío, lo dejo" está **prohibido**. Cualquier gap que detectes (incluido uno preexistente)
-se resuelve en el mismo turno: o lo arreglas, o lo **registras en el ledger** con tier+área
-(`tools/findings/`). Reportar = loguear al ledger, no solo mencionarlo en prosa.
+"No es mío, lo dejo" está **prohibido**: cualquier gap que detectes (incluido uno preexistente)
+queda **registrado en el ledger** con tier+área (`tools/findings/`). Reportar = loguear al ledger,
+no solo mencionarlo en prosa.
+
+**Pero registrar no es arreglar, y solo una clase de hallazgo bloquea el turno:** el que es
+`high` **y** cae dentro del scope declarado del encargo. Todo lo demás —severidad menor, o fuera
+de scope— se registra y el turno **sigue**.
+
+> Esta regla decía "se resuelve en el mismo turno: o lo arreglas, o lo registras", sin distinguir
+> severidad ni scope. Esa versión es el motor documentado de la divergencia del ledger: revisar
+> produce hallazgos → cerrarlos cambia el diff → el marker ligado a `sha256(diff staged)` se
+> invalida → hay que volver a revisar, que produce hallazgos. **Medido en este repo:** del 5 al 15
+> de agosto de 2026 se cerraba lo que se abría; desde el 19 se abrió 2–3× más de lo que se cerró y
+> la brecha no volvió a cerrarse (el 31 de agosto: 226 entradas REGISTRADAS y 155 cerradas, o sea
+> 71 sin cerrar — 67 `open` + 4 `accepted`). La causa próxima ya
+> estaba nombrada en `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`: *"muchas de esas
+> rondas existían solo porque el marker se invalidaba tras un cambio de una línea en el ledger"*.
+
+**Y un hallazgo de revisión no es trabajo hasta que sobrevive a una refutación.** Antes de entrar
+al ledger, todo hallazgo emitido por un agente revisor (`reviewer`, `design-reviewer`, jueces) pasa
+por un intento explícito de tumbarlo: **¿hay un caso concreto —entradas y estado— en el que el
+código haga lo que el hallazgo afirma?** Sin ese caso, no entra. Un revisor al que se le pide
+encontrar huecos encuentra huecos aunque el trabajo esté bien: es exactamente lo que se le pidió, y
+es el modo de fallo que la literatura de 2026 mide como sobre-corrección sistemática. El filtro de
+refutación es lo que separa un revisor de alta precisión de un generador de ruido.
 
 **Y toda lección aprendida se convierte en un detector.** `docs/process/lessons_learned.md`
 exige el campo `Detector:` y `tools/lesson-detector-link.sh` lo verifica en CI; cuando ese
@@ -202,6 +224,25 @@ es un gate distinto del "Approved" del owner** — no es salteable para cambios 
 ## 13. Reviewer-gate pre-commit
 
 Todo commit que toque código de producto requiere ejecución previa del sub-agente `reviewer`.
+
+**Tope de DOS rondas por unidad de trabajo. La tercera no se revisa: se parte.** Un cambio que
+llega en rojo a la tercera ronda no tiene un problema que una ronda más vaya a encontrar — tiene un
+lote demasiado grande o un diseño equivocado. En ese punto, o se **divide por naturaleza**
+(`bash tools/check-diff-nature.sh`) y cada mitad entra limpia, o se sube un nivel y se revisa el
+**DISEÑO** (`design-reviewer`, §12) en vez del código. Los tres datos que fijan el tope, todos de
+este repo y recalculables:
+
+- De **107** unidades de trabajo revisadas, solo **29 (27%)** pasaron en verde a la primera —
+  `.agents/state/review-history.jsonl`, campo `verdict`: 53 GREEN · 52 AMBER · 28 RED.
+- Un mismo encargo llegó a **17 rondas** y otro a 9.
+- El `reviewer` rinde **0,84** hallazgos por invocación y el `design-reviewer` **4–9**; en la sesión
+  de las ocho rondas, lo que el reviewer no podía encontrar ronda a ronda (un diseño fail-open) lo
+  encontró el design-review en una. Fuente: `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`.
+
+**Y el `reviewer` reporta solo lo que rompe algo:** corrección, seguridad, o un requisito explícito
+del encargo. Preferencias de estilo, refactors oportunistas y defensas para casos que no pueden
+ocurrir se mencionan en una línea como opcionales y **no generan findings ni bloquean**. Esta regla
+es canónica aquí; `.claude/agents/reviewer.md` la implementa y si divergen, gana esta.
 
 **El veredicto no lo emite el modelo, lo deriva el sistema.** El `reviewer` termina su mensaje
 con `VERDICT: GREEN|AMBER|RED`, y el hook `SubagentStop` escribe el marker a partir de esa línea

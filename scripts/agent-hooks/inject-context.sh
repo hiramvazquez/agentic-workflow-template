@@ -31,7 +31,7 @@ if [ -f "$LEDGER" ]; then
   # "0\n0" y un [: integer expression expected.
   N="$(grep -cE '"status": ?"open"' "$LEDGER" 2>/dev/null || true)"; : "${N:=0}"
   if [ "${N:-0}" -gt 0 ]; then
-    add "· Findings ABIERTOS: $N — si tocas su área, los cierras o los actualizas (§10):"
+    add "· Findings ABIERTOS: $N — solo los \`high\` de tu scope bloquean el turno (§10):"
     grep -E '"status": ?"open"' "$LEDGER" 2>/dev/null \
       | sed -E 's/.*"id": ?"([^"]+)".*"title": ?"([^"]+)".*"area": ?"([^"]+)".*/    [\1] \3 — \2/' \
       | head -5 | while IFS= read -r l; do printf '%s\n' "$l"; done > /tmp/.ic_$$ 2>/dev/null

@@ -181,8 +181,11 @@ Esta es la apuesta de fondo, y lo que distingue el harness de una lista de buena
   puede bajar; el mutation score solo puede subir. Ningún override los relaja — el
   override de emergencia existe para el marcador de review (juicio humano), nunca para un
   detector mecánico. Un número que se puede aflojar no es un trinquete: es una sugerencia.
-- **"El que toca, cierra":** si tocas un módulo con hallazgos abiertos, los arreglas o los
-  actualizas en el mismo cambio. "No es mío, lo dejo" está prohibido.
+- **"El que toca, cierra lo que bloquea":** si tocas un módulo con hallazgos abiertos, los `high`
+  de tu scope los arreglas en el mismo cambio; el resto se registra y no bloquea. "No es mío, lo
+  dejo" sigue prohibido —todo queda en el ledger—, pero registrar no es arreglar: la versión que no
+  distinguía severidad convertía cada ronda de review en más trabajo bloqueante, y el ledger
+  divergió durante tres semanas por eso (§10).
 
 Este bucle es el único mecanismo conocido por el que la necesidad de revisión humana
 **decrece** con el tiempo en vez de mantenerse plana.

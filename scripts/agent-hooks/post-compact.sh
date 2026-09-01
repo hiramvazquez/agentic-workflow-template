@@ -37,7 +37,11 @@ CTX="🔄 Contexto compactado — reinyectando lo irrenunciable (no lo vuelvas a
 4. **El dominio no importa UI ni infraestructura** (§3) — lo verifica \`tools/check-layers.sh\`.
 5. **Open Question > suposición silenciosa** (§1.4). Si no sabes, pregunta.
 6. Jamás \`--no-verify\`, \`--amend\` ni \`push\` sin orden explícita del owner (§7).
-7. **El que toca, cierra**: findings preexistentes se arreglan o se registran (§10).
+7. **El que toca, cierra lo que BLOQUEA**: solo los \`high\` de tu scope se arreglan en el turno;
+   el resto se registra en el ledger y NO bloquea (§10). Un hallazgo de revisión entra al ledger
+   solo si sobrevive a un intento de refutarlo con un caso concreto.
+8. **Máximo DOS rondas de review por cambio** (§13). A la tercera se parte el lote o se revisa el
+   diseño, no el código.
 "
 
 # ── Fase actual del proyecto ────────────────────────────────────────
@@ -59,7 +63,7 @@ if [ -f "$LEDGER" ]; then
           | head -8 || true)"
   N="$(grep -cE '"status": ?"open"' "$LEDGER" 2>/dev/null || true)"; : "${N:=0}"
   [ -n "$OPEN" ] && CTX="$CTX
-## Findings ABIERTOS ($N) — si tocas su área, los cierras o los actualizas
+## Findings ABIERTOS ($N) — solo los \`high\` de tu scope bloquean el turno (§10)
 $OPEN
 "
 fi

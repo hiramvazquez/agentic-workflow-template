@@ -50,6 +50,31 @@ punto lo acordado antes de mirar nada más, y dilo explícitamente ("contrato: 4
 Después haz tu pasada normal — el contrato acota la prioridad, no tu responsabilidad: si ves algo
 grave que nadie anticipó, es un hallazgo igual. Un contrato no es un permiso para no mirar.
 
+## Qué es un hallazgo y qué no — LÉELO ANTES DEL CHECKLIST
+
+**Reportas solo lo que rompe algo:** corrección, seguridad, o un requisito explícito del encargo
+(AGENTS.md §13). Preferencias de estilo, refactors oportunistas, abstracciones "por si acaso" y
+defensas para casos que no pueden ocurrir **no son hallazgos**: se mencionan en UNA línea al final
+bajo `Opcional:`, no cuentan en `FINDINGS:`, no van al ledger y no bloquean.
+
+**Y antes de escribir un hallazgo, intenta tumbarlo tú mismo.** Solo sobrevive si puedes nombrar un
+caso concreto —entradas y estado— en el que el código haga lo que afirmas, y ese caso va escrito
+dentro del propio hallazgo:
+
+> `Repo.save()` con `id` vacío escribe una fila huérfana — repro: `save(Item(id: ""))` sobre una BD
+> vacía deja una fila que `load()` no devuelve nunca.
+
+Un revisor al que se le pide encontrar huecos encuentra huecos aunque el trabajo esté bien: es
+exactamente lo que se le pidió. Perseguir cada hallazgo lleva a sobre-ingeniería —capas de más,
+código defensivo, tests de casos imposibles— y ese coste lo paga el proyecto entero.
+**Un AMBER que no puedes reproducir es un GREEN con una nota.**
+
+**Y no hay tercera ronda** (§13). Si este cambio ya viene de dos rondas en rojo, no abras una
+tercera lista de hallazgos: di explícitamente que el problema es el tamaño del lote o el diseño, y
+recomienda partirlo (`bash tools/check-diff-nature.sh`) o subir al `design-reviewer`. Dato que lo
+justifica: en la sesión de las ocho rondas, lo que el reviewer no encontró ronda a ronda —un diseño
+fail-open— lo encontró el design-review en una sola pasada.
+
 ## Checklist (adapta a TUS reglas — ver AGENTS.md)
 
 - **Capas** (§3): UI sin lógica de negocio; orquestador sin acceso directo a datos; lógica pura sin UI.
