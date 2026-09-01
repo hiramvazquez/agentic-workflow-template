@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **69** · Cerrados: 160 · Total: 229
+Abiertos: **68** · Cerrados: 161 · Total: 229
 
 ## Abiertos
 
@@ -13,13 +13,11 @@ Abiertos: **69** · Cerrados: 160 · Total: 229
 | `f-1ae68da7` | high | owner-decision | `tools/upgrade.sh + lefthook.yml` | lefthook.yml esta congelado para adoptantes por copia: ninguna mejora del Anillo 1 les llega |
 | `f-1caf51c6` | high | owner-decision | `tools/check-ring3.sh:169 (rama timeout) + tools/tests/test_ring3.sh` | check-ring3: _con_limite bifurca por plataforma y la rama de CI no escala a KILL, asi que el limite no limita en Linux |
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
-| `f-298e3cd2` | high | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
 | `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
-| `f-mutation-score-nunca-medido` | high | owner-decision | `tools/mutation-ratchet.json` | El nivel 4 lleva mudo desde el dia uno y un piso de 0 lo disfraza de suelo |
 | `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_agent_runner.sh:91` | Senal CI intermitente en macOS: test_review_tambien_respeta_timeout no propago 124 |
 | `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
@@ -55,6 +53,7 @@ Abiertos: **69** · Cerrados: 160 · Total: 229
 | `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
+| `f-298e3cd2` | low | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-41445734` | low | owner-decision | `tools/check-ring3.sh (_con_limite/_vivo) vs tools/tests/run-tests.sh (_run_test)` | Dos watchdogs portatiles independientes en tools/: _con_limite y _run_test resuelven el mismo problema con garantias distintas |
 | `f-589f151f` | low | owner-decision | `scripts/agent-hooks/session-start.sh (los dos checks de FILL)` | Los checks de FILL de session-start no quitan los backticks: documentar el patron dentro del fichero vigilado lo volveria a romper |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
@@ -116,6 +115,7 @@ Abiertos: **69** · Cerrados: 160 · Total: 229
 | `f-gate-sin-evidencia-de-build` | fixed | tools/verify.conf (fuente unica del comando, consumida por el gate local y por el paso 6 de CI) + to |
 | `f-hook-roto-brickea` | fixed | scripts/agent-hooks/run-hook.sh valida con bash -n el hook Y sus libs antes de exec; si no parsean a |
 | `f-verify-run-lows` | fixed | command -v sobre el primer token antes de ejecutar (exit 3 propio); check-verify-marker llama a veri |
+| `f-mutation-score-nunca-medido` | fixed | Cerrado retirando la AFIRMACION, no cableando el score. AGENTS.md §5 ya no dice que el mutation scor |
 | `f-merge-hooks-duplicados` | fixed | La identidad se calcula sobre el comando normalizado (fuera 'bash ' y el lanzador); cambiar de lanza |
 | `f-main-rojo-publicable` | fixed | Job harness-suite en pre-push de lefthook.yml: la suite corre en la maquina de quien publica, con lo |
 | `f-merge-settings-crashea-con-comentarios` | fixed | Se saltan las claves cuyo valor no es lista, conservandolas (saltar != borrar), y el test ahora fund |

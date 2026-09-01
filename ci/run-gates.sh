@@ -165,9 +165,10 @@ else
 fi
 
 # 7) Mutation score — ¿los tests COMPRUEBAN algo?
-#    La cobertura es un piso; ESTA es la métrica real. Es el único gate que
-#    distingue un test que verifica de uno que solo pasa — el modo de fallo
-#    más común del código escrito por agentes.
+#    La cobertura es un piso; ESTA sería la métrica real. OJO: mientras el piso
+#    sea 0 este paso NO es el árbitro de nada — lo es la práctica manual de
+#    mutantes dirigidos que declara AGENTS.md §5, verificada por el `reviewer`.
+#    Este paso automatiza esa práctica en cuanto tu stack tenga runner.
 step "7/8 mutation-score (calidad de los tests)"
 if [ -f tools/mutation-score.sh ]; then
   # Auto-escalada: mientras el piso sea 0 el gate no dice nada y no bloquea por
@@ -180,7 +181,7 @@ if [ -f tools/mutation-score.sh ]; then
   GATES_REQUIRE_MUTATION="$_req" bash tools/mutation-score.sh --check || FAIL=1
   [ "$_req" = "0" ] && echo "   (piso=0: gate informativo. Sube el piso y pasa a obligatorio automáticamente.)"
 else
-  echo "❌ tools/mutation-score.sh ausente — sin él nada distingue un test real de uno decorativo."; FAIL=1
+  echo "❌ tools/mutation-score.sh ausente — el nivel 4 pierde su vía automática (el árbitro manual de AGENTS.md §5 sigue en pie, pero este gate no puede correr)."; FAIL=1
 fi
 
 # ════════════════════════════════════════════════════════════════════

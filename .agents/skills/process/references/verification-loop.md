@@ -124,8 +124,10 @@ de valor. La métrica real es el **mutation score** — se inyectan fallos en el
 se mide qué porcentaje matan los tests.
 
 > La función objetivo de un agente es *"que los tests pasen"*, y la forma más barata
-> de conseguirlo es escribir tests que no comprueban nada. El mutation score es el
-> único gate que distingue un test que verifica de uno que solo pasa.
+> de conseguirlo es escribir tests que no comprueban nada. Distinguirlos es el trabajo
+> del nivel 4 — pero **en este repo no lo hace un score**: `mutation-ratchet.json` lleva
+> `measured:false` y no hay runner para shell. El árbitro vigente son los **mutantes
+> dirigidos a mano**, listados en el PR y verificados por el `reviewer` (`AGENTS.md` §5).
 
 **Property-based testing**: en vez de ejemplos, declaras invariantes y la herramienta
 busca contraejemplos y los minimiza. La evidencia empírica es contundente — un test

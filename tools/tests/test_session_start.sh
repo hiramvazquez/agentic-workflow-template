@@ -291,3 +291,52 @@ _case_nivel1_con_fill_real_sigue_avisando() {
   return 0
 }
 test_nivel1_con_fill_real_sigue_avisando() { _sst_sandbox _case_nivel1_con_fill_real_sigue_avisando; }
+
+# ── El nivel 4 se reporta UNA vez y sin contradecirse ────────────────
+# El bug real: el arranque emitía DOS líneas sobre el nivel 4 en la misma
+# pantalla y se desmentían entre ellas — el `case` decía que el árbitro son los
+# mutantes dirigidos (§5), y catorce líneas más abajo un grep sobre
+# `mutation-ratchet.json` añadía "Nivel 4 MUDO: NADA distingue un test real de
+# uno decorativo". Dos avisos que se contradicen no informan: enseñan a ignorar
+# los dos, que es como muere un detector (§14.2).
+_case_nivel4_no_se_contradice() {
+  cp "$PROJECT_ROOT/tools/mutation-ratchet.json" tools/mutation-ratchet.json 2>/dev/null
+  local out; out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  local n; n="$(printf '%s\n' "$out" | grep -ciE 'nivel 4' || true)"
+  [ "$n" = "1" ] || { echo "    el nivel 4 se reporta $n veces (esperado 1). Salida:"; printf '%s\n' "$out" | grep -iE 'nivel 4' | sed 's/^/      /'; return 1; }
+  case "$out" in
+    *"NADA distingue un test real"*)
+      echo "    volvió el aviso que contradice a §5 ('NADA distingue un test real de uno decorativo')"; return 1 ;;
+  esac
+}
+test_nivel4_se_reporta_una_vez_y_sin_contradecirse() { _sst_sandbox _case_nivel4_no_se_contradice; }
+
+# El aviso de findings abiertos cita §10, que desde 46a2d33 dice que solo los
+# `high` del scope bloquean. Si vuelve la redacción vieja, el arranque estaría
+# ordenando algo que la regla canónica ya no pide.
+_case_aviso_findings_cita_la_regla_vigente() {
+  mkdir -p tools/findings
+  printf '%s\n' '{"id":"f-x","title":"t","area":"a","severity":"low","tier":"auto-fix","status":"open","detail":"d","createdAt":"2026-01-01","updatedAt":"2026-01-01"}' > tools/findings/ledger.jsonl
+  local out; out="$(bash scripts/agent-hooks/session-start.sh --report 2>&1)"
+  case "$out" in
+    *"ciérralos o actualízalos"*) echo "    el arranque volvió a la redacción de §10 anterior a 46a2d33"; return 1 ;;
+  esac
+  case "$out" in
+    *"Findings abiertos"*) ;;
+    *) echo "    el arranque dejó de listar los findings abiertos"; return 1 ;;
+  esac
+  # Aserción POSITIVA, y no es redundante con la de arriba: comprobar solo la
+  # AUSENCIA de la frase vieja deja pasar cualquier reescritura que se aleje de
+  # §10 sin volver a ella ("revisa cuando puedas" pasaba). El reviewer mató así
+  # la primera versión de este test. Se exige el término que lleva la regla —
+  # `high` es lo que decide qué bloquea— y la cita de la sección.
+  case "$out" in
+    *"high"*) ;;
+    *) echo "    el aviso ya no dice que solo los \`high\` bloquean; §10 dejó de estar citada de verdad"; return 1 ;;
+  esac
+  case "$out" in
+    *"§10"*) ;;
+    *) echo "    el aviso dejó de citar §10, así que nada lo ata a la regla canónica"; return 1 ;;
+  esac
+}
+test_aviso_de_findings_cita_la_regla_vigente() { _sst_sandbox _case_aviso_findings_cita_la_regla_vigente; }

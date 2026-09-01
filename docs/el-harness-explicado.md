@@ -236,10 +236,14 @@ el mismo día, documentado en commits:
 
 Esta sección existe porque el documento la necesita para ser creíble. En orden de importancia:
 
-1. **El nivel 4 (mutation testing) está MUDO.** El score es 0 y nunca ha medido. Hoy,
-   nada mecánico distingue un test real de uno decorativo — lo cubre el revisor, que es
-   justo la capa cara. El propio reglamento declara al mutation score "el árbitro" de la
-   calidad de tests: mientras no mida, esa frase es prosa (y está registrada como tal).
+1. **El nivel 4 no tiene score automático, y ya no finge tenerlo.** `mutation-ratchet.json`
+   lleva `measured:false` desde el día uno y no hay runner de mutación para shell, que es el
+   lenguaje del harness. El reglamento llegó a declarar al mutation score *"el árbitro"* de la
+   calidad de los tests, lo cual era prosa. Desde el 2026-09-01, §5 declara el mecanismo que de
+   verdad se usa: **mutantes dirigidos a mano**, escritos en el PR, verificados por el `reviewer`
+   —cuyo encargo incluye buscar uno que sobreviva—. Sigue siendo la capa cara (un humano y un
+   LLM, no un número), y eso está declarado, no disimulado: automatizarlo requiere un runner de
+   mutación para bash que hoy no existe con calidad suficiente.
 2. **El template llega sin stack cableado, a propósito.** Build, tests, lint del proyecto
    concreto son huecos `FILL` que el arranque rellena. Hasta entonces, el nivel 1 es
    parcial y `verify-run` verifica el harness, no tu producto. El protocolo de arranque

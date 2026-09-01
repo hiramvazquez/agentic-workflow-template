@@ -219,8 +219,15 @@ qué porcentaje matan los tests.
 
 > **Esto es lo que más importa con código escrito por IA.** La función objetivo de un
 > agente es "que los tests pasen", y la forma más barata de conseguirlo es escribir tests
-> que no comprueban nada. El mutation score es el único gate que distingue un test que
-> verifica de uno que solo pasa.
+> que no comprueban nada. Distinguir un test que verifica de uno que solo pasa es, por
+> tanto, el trabajo del nivel 4.
+>
+> **Y ese nivel NO lo hace hoy un número.** `mutation-ratchet.json` lleva `measured:false`
+> y no hay runner de mutación para shell (`AGENTS.md` §5). El árbitro vigente son los
+> **mutantes dirigidos a mano**: rompe la línea que el test dice cubrir, comprueba que el
+> test muere, y escribe en el PR cuáles lanzaste. El `reviewer` lo verifica y además busca
+> uno que SOBREVIVA. Los comandos de abajo cablean la versión automática cuando tu stack
+> tenga runner; hasta entonces son opcionales, no el veredicto.
 
 ```bash
 bash tools/mutation-score.sh --check     # ¿estamos por encima del piso?
@@ -254,7 +261,8 @@ bash tools/mutation-score.sh --update    # sube el piso (SOLO sube)
 | `tester` (sub-agente) | Escribe los tests siguiendo este loop |
 | `reviewer` | RED si falta un comportamiento/riesgo o rama observable aplicable, **y si los tests pasan con cualquier implementación** |
 | `check-drift.sh` | Señala lógica nueva sin archivo de test espejo (señal, no veredicto) |
-| `tools/mutation-score.sh` | **El veredicto real**: piso de mutation score con trinquete que solo sube |
+| Mutantes dirigidos a mano | **El veredicto vigente** (`AGENTS.md` §5): el autor los lista en el PR y el `reviewer` busca uno que sobreviva |
+| `tools/mutation-score.sh` | La versión automática, **DORMIDA** hasta que tu stack tenga runner (`measured:false`) |
 | DoD del PRD | "tests (happy + errores) verdes" es checkbox obligatorio de cierre |
 
 El contexto completo de dónde encaja cada uno: `verification-loop.md`.

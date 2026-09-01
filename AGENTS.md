@@ -77,9 +77,21 @@ test que reproduce el bug (falla), luego el fix. Antes de marcar terminado: test
 sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/tdd-workflow.md`.
 
 - **Un test que pasa con cualquier implementación no es un test.** La prueba de bolsillo: *si
-  rompo a propósito la lógica que dice cubrir, ¿falla?* El veredicto mecánico lo da el
-  **mutation score** (`tools/mutation-score.sh`), cuyo piso **solo sube**. Es el gate que
-  distingue un test que verifica de uno escrito para que pase.
+  rompo a propósito la lógica que dice cubrir, ¿falla?*
+  *Mecanismo real, y se declara como lo que es:* **mutantes dirigidos, a mano**. Quien escribe
+  el test rompe a propósito la línea que dice cubrir y comprueba que el test muere; lo hace por
+  cada afirmación de cobertura que el cambio haga, y **escribe en el PR qué mutantes lanzó y
+  cuáles murieron**. El `reviewer` lo verifica (ítem "Calidad del test") y su encargo incluye
+  buscar un mutante que **sobreviva** — el valor está en el que al autor no se le ocurrió.
+  > Esto decía que el veredicto lo daba el **mutation score** de `tools/mutation-score.sh`, "el
+  > gate que distingue un test que verifica de uno escrito para que pase". Esa frase **nunca ha
+  > sido verdad en este repo**: `tools/mutation-ratchet.json` lleva `measured: false` desde el
+  > día uno y no hay runner de mutación para shell, que es el lenguaje del harness
+  > (`f-mutation-score-nunca-medido`, `f-298e3cd2`). Un nivel de la pirámide anunciado y mudo es
+  > peor que uno ausente: da por cubierto lo que nadie mide. La maquinaria se queda —es honesta:
+  > `--update` se niega a escribir un piso de 0 y el script sale 3 sin runner— pero **hasta que
+  > mida, el árbitro es el de arriba**. Práctica validada el 2026-09-01: cinco mutantes dirigidos
+  > contra `canon-enforce`, los cinco muertos, y el `reviewer` encontró un sexto vivo.
 - **Aserciones / Design by Contract:** toda frontera pública expresa las precondiciones e
   invariantes que realmente tiene; una función sin precondición no inventa dos. Las aserciones
   son para errores de programación/invariantes, sin efectos secundarios. Input recuperable se
@@ -132,7 +144,7 @@ meta-doc (este archivo, `.agents/skills/**`, `_template.md`), o refactorizar arc
 | Archivo | Métrica | Dirección | Actualiza con |
 |---|---|---|---|
 | `tools/drift-ratchet.json` | errores + warnings | **solo baja** | `tools/drift-ratchet.sh --update` |
-| `tools/mutation-ratchet.json` | mutation score | **solo sube** | `tools/mutation-score.sh --update` |
+| `tools/mutation-ratchet.json` | mutation score | **solo sube** | `tools/mutation-score.sh --update` — ⚠️ **DORMIDO**: `measured:false`, nunca ha medido. No es un piso de 0, es la ausencia de veredicto (§5). |
 
 - Ni el preset `lite` ni `REVIEWER_OVERRIDE` relajan un trinquete. Ese override existe para el
   **marker de review** (juicio humano), nunca para un detector mecánico. Está fijado por
@@ -285,7 +297,7 @@ Dos principios que gobiernan todo lo demás:
 
 ```
 9 Métricas + lección→detector     8 Gate por evidencia      7 Review adversarial de IA
-6 Arquitectura (imports directos; ciclos si hay adapter) 5 Contratos (fake ≡ real) 4 CALIDAD del test (mutación)
+6 Arquitectura (imports directos; ciclos si hay adapter) 5 Contratos (fake ≡ real) 4 CALIDAD del test (mutantes dirigidos, a mano — el score automático está DORMIDO, §5)
 3 Spec ejecutable (TDD + DbC)     2 Patrón AST (Semgrep)    1 Lint/typecheck in-loop
 0 Imposibilitar (tipos)
 ```

@@ -105,7 +105,7 @@ case "$(bash tools/mutation-score.sh --state 2>/dev/null || echo sin-cablear)" i
   runner-incompleto)
     echo "⚠️  NIVEL 4 CABLEADO PERO SIN VEREDICTO: el runner de mutación está y NO completa su corrida. Esto NO se arregla cablear-más: es un fallo de la herramienta. Aísla el síntoma y abre issue upstream (y comprueba su repositorio, no solo el release de tu gestor de paquetes)."; _health=0 ;;
   sin-cablear)
-    echo "⚠️  NIVEL 4 SIN CABLEAR: no hay runner de mutación. AGENTS.md §5 declara el mutation score el árbitro de la calidad de los tests; hasta que exista, esa frase es prosa. Cablea el runner de tu stack (tools/mutation-score.sh §FILL)."; _health=0 ;;
+    echo "ℹ️  NIVEL 4 con score DORMIDO: no hay runner de mutación cableado. NO es un agujero mudo — AGENTS.md §5 declara que, mientras el score no mida, el árbitro son los MUTANTES DIRIGIDOS a mano: rompe la línea que el test dice cubrir, comprueba que muere, y escribe en el PR cuáles lanzaste. El reviewer lo verifica y busca uno que sobreviva. Cablear el runner de tu stack (tools/mutation-score.sh §FILL) lo automatiza, pero no es un prerrequisito." ;;
   *)
     echo "⚠️  NIVEL 4 NUNCA MEDIDO: el runner corre, pero nadie ha fijado el piso. Mide una vez (\`bash tools/mutation-score.sh --update\`) y a partir de ahí solo sube."; _health=0 ;;
 esac
@@ -173,8 +173,12 @@ fi
 grep -qE "$_SST_FILL_ERE" scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && grep -qE '^\s*\*\)\s*:\s*;;' scripts/agent-hooks/post-edit-verify.sh 2>/dev/null \
   && { echo "⚠️  Nivel 1 PARCIAL: post-edit-verify sin lint/typecheck de tu stack (§FILL) — el agente no recibe señal in-loop."; _health=0; }
-grep -q '"min_score": 0' tools/mutation-ratchet.json 2>/dev/null \
-  && { echo "⚠️  Nivel 4 MUDO: mutation score en 0 — NADA distingue un test real de uno decorativo."; _health=0; }
+# Sin línea propia a propósito: el estado del nivel 4 ya lo imprime el `case` de
+# arriba, y ANTES este bloque añadía un segundo aviso que lo CONTRADECÍA en la
+# misma pantalla ("NADA distingue un test real de uno decorativo" frente a "el
+# árbitro son los mutantes dirigidos"). Dos avisos que se desmienten no informan:
+# enseñan a ignorar los dos. El score dormido no es un agujero — §5 declara el
+# mecanismo manual que lo sustituye mientras tanto.
 # El fallo más caro del primer proyecto real: 9 niveles en verde y el build
 # roto. La comprobación más barata y definitiva (¿compila?) no puede ser el
 # único FILL silencioso mientras semgrep y trinquetes vienen de fábrica.
@@ -224,13 +228,13 @@ fi
 
 [ "$_health" = "1" ] && echo "✓ Stack, código, matriz de skills y pirámide de verificación configurados."
 
-# ── Findings abiertos (AGENTS.md §10: el que toca, cierra) ──────────
+# ── Findings abiertos (AGENTS.md §10: cierra lo que BLOQUEA) ────────
 if [ -f tools/findings/ledger.jsonl ]; then
   # Tolerante a ambos formatos JSON ('"status":"open"' y '"status": "open"'):
   # findings.sh (python) y findings antiguos difieren en el espaciado, y un grep
   # rígido reportaba 0 abiertos SIEMPRE — silenciosamente (lección L-json-espacios).
   _open="$(grep -cE '"status": ?"open"' tools/findings/ledger.jsonl 2>/dev/null || true)"
-  [ "${_open:-0}" -gt 0 ] && { echo ""; echo "── Findings abiertos: $_open (si tocas su área, ciérralos o actualízalos) ──"; }
+  [ "${_open:-0}" -gt 0 ] && { echo ""; echo "── Findings abiertos: $_open (solo los \`high\` de tu scope bloquean el turno — §10) ──"; }
 fi
 
 echo ""

@@ -70,7 +70,7 @@ El corazón del template. Detalle completo en
 | 7 | Review adversarial de IA | sub-agentes `reviewer`/`security-reviewer` · plugin `security-guidance` · `ci/ai-review.sh` |
 | 6 | Arquitectura | `tools/check-layers.sh` + `tools/layers.conf` (dirección de imports directos) |
 | 5 | Contratos | suite de conformidad fake ≡ real (`domain/SKILL.md`) |
-| 4 | **Calidad del test** | `tools/mutation-score.sh` + trinquete que **solo sube** |
+| 4 | **Calidad del test** | mutantes dirigidos a mano, verificados por el `reviewer` (`AGENTS.md` §5) · `tools/mutation-score.sh` es la versión automática, **dormida** |
 | 3 | Spec ejecutable | TDD red-first + aserciones/DbC (`tdd-workflow.md`) |
 | 2 | Patrón semántico | `tools/semgrep/rules/*.yaml` (AST, no texto) |
 | 1 | Determinista in-loop | `post-edit-verify.sh` (PostToolUse → `additionalContext`) |
@@ -78,7 +78,10 @@ El corazón del template. Detalle completo en
 
 > El nivel 4 es el que más importa con código escrito por IA: la función objetivo de un agente
 > es *"que los tests pasen"*, y la forma más barata de conseguirlo es escribir tests que no
-> comprueban nada. El mutation score es el único gate que los distingue.
+> comprueban nada. Aquí los distingue una práctica, no un número: **mutantes dirigidos a mano**
+> —rompe a propósito la línea que el test dice cubrir y comprueba que muere—, listados en el PR
+> y verificados por el `reviewer`, que además busca uno que sobreviva. El score automático
+> (`tools/mutation-score.sh`) está **dormido**: nunca ha medido y no hay runner para shell.
 
 ## Los anillos 0–3 de enforcement (el "plus" cross-tool)
 

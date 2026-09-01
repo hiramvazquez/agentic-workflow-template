@@ -16,7 +16,7 @@
 | [`semgrep`](https://semgrep.dev) | detectores AST (nivel 2 de la pirámide) | sí — sin él el nivel 2 está MUDO (local avisa, CI bloquea) |
 | `python3` | `tools/findings/findings.sh` (ledger) + utilidades | sí (viene en macOS/Linux) |
 | `jq` | hooks de IA (parsing JSON) | sí para el Anillo 2 |
-| Runner de mutación (muter/Stryker/PIT/mutmut) | nivel 4: calidad real de los tests | recomendada — sin él nada distingue un test real de uno decorativo |
+| Runner de mutación (muter/Stryker/PIT/mutmut) | nivel 4: calidad real de los tests | opcional — sin él el nivel 4 lo cubren los mutantes dirigidos a mano (`AGENTS.md` §5), que es como funciona hoy el propio template |
 | Tu CI (GitHub/GitLab/…) | Anillo 3 | sí en `full`; pérdida explícita en `lite` |
 
 <!-- BEGIN GENERATED: capabilities -->

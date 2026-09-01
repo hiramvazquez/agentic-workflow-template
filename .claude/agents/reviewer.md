@@ -106,6 +106,13 @@ fail-open— lo encontró el design-review en una sola pasada.
 - **Calidad del test, no solo su existencia** (§5): ¿el test FALLA si rompes la lógica que
   dice cubrir? Un test que pasa con cualquier implementación es decorativo. Comprueba que
   hay aserciones sobre el resultado, no solo sobre "no lanzó excepción".
+  **Este ítem eres TÚ el mecanismo** — el mutation score automático está dormido (§5), así que
+  no hay número que te cubra. Dos obligaciones concretas: (1) exige que el autor diga **qué
+  mutantes lanzó y cuáles murieron**; una afirmación de cobertura sin esa lista es un hallazgo.
+  (2) Busca un mutante que **SOBREVIVA**: aplica un cambio de comportamiento real al código
+  tocado, corre los tests con filtro (`bash tools/tests/run-tests.sh <token>`, ~2s) y mira si
+  alguno muere. Si ninguno muere, ese es el hallazgo — y **restaura el archivo** antes de seguir.
+  Ahí está tu mayor valor: el mutante que al autor no se le ocurrió.
 - **Aserciones / DbC** (§5): las fronteras públicas NUEVAS expresan precondiciones/invariantes
   reales (sin cuotas ni efectos secundarios); input recuperable usa tipos/errores. Tú eres el
   mecanismo de esta regla — no existe detector automático a propósito (sería ruido): si una

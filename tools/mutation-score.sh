@@ -8,8 +8,15 @@
 #
 # Por qué importa especialmente con agentes: la función objetivo de un agente
 # es "que los tests pasen", y la forma más barata de conseguirlo es escribir
-# tests que no comprueban nada. Este es el ÚNICO gate que distingue un test
-# real de uno decorativo.
+# tests que no comprueban nada.
+#
+# OJO CON LO QUE ESTE SCRIPT ES Y NO ES. No es "el único gate que distingue un
+# test real de uno decorativo" — esa frase estuvo aquí y era falsa en el propio
+# repo que la escribió: `mutation-ratchet.json` lleva `measured:false` desde el
+# día uno y no hay runner de mutación para shell. El árbitro vigente del nivel 4
+# son los MUTANTES DIRIGIDOS A MANO que declara AGENTS.md §5, verificados por el
+# `reviewer`. Este script es la vía AUTOMÁTICA de esa misma idea, y solo pasa a
+# ser el veredicto cuando mide de verdad (piso > 0 ⇒ el gate se vuelve obligatorio).
 #
 # Dirección del ratchet: el piso **SOLO SUBE** (opuesto al drift-ratchet, cuyo
 # techo solo baja). Bajarlo a mano = esconder deuda (AGENTS.md §9).
