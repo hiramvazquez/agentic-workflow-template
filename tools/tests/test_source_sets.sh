@@ -40,15 +40,8 @@ _case_el_mismo_import_en_androidmain_es_correcto() {
   # runner no tenía semgrep—, y diagnosticar la diferencia costó veinte minutos.
   # Un test que dice la causa equivocada es peor que uno que solo dice "falló".
   local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
-  [ "$rc" = "0" ] || {
-    if [ "$rc" = "3" ]; then
-      echo "    el detector NO PUDO MIRAR (exit 3): falta semgrep en este entorno."
-      echo "    No es un falso positivo — es el fail-closed de §14.3. Estos tests"
-      echo "    comprueban SEMÁNTICA y necesitan el motor primario."
-    else
-      echo "    FALSO POSITIVO: acusó a androidMain, que es donde SÍ toca importar plataforma (exit $rc)"
-    fi
-    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  assert_detector_limpio "$rc" "$out" \
+    "acusó a androidMain, que es donde SÍ toca importar plataforma"
 }
 test_androidmain_si_puede_importar_plataforma() { _ss_repo _case_el_mismo_import_en_androidmain_es_correcto; }
 
@@ -64,9 +57,8 @@ _case_mencionar_no_es_importar() {
     'val doc = "import android.net.Uri"' \
     'class Repo'
   local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
-  [ "$rc" = "0" ] || {
-    echo "    FALSO POSITIVO: un comentario/cadena que NOMBRA el paquete contó como import (exit $rc)"
-    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  assert_detector_limpio "$rc" "$out" \
+    "un comentario/cadena que NOMBRA el paquete contó como import"
 }
 test_un_comentario_que_nombra_el_paquete_no_es_un_import() { _ss_repo _case_mencionar_no_es_importar; }
 

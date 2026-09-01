@@ -52,9 +52,7 @@ _case_androidx_multiplataforma_no_es_una_violacion() {
     'import androidx.lifecycle.ViewModel' \
     'class Repo'
   local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
-  [ "$rc" = "0" ] || {
-    echo "    FALSO POSITIVO: acusó a androidx multiplataforma (exit $rc)"
-    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  assert_detector_limpio "$rc" "$out" "acusó a androidx multiplataforma"
 }
 test_androidx_multiplataforma_no_cuenta_como_import_de_plataforma() {
   _ssp_repo _case_androidx_multiplataforma_no_es_una_violacion; }
@@ -88,9 +86,8 @@ test_los_androidx_solo_de_android_siguen_bloqueando() {
 _case_el_ancla_no_acusa_a_paquetes_vecinos() {
   _ssp_common 'package dominio' 'import com.google.androidwear.WearThing' 'class Repo'
   local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
-  [ "$rc" = "0" ] || {
-    echo "    FALSO POSITIVO: com.google.androidwear no es com.google.android.* (exit $rc)"
-    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  assert_detector_limpio "$rc" "$out" \
+    "com.google.androidwear no es com.google.android.*"
 }
 test_el_ancla_de_com_google_android_no_acusa_a_paquetes_vecinos() {
   _ssp_repo _case_el_ancla_no_acusa_a_paquetes_vecinos; }

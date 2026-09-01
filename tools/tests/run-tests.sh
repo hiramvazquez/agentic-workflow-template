@@ -118,6 +118,26 @@ assert_exit() { # assert_exit <esperado> <comando...>
   echo "    exit esperado: $want · obtenido: $got · cmd: $*"; return 1
 }
 
+# Un detector que sale 3 NO es un falso positivo: es "no pude mirar" (§14.3),
+# el fail-closed que se dispara cuando le falta su herramienta. Confundir los
+# dos costó veinte minutos de diagnóstico el día que el Anillo 3 revivió y la
+# suite corría sin semgrep: 10 tests gritaban "FALSO POSITIVO" sobre un exit 3.
+# La distinción vive AQUÍ, en un solo sitio, y no copiada en cada aserción —
+# que es exactamente como se quedó a medias la primera vez que se arregló.
+assert_detector_limpio() { # assert_detector_limpio <rc> <salida> <mensaje-si-es-falso-positivo>
+  local rc="$1" out="$2" msg="$3"
+  [ "$rc" = "0" ] && return 0
+  if [ "$rc" = "3" ]; then
+    echo "    el detector NO PUDO MIRAR (exit 3): le falta su herramienta en este entorno."
+    echo "    No es un falso positivo — es el fail-closed de §14.3. Este test"
+    echo "    comprueba SEMÁNTICA y necesita el motor primario instalado."
+  else
+    echo "    FALSO POSITIVO: $msg (exit $rc)"
+  fi
+  printf '%s\n' "$out" | sed 's/^/      /'
+  return 1
+}
+
 # Crea un repo git desechable y ejecuta el cuerpo dentro. Se limpia siempre.
 with_temp_repo() { # with_temp_repo <función>
   local d; d="$(mktemp -d)"
@@ -132,7 +152,7 @@ with_temp_repo() { # with_temp_repo <función>
   rm -rf "$d"
   return $rc
 }
-export -f assert_eq assert_contains assert_exit with_temp_repo
+export -f assert_eq assert_contains assert_exit assert_detector_limpio with_temp_repo
 
 # ── Descubrimiento y ejecución ──────────────────────────────────────
 for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
