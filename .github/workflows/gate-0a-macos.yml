@@ -15,6 +15,14 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
+      # Sin esto el bucle mide otra cosa: la suite sin semgrep ni gitleaks
+      # falla 10 tests de forma DETERMINISTA, así que "rojo en la corrida 1"
+      # no diría nada sobre el flaky que este gate persigue
+      # (f-wf01-ci-macos-intermitente). Mismo paso que en harness-ci-macos.yml.
+      - name: Dependencias reales de la suite (semgrep + gitleaks)
+        run: |
+          python3 -m pip install --quiet --break-system-packages semgrep || python3 -m pip install --quiet semgrep
+          bash ci/install-gitleaks.sh /usr/local/bin
       - name: suite x N con corte al primer rojo
         env:
           N: ${{ github.event.inputs.runs }}   # via env, no interpolado en el shell (inyeccion clasica de Actions)

@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **68** · Cerrados: 161 · Total: 229
+Abiertos: **68** · Cerrados: 162 · Total: 230
 
 ## Abiertos
 
@@ -243,3 +243,4 @@ Abiertos: **68** · Cerrados: 161 · Total: 229
 | `f-72c1dc64` | fixed | Resuelto en este mismo cambio: los dos tests dejan de provocar el escenario a traves de semgrep y pa |
 | `f-cbf21371` | fixed | Arreglado en d98d0a8. Los dos avisos usan ahora _SST_FILL_ERE='<!--[[:space:]]*FILL([[:space:]:>]|-- |
 | `f-e2a65344` | fixed | CHECK 4 deja de correr run-tests.sh entero. Ahora: (a) bash -n sobre cada .sh tocado —la rotura cata |
+| `f-4b971920` | fixed | Los tres workflows instalan ahora semgrep + gitleaks antes de la suite (harness-ci job suite, harnes |

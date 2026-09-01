@@ -34,8 +34,21 @@ _case_el_mismo_import_en_androidmain_es_correcto() {
   _common 'package dominio' 'expect class Reloj'
   printf '%s\n' 'package dominio' 'import android.net.Uri' 'actual class Reloj' \
     > shared/src/androidMain/kotlin/Reloj.kt
-  bash tools/check-source-sets.sh >/dev/null 2>&1 \
-    || { echo "    FALSO POSITIVO: acusó a androidMain, que es donde SÍ toca importar plataforma"; return 1; }
+  # Se captura salida Y exit code en vez de mandar todo a /dev/null. Motivo
+  # medido: cuando el Anillo 3 revivió, este test falló en CI imprimiendo
+  # "FALSO POSITIVO" mientras el exit real era 3 —"no pude mirar", porque el
+  # runner no tenía semgrep—, y diagnosticar la diferencia costó veinte minutos.
+  # Un test que dice la causa equivocada es peor que uno que solo dice "falló".
+  local out rc; out="$(bash tools/check-source-sets.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    if [ "$rc" = "3" ]; then
+      echo "    el detector NO PUDO MIRAR (exit 3): falta semgrep en este entorno."
+      echo "    No es un falso positivo — es el fail-closed de §14.3. Estos tests"
+      echo "    comprueban SEMÁNTICA y necesitan el motor primario."
+    else
+      echo "    FALSO POSITIVO: acusó a androidMain, que es donde SÍ toca importar plataforma (exit $rc)"
+    fi
+    printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
 }
 test_androidmain_si_puede_importar_plataforma() { _ss_repo _case_el_mismo_import_en_androidmain_es_correcto; }
 

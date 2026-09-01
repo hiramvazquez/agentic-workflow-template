@@ -22,5 +22,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      # Mismo paso y misma razón que en harness-ci.yml (job `suite`): sin
+      # semgrep ni gitleaks, check-source-sets y secret-scan salen 3 —"no pude
+      # mirar"— y 10 tests que asertan 0 fallan. Aquí `sudo` no hace falta:
+      # /usr/local/bin es escribible por el runner en macOS.
+      - name: Dependencias reales de la suite (semgrep + gitleaks)
+        run: |
+          python3 -m pip install --quiet --break-system-packages semgrep || python3 -m pip install --quiet semgrep
+          bash ci/install-gitleaks.sh /usr/local/bin
       - name: Suite del harness (los tests de los propios gates)
         run: bash tools/tests/run-tests.sh

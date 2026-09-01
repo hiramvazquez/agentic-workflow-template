@@ -40,6 +40,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # Sin este paso la suite corria SIN semgrep ni gitleaks y 10 tests
+      # fallaban en los dos runners mientras en local iban 758/758 (runs
+      # 33558503811 y 33558518133, primer arranque real del Anillo 3).
+      # Y NO era un bug de los detectores: sin la herramienta, check-source-sets
+      # y secret-scan salen 3 —"no pude mirar", el fail-closed de §14.3— y esos
+      # tests asertan 0. Instalarlas no esconde nada: es lo que hace que las
+      # aserciones de SEMANTICA (androidMain si puede importar plataforma, un
+      # comentario no es un import, androidx multiplataforma no es violacion)
+      # comprueben de verdad lo que dicen comprobar, en vez de pasar por la rama
+      # degradada. La rama sin herramienta tiene sus propios tests
+      # (test_source_sets_fallback.sh), que es donde toca probarla.
+      # gitleaks va por ci/install-gitleaks.sh —version fijada + checksum— que
+      # el template ya traia para sus adoptantes y su propio CI no usaba.
+      - name: Dependencias reales de la suite (semgrep + gitleaks)
+        run: |
+          python3 -m pip install --quiet semgrep
+          sudo bash ci/install-gitleaks.sh /usr/local/bin
       - name: Suite del harness (los tests de los propios gates)
         run: bash tools/tests/run-tests.sh
 
