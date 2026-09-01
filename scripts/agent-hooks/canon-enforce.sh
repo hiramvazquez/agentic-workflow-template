@@ -103,11 +103,75 @@ fi
 # ════════════════════════════════════════════════════════════════════
 # Si el turno tocó los gates, sus tests deben pasar. Un gate roto es peor que
 # ausente: bloquea trabajo legítimo y deja pasar lo que debía parar.
-if printf '%s\n' "$CHANGED" | grep -qE '^(scripts/agent-hooks/|tools/)' 2>/dev/null; then
-  if [ -f tools/tests/run-tests.sh ]; then
-    if ! out="$(bash tools/tests/run-tests.sh 2>&1)"; then
-      err "Tocaste el harness y sus tests FALLAN:"$'\n'"$(printf '%s' "$out" | tail -12)"
+#
+# ⚠️  Esto corría `run-tests.sh` ENTERO —750 tests, 5:07 medidos— en CADA cierre
+# de turno que tocara `tools/` o `scripts/`. En este repo el harness ES el
+# producto, así que casi todo turno casaba: cinco minutos por turno, repetidos
+# sobre un árbol que el turno siguiente volvía a cambiar (`f-e2a65344`).
+#
+# La suite completa NO desaparece — ya corría en otras dos capas y sigue ahí:
+#   · `lefthook.yml` job `harness-suite` (pre-push, Anillo 1, instalado y activo)
+#   · `ci/run-gates.sh` paso 1/8 (Anillo 3)
+# Lo que se elimina aquí es la TERCERA ejecución: la de mayor frecuencia y menor
+# rendimiento, sobre trabajo que aún no ha terminado. Es §14.1 aplicado a sí
+# mismo — cázalo en la capa más barata, y "barata" incluye el reloj.
+#
+# Lo que un cierre de turno SÍ debe pagar (≈2s):
+#   (a) `bash -n` sobre cada .sh tocado. La rotura catastrófica local es un hook
+#       que NO PARSEA: se lee como DENY y deja al agente sin poder ejecutar nada
+#       —ni el `git status` con el que diagnosticarlo—. Es la razón de ser de
+#       `run-hook.sh`, y se caza en milisegundos.
+#   (b) Los tests DIRIGIDOS del archivo tocado, con el filtro que `run-tests.sh`
+#       ya acepta: 2s en vez de 307s.
+#   (c) Un aviso NO bloqueante por lo que quedó sin test dirigido. Deferir en
+#       silencio sería la "defensa anunciada que no existe" que este harness
+#       persigue en todo lo demás.
+# El alcance es el CÓDIGO y la CONFIGURACIÓN del harness: un `.conf` cambia el
+# comportamiento de un gate igual que un `.sh` (`skill-matrix.conf` gobierna
+# `skill-reminder`, `layers.conf` gobierna `check-layers`). Quedan fuera los
+# DATOS y la doc bajo esas rutas —`findings/ledger.jsonl`, los `*-ratchet.json`,
+# los `.md`—: cambian en casi todos los turnos y no alteran ninguna lógica, así
+# que dispararían un aviso permanente. Un aviso que sale siempre no se lee.
+HARNESS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(scripts/agent-hooks/|tools/).*\.(sh|conf|ya?ml)$' || true)"
+if [ -n "$HARNESS_CHANGED" ]; then
+
+  # (a) Sintaxis — la rotura que deja al agente sin herramientas. Solo shell.
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in *.sh) ;; *) continue ;; esac
+    [ -f "$f" ] || continue
+    if ! syn="$(bash -n "$f" 2>&1)"; then
+      err "$f NO PARSEA — un hook que no parsea se lee como DENY:"$'\n'"$syn"
     fi
+  done <<< "$HARNESS_CHANGED"
+
+  # (b)+(c) Tests dirigidos. El token solo se usa si su archivo de test EXISTE:
+  # un filtro que no casa nada sale 0 en el runner, así que derivar mal el nombre
+  # sería un falso verde silencioso. Sin test que casar → aviso, no silencio.
+  if [ -f tools/tests/run-tests.sh ]; then
+    CE_TOKENS=""; CE_UNMAPPED=""
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      base="$(basename "$f")"; base="${base%.*}"; norm="${base//-/_}"; tok=""
+      for cand in "$norm" "${norm#check_}"; do
+        case "$cand" in test_*) [ -f "tools/tests/$cand.sh" ] && { tok="$cand"; break; } ;;
+                        *)      [ -f "tools/tests/test_$cand.sh" ] && { tok="test_$cand"; break; } ;;
+        esac
+      done
+      if [ -n "$tok" ]; then
+        case " $CE_TOKENS " in *" $tok "*) ;; *) CE_TOKENS="$CE_TOKENS $tok" ;; esac
+      else
+        CE_UNMAPPED="$CE_UNMAPPED $f"
+      fi
+    done <<< "$HARNESS_CHANGED"
+
+    for tok in $CE_TOKENS; do
+      if ! out="$(bash tools/tests/run-tests.sh "$tok" 2>&1)"; then
+        err "Tocaste el harness y los tests de \`$tok\` FALLAN:"$'\n'"$(printf '%s' "$out" | tail -12)"
+      fi
+    done
+
+    [ -n "$CE_UNMAPPED" ] && warn "Sin test dirigido:$CE_UNMAPPED — la suite completa NO corrió aquí; corre en pre-push (lefthook \`harness-suite\`) y en CI."
   fi
 fi
 

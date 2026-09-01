@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **67** · Cerrados: 159 · Total: 226
+Abiertos: **68** · Cerrados: 160 · Total: 228
 
 ## Abiertos
 
@@ -49,6 +49,7 @@ Abiertos: **67** · Cerrados: 159 · Total: 226
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
+| `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
@@ -240,3 +241,4 @@ Abiertos: **67** · Cerrados: 159 · Total: 226
 | `f-c4e45fca` | fixed | HEAD como ultimo recurso en _resolver_rango, con test y mutante verificado |
 | `f-72c1dc64` | fixed | Resuelto en este mismo cambio: los dos tests dejan de provocar el escenario a traves de semgrep y pa |
 | `f-cbf21371` | fixed | Arreglado en d98d0a8. Los dos avisos usan ahora _SST_FILL_ERE='<!--[[:space:]]*FILL([[:space:]:>]|-- |
+| `f-e2a65344` | fixed | CHECK 4 deja de correr run-tests.sh entero. Ahora: (a) bash -n sobre cada .sh tocado —la rotura cata |
