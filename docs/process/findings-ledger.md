@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **68** · Cerrados: 160 · Total: 228
+Abiertos: **69** · Cerrados: 160 · Total: 229
 
 ## Abiertos
 
@@ -63,6 +63,7 @@ Abiertos: **68** · Cerrados: 160 · Total: 228
 | `f-708ec207` | low | owner-decision | `tools/check-execution-map.sh (PALABRAS_AMBIGUAS / exencion por posicion)` | Dos fugas de posicion en el detector de evidencia del mapa, encontradas tras cerrarlo |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
+| `f-86d257b3` | low | auto-fix | `scripts/agent-hooks/canon-enforce.sh:135 + tools/tests/test_canon_enforce.sh` | Ningun test fija que los .yaml esten en el alcance de CHECK 4: el mutante sobrevive |
 | `f-88348888` | low | owner-decision | `CLAUDE.md:19 (Maquinaria exclusiva de Claude Code)` | CLAUDE.md anuncia solo /goal y ya hay 5 comandos: los otros 4 son indescubribles |
 | `f-89015e28` | low | owner-decision | `scripts/agent-hooks/session-start.sh + skill-reminder.sh + tools/harness-report.sh` | El literal de la ERE de FILL esta copiado en tres ficheros sin fuente compartida |
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
