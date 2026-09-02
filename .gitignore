@@ -3,6 +3,10 @@
 .agents/state/
 # (Los markers del reviewer-gate y el override_log viven en .agents/state/markers/,
 #  ya cubierto por la línea .agents/state/ de arriba — no dupliques rutas muertas aquí.)
+# El lock de mutación NO vive bajo state/ a propósito: `.claude/settings.json`
+# deniega `Edit(./.agents/state/**)` y ese deny alcanza a las escrituras por
+# Bash, así que el `reviewer` no podía declarar su mutación (f-e012fcce).
+.agents/mutation.lock
 
 # ─── Secretos (NUNCA al repo) ────────────────────────────────────────
 # <!-- FILL: añade aquí los archivos de secretos reales de tu stack -->

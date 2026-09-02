@@ -113,6 +113,21 @@ fail-open— lo encontró el design-review en una sola pasada.
   tocado, corre los tests con filtro (`bash tools/tests/run-tests.sh <token>`, ~2s) y mira si
   alguno muere. Si ninguno muere, ese es el hallazgo — y **restaura el archivo** antes de seguir.
   Ahí está tu mayor valor: el mutante que al autor no se le ocurrió.
+
+  **DECLARA la mutación antes de tocar nada, y retírala al acabar.** Mutas el árbol de
+  trabajo COMPARTIDO, y el hook `Stop` de la sesión que te invocó lee esos mismos archivos:
+  el 2026-09-01 eso causó tres bloqueos falsos —dos por un `syntax error` inexistente, leyendo
+  un archivo a media escritura, y uno por un mutante todavía puesto— (`f-e012fcce`).
+
+  ```bash
+  date -u +%FT%TZ > .agents/mutation.lock   # ANTES de mutar
+  # … muta, corre los tests con filtro, RESTAURA …
+  rm -f .agents/mutation.lock               # SIEMPRE, aunque falles
+  ```
+
+  Mientras el lock exista, `canon-enforce` no corre su CHECK 4 y lo dice. Si te lo dejas puesto
+  caduca solo a los 20 minutos: el gate vuelve a morder y como mucho habrás perdido su señal
+  en un turno. Si te olvidas de ponerlo, el gate bloqueará de más — molesto, pero nunca silencioso.
 - **Aserciones / DbC** (§5): las fronteras públicas NUEVAS expresan precondiciones/invariantes
   reales (sin cuotas ni efectos secundarios); input recuperable usa tipos/errores. Tú eres el
   mecanismo de esta regla — no existe detector automático a propósito (sería ruido): si una

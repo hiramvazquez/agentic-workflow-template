@@ -132,8 +132,56 @@ fi
 # DATOS y la doc bajo esas rutas —`findings/ledger.jsonl`, los `*-ratchet.json`,
 # los `.md`—: cambian en casi todos los turnos y no alteran ninguna lógica, así
 # que dispararían un aviso permanente. Un aviso que sale siempre no se lee.
+# ── El mutador DECLARA; nosotros no adivinamos (f-e012fcce) ─────────
+# CHECK 4 lee archivos y corre tests sobre el árbol. Si algo los cambia
+# MIENTRAS los mira, su veredicto no habla del trabajo del agente: habla de una
+# carrera. Pasó tres veces el 2026-09-01, todas con el sub-agente `reviewer`
+# escribiendo mutantes en el árbol compartido — cosa que AGENTS.md §5 le PIDE,
+# así que es estructural y va a repetirse.
+#
+# La primera versión de este guard INFERÍA la carrera comparando el árbol antes
+# y después. El reviewer la tumbó con dos repros, y las dos son correctas:
+#   · `git diff` sin pathspec mira el árbol ENTERO, así que un proceso en
+#     background tocando CUALQUIER archivo trackeado —`echo x >> otro.txt`—
+#     hacía desaparecer del veredicto un error de sintaxis REAL. Un bypass de
+#     canon-enforce a coste casi nulo, para el propio agente que debe constreñir.
+#   · Y para el caso que la motivaba no servía: mutar→probar→restaurar deja los
+#     dos extremos idénticos, así que el guard ni siquiera disparaba.
+#
+# Ahora el mutador lo DECLARA. Diferencia que decide el diseño: si el mutador
+# olvida el lock, CHECK 4 vuelve a bloquear de más — falla hacia el RUIDO, que
+# es recuperable. La inferencia fallaba hacia el SILENCIO, que no lo es.
+#
+# El TTL existe para que un mutador que muera dejando el lock no desactive
+# CHECK 4 para siempre: un lock rancio se ignora y el gate vuelve a morder.
+# NO vive en .agents/state/: `.claude/settings.json` deniega `Edit(./.agents/state/**)`
+# y ese deny alcanza tambien a las escrituras por Bash del sub-agente, asi que el
+# `reviewer` —el unico actor que debe poner este lock— NO PODIA crearlo. El
+# protocolo era codigo muerto para su usuario principal: una defensa anunciada
+# que no existe. Lo cazo el propio reviewer con tres sondas y un control.
+_CE_LOCK=".agents/mutation.lock"
+_CE_LOCK_TTL_SECS="${CANON_MUTATION_LOCK_TTL:-1200}"
+_ce_mutacion_declarada() {
+  [ -f "$_CE_LOCK" ] || return 1
+  local edad ahora mtime
+  ahora="$(date +%s 2>/dev/null)" || return 1
+  # `stat` difiere entre BSD (macOS) y GNU; se prueban las dos formas.
+  mtime="$(stat -f %m "$_CE_LOCK" 2>/dev/null || stat -c %Y "$_CE_LOCK" 2>/dev/null)" || return 1
+  [ -n "$mtime" ] || return 1
+  edad=$(( ahora - mtime ))
+  # `-lt`, no `-le`: así un TTL de 0 significa "el lock no vale nunca", que es
+  # un interruptor util para desactivar la supresion sin tocar codigo. Con
+  # `-le`, TTL=0 aceptaba una edad de 0 y el interruptor no apagaba nada.
+  [ "$edad" -lt "$_CE_LOCK_TTL_SECS" ]
+}
+
 HARNESS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(scripts/agent-hooks/|tools/).*\.(sh|conf|ya?ml)$' || true)"
-if [ -n "$HARNESS_CHANGED" ]; then
+if [ -n "$HARNESS_CHANGED" ] && _ce_mutacion_declarada; then
+  warn "CHECK 4 NO corrió: hay una mutación declarada en curso ($_CE_LOCK).
+   Un sub-agente está escribiendo mutantes en el árbol compartido (AGENTS.md §5 se lo pide al
+   \`reviewer\`), así que leer estos archivos ahora mediría la carrera, no tu cambio.
+   Cierra el turno otra vez cuando termine. La suite completa sigue corriendo en pre-push y en CI."
+elif [ -n "$HARNESS_CHANGED" ]; then
 
   # (a) Sintaxis — la rotura que deja al agente sin herramientas. Solo shell.
   while IFS= read -r f; do

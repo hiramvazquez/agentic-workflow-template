@@ -208,3 +208,91 @@ _case_datos_del_harness_no_avisan() {
   case "$out" in *"Sin test dirigido"*) echo "    los datos del harness generaron aviso; saldría en cada turno"; return 1 ;; esac
 }
 test_datos_del_harness_no_avisan() { _ce_sandbox_suite _case_datos_del_harness_no_avisan; }
+
+# ── El mutador DECLARA, no lo adivinamos (f-e012fcce) ────────────────
+# La primera version de este guard INFERIA la carrera comparando el arbol antes
+# y despues, y el reviewer la tumbo con dos repros: (1) `git diff` sin pathspec
+# miraba el arbol ENTERO, asi que tocar CUALQUIER archivo trackeado en
+# background borraba del veredicto un error de sintaxis REAL —un bypass—; y
+# (2) mutar+restaurar dentro de la ventana deja los dos extremos identicos, o
+# sea que no servia ni para el caso que la motivaba.
+#
+# Estos tests fijan las tres propiedades del diseno que la sustituyo.
+
+_ce_lock() { mkdir -p .agents; date -u +%FT%TZ > .agents/mutation.lock; }
+
+# ── 1. Con mutacion declarada, CHECK 4 no corre y lo DICE ───────────
+_case_lock_suspende_check4() {
+  printf '#!/usr/bin/env bash\nif [ 1 = 1 ; then echo roto\n' > scripts/agent-hooks/zzz-roto.sh
+  git add -A 2>/dev/null
+  _ce_lock
+  local out rc
+  out="$(echo '{}' | bash scripts/agent-hooks/canon-enforce.sh 2>&1 >/dev/null)"; rc=$?
+  [ "$rc" = "0" ] || { echo "    con mutacion declarada CHECK 4 bloqueo igual (exit=$rc)"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  case "$out" in *"mutación declarada"*) ;; *) echo "    suspendio CHECK 4 EN SILENCIO; eso esconde el hueco. salida: [$out]"; return 1 ;; esac
+}
+test_una_mutacion_declarada_suspende_check4_y_lo_dice() { _ce_sandbox _case_lock_suspende_check4; }
+
+# ── 2. Un lock RANCIO se ignora: no hay fail-open permanente ────────
+# Sin TTL, un mutador que muera dejando el lock desactiva CHECK 4 para siempre.
+_case_lock_rancio_se_ignora() {
+  printf '#!/usr/bin/env bash\nif [ 1 = 1 ; then echo roto\n' > scripts/agent-hooks/zzz-roto.sh
+  git add -A 2>/dev/null
+  _ce_lock
+  # Un lock de VERDAD viejo (2020), no el borde del TTL: es el escenario real
+  # —un mutador que murio y lo dejo puesto— y no depende de si la comparacion
+  # es -lt o -le.
+  touch -t 202001010000 .agents/mutation.lock
+  local rc
+  bash scripts/agent-hooks/canon-enforce.sh >/dev/null 2>&1 <<< '{}'; rc=$?
+  [ "$rc" = "2" ] || { echo "    un lock RANCIO siguio suspendiendo CHECK 4 (exit=$rc): fail-open permanente"; return 1; }
+}
+test_un_lock_rancio_no_desactiva_check4() { _ce_sandbox _case_lock_rancio_se_ignora; }
+
+# ── 3. Sin lock, todo sigue como antes: el gate muerde ──────────────
+# El guard no puede ser una amnistia. Sin declaracion, un .sh roto bloquea.
+_case_sin_lock_sigue_bloqueando() {
+  printf '#!/usr/bin/env bash\nif [ 1 = 1 ; then echo roto\n' > scripts/agent-hooks/zzz-roto.sh
+  git add -A 2>/dev/null
+  rm -f .agents/mutation.lock
+  local rc; rc="$(_run)"
+  [ "$rc" = "2" ] || { echo "    sin lock, un hook que no parsea dejo de bloquear (exit=$rc)"; return 1; }
+}
+test_sin_mutacion_declarada_check4_sigue_mordiendo() { _ce_sandbox _case_sin_lock_sigue_bloqueando; }
+
+# ── 4. El bypass que tumbo el diseno anterior ya NO funciona ────────
+# Repro exacto del reviewer: tocar un archivo trackeado CUALQUIERA durante la
+# ventana de CHECK 4 borraba del veredicto un error de sintaxis real. Con el
+# lock, ese toque no declara nada y el gate sigue mordiendo.
+_case_tocar_otro_archivo_no_es_un_bypass() {
+  printf 'contenido\n' > ajeno.txt
+  git add -A 2>/dev/null; git commit -qm "ajeno" 2>/dev/null
+  printf '#!/usr/bin/env bash\nif [ 1 = 1 ; then echo roto\n' > scripts/agent-hooks/zzz-roto.sh
+  git add -A 2>/dev/null
+  # El archivo ajeno queda SUCIO y sin stagear ANTES de arrancar: es la
+  # condicion exacta que el diseno por inferencia miraba (`git diff` no vacio).
+  # Deterministico a proposito — la primera version usaba un `sleep 0.4` en
+  # background y el mutante que reintroduce la inferencia SOBREVIVIA, porque la
+  # escritura podia llegar despues de que CHECK 4 ya hubiera evaluado. Un test
+  # con carrera para probar una carrera no prueba nada.
+  printf 'sucio\n' >> ajeno.txt
+  local rc; rc="$(_run)"
+  [ "$rc" = "2" ] || { echo "    un archivo AJENO sucio silencio un error real (exit=$rc): el bypass de la inferencia sigue vivo"; return 1; }
+}
+test_tocar_un_archivo_ajeno_no_silencia_check4() { _ce_sandbox _case_tocar_otro_archivo_no_es_un_bypass; }
+
+# ── El interruptor TTL=0 apaga la supresion DE VERDAD ───────────────
+# El mutante que sobrevivio a los cuatro tests anteriores: `-lt` -> `-le` en la
+# comparacion de edad. Con `-le`, un lock recien creado (edad 0) sigue valiendo
+# aunque el TTL sea 0, o sea que el interruptor documentado para apagar la
+# supresion no apagaba nada. `test_un_lock_rancio_no_desactiva_check4` usa un
+# timestamp de 2020, muy lejos del borde, y por eso no distinguia las dos.
+_case_ttl_cero_apaga_la_supresion() {
+  printf '#!/usr/bin/env bash\nif [ 1 = 1 ; then echo roto\n' > scripts/agent-hooks/zzz-roto.sh
+  git add -A 2>/dev/null
+  _ce_lock                       # lock RECIEN creado: edad 0, justo el borde
+  local rc
+  CANON_MUTATION_LOCK_TTL=0 bash scripts/agent-hooks/canon-enforce.sh >/dev/null 2>&1 <<< '{}'; rc=$?
+  [ "$rc" = "2" ] || { echo "    con TTL=0 la supresion siguio activa (exit=$rc): el interruptor no apaga nada"; return 1; }
+}
+test_ttl_cero_apaga_la_supresion_aunque_el_lock_sea_nuevo() { _ce_sandbox _case_ttl_cero_apaga_la_supresion; }
