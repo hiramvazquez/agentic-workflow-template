@@ -297,12 +297,29 @@ _case_sigchld_ignorado_no_apaga_el_gate() {
     'bash tools/agent-runner.sh run --backend fake --prompt-file prompt.md --cwd "$PWD" >/dev/null 2>&1; echo "$?" > rc-observado.txt'
   local rc; rc="$(cat rc-observado.txt 2>/dev/null)"
   [ "$rc" = 7 ] || { echo "    con SIGCHLD ignorado el runner devolvió [${rc:-nada}], no 7: falso verde"; return 1; }
-  # y bajo el mismo entorno hostil el timeout sigue siendo 124
-  printf '#!/usr/bin/env bash\nsleep 30\n' > lento-ign.sh; chmod +x lento-ign.sh
+  # y bajo el mismo entorno hostil el timeout sigue siendo 124.
+  #
+  # El fixture deja un BEACON antes de dormir. Sin el, este test no podia
+  # distinguir "el timeout no disparo" de "el backend murio solo y nunca hubo
+  # timeout que disparar", y culpaba al timeout de lo segundo: el gate 0a cayo
+  # asi en la corrida 9 de 30 con "el timeout devolvio [1], no 124" (run
+  # 33638863957). El 1 era el backend propagandose, no un watchdog roto — el
+  # camino de timeout del runner hace `raise SystemExit(124)` pase lo que pase
+  # en la limpieza, asi que nunca puede devolver 1.
+  #
+  # Los demas tests de timeout ya tenian beacon (`touch ready.marker` +
+  # `_espera_archivo`); este era el unico sin el. Se escribe desde el bash
+  # INTERIOR por la misma razon que `rc-observado.txt`: el wrapper de python
+  # corre con SIGCHLD=SIG_IGN y lo que observe desde fuera es basura.
+  rm -f lento-ready.marker
+  printf '#!/usr/bin/env bash\ntouch lento-ready.marker\nexec sleep 30\n' > lento-ign.sh; chmod +x lento-ign.sh
   FAKE_RUN_SCRIPT="$PWD/lento-ign.sh" python3 ignora-sigchld.py bash -c \
     'bash tools/agent-runner.sh run --backend fake --prompt-file prompt.md --cwd "$PWD" --timeout '"$_AR_TIMEOUT"' >/dev/null 2>&1; echo "$?" > rc-observado.txt'
   rc="$(cat rc-observado.txt 2>/dev/null)"
-  [ "$rc" = 124 ] || { echo "    con SIGCHLD ignorado el timeout devolvió [${rc:-nada}], no 124"; return 1; }
+  [ -e lento-ready.marker ] || {
+    echo "    el backend NO llegó a arrancar (sin beacon), así que no hubo timeout que medir — rc=[${rc:-nada}]"
+    echo "    Esto NO acusa al watchdog: es el fixture que murió antes. Ver f-wf01."; return 1; }
+  [ "$rc" = 124 ] || { echo "    con SIGCHLD ignorado el timeout devolvió [${rc:-nada}], no 124 (el backend SÍ arrancó)"; return 1; }
 }
 test_sigchld_ignorado_no_apaga_el_gate() { _ar_repo _case_sigchld_ignorado_no_apaga_el_gate; }
 

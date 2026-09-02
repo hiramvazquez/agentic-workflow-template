@@ -18,7 +18,6 @@ Abiertos: **70** · Cerrados: 162 · Total: 232
 | `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
-| `f-wf01-ci-macos-intermitente` | high | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky en macOS: senales, procesos hijo y timeouts. ~2 de 3 corridas en rojo |
 | `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
@@ -50,6 +49,7 @@ Abiertos: **70** · Cerrados: 162 · Total: 232
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
+| `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky en macOS: senales, procesos hijo y timeouts. ~2 de 3 corridas en rojo |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `tools/upgrade.sh + 8 tests + validate-harness.sh + capture-review-verdict.sh` | Archivos del harness sobre o rozando su propio hard limit de 400 lineas |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
 | `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
