@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 # Probes funcionales: presente no equivale a operativo.
 
+# Mismo motivo que `_AR_TIMEOUT` en test_agent_runner.sh (f-wf01): con 1s el
+# timeout compite contra el arranque de python + semgrep stub y gana la carrera
+# en runners pequeños. 2 de 3 corridas de CI en macOS morían aquí.
+_PROBE_TIMEOUT="${PROBE_TEST_TIMEOUT:-5}"
+# Y la cota se DERIVA del timeout, no se escribe a mano. Estaba en un `30`
+# literal calibrado al default de 5s: con PROBE_TEST_TIMEOUT=30 el test fallaba
+# en el borde (`30 -lt 30` es falso) aunque el watchdog cortara perfectamente.
+# Es exactamente el acoplamiento que este commit existe para eliminar, colado
+# dos lineas mas abajo — lo cazo el reviewer. El margen cubre TERM->gracia->KILL
+# y sigue MUY por debajo de los 60s que duerme el stub, que es lo que hace que
+# la cota siga significando "no espero al hijo".
+_PROBE_CORTE_MAX=$(( _PROBE_TIMEOUT + 25 ))
+
 _probe_sandbox() {
   local d; d="$(mktemp -d)"
   mkdir -p "$d/tools/semgrep/rules" "$d/tools/semgrep/fixtures" "$d/bin"
@@ -96,13 +109,16 @@ _case_json_seguro() {
 test_diagnostico_multilinea_sigue_siendo_json_valido() { _probe_sandbox _case_json_seguro; }
 
 _case_timeout_es_broken() {
-  stub bin/semgrep '#!/usr/bin/env bash\nsleep 10\n'
+  # 60s, no 10s: la cota de abajo prueba "no esperó al hijo", y con el sleep
+  # cerca del timeout esa prueba se vuelve una carrera. Con 60s el margen es
+  # enorme y la aserción sigue diciendo exactamente lo mismo.
+  stub bin/semgrep '#!/usr/bin/env bash\nsleep 60\n'
   local out rc start end
   start="$(date +%s)"
-  out="$(PROBE_TIMEOUT_SECS=1 bash tools/probe-capability.sh semgrep 2>/dev/null)"; rc=$?
+  out="$(PROBE_TIMEOUT_SECS="$_PROBE_TIMEOUT" bash tools/probe-capability.sh semgrep 2>/dev/null)"; rc=$?
   end="$(date +%s)"
   [ "$rc" = "1" ] || { echo "    timeout salió $rc: $out"; return 1; }
-  [ $((end-start)) -lt 5 ] || { echo "    el probe tardó $((end-start))s pese al timeout de 1s"; return 1; }
+  [ $((end-start)) -lt "$_PROBE_CORTE_MAX" ] || { echo "    el probe tardó $((end-start))s (timeout=${_PROBE_TIMEOUT}s, máx=${_PROBE_CORTE_MAX}s, el stub duerme 60)"; return 1; }
   assert_eq "broken" "$(_json_status "$out")" || return 1
   assert_contains "$out" 'timeout'
 }
@@ -110,7 +126,7 @@ test_probe_cuelgue_termina_como_broken() { _probe_sandbox _case_timeout_es_broke
 
 _case_timeout_mata_descendientes() {
   stub bin/semgrep "#!/usr/bin/env bash\n(trap '' TERM; sleep 30) &\necho \$! > probe-child.pid\nwait\n"
-  PROBE_TIMEOUT_SECS=1 bash tools/probe-capability.sh semgrep >/dev/null 2>&1 || true
+  PROBE_TIMEOUT_SECS="$_PROBE_TIMEOUT" bash tools/probe-capability.sh semgrep >/dev/null 2>&1 || true
   local child
   child="$(cat probe-child.pid 2>/dev/null || echo '')"
   [ -n "$child" ] || { echo "    el stub no registró su descendiente"; return 1; }

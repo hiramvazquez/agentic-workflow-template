@@ -1,5 +1,31 @@
 #!/usr/bin/env bash
 # Contratos separados run/review; el backend fake prueba el boundary sin proveedor.
+
+# ── Por qué el timeout de estos tests NO es 1 segundo (f-wf01) ──────
+# Con `--timeout 1`, el timeout compite contra el ARRANQUE de procesos: bash,
+# el runner, a veces python, y el fixture que aún tiene que poner su trap,
+# forkear un hijo y escribir `child.pid`. Si el timeout gana esa carrera, el
+# test falla por "el fixture no registró al descendiente" — que no es el bug
+# que dice buscar. Medido el 2026-09-01/02: en `macos-latest`, 2 de 3 corridas
+# de la suite completa morían en esta familia (test_timeout_no_deja_
+# descendientes, test_sigchld_ignorado_no_apaga_el_gate, y su primo
+# test_probe_cuelgue_termina_como_broken); en local con 10 núcleos, 0 de 12
+# aislados y 0 en la suite entera. No es un bug del runner: es una carrera del
+# test contra su propio andamiaje.
+#
+# El coste (unos segundos más por test que ejercita el timeout) es temporal en
+# el sentido que importa: son ESPERAS, y en cuanto el runner corra los archivos
+# en paralelo se solapan con los otros 64. El flaky, en cambio, es justo lo que
+# BLOQUEA esa paralelización — la familia sensible a presión de procesos ya
+# falla en serie. Pagar segundos aquí desbloquea minutos allí.
+_AR_TIMEOUT="${AR_TEST_TIMEOUT:-5}"
+# La cota de "el watchdog cortó a tiempo" se DERIVA del timeout, no se escribe
+# a mano. Estaba fijada en 5s cuando el timeout era 1s, así que subir el timeout
+# la invertía en silencio: `5 -lt 5` es falso y el test rojo culpaba al watchdog
+# de un cambio del propio test. El margen cubre la secuencia TERM→gracia→KILL.
+# Sigue probando lo que decía probar: los fixtures duermen 30s, así que cortar
+# en ~timeout+margen demuestra que el watchdog actuó y no que el hijo terminó.
+_AR_CORTE_MAX=$(( _AR_TIMEOUT + 5 ))
 _ar_repo() {
   local d; d="$(mktemp -d)"
   mkdir -p "$d/tools/agent-backends" "$d/scripts/agent-hooks/lib"
@@ -92,7 +118,7 @@ _case_timeout_propaga_124() {
   printf '#!/usr/bin/env bash\ntouch ready.marker\nexec sleep 30\n' > slow.sh; chmod +x slow.sh
   local runner started elapsed rc
   FAKE_RUN_SCRIPT="$PWD/slow.sh" bash tools/agent-runner.sh run --backend fake \
-    --prompt-file prompt.md --cwd "$PWD" --timeout 1 >/dev/null 2>runner-err.txt &
+    --prompt-file prompt.md --cwd "$PWD" --timeout "$_AR_TIMEOUT" >/dev/null 2>runner-err.txt &
   runner=$!
   _espera_archivo ready.marker "$runner" || true  # si murió antes de listo, el rc lo dirá
   started="$(date +%s)"
@@ -101,8 +127,8 @@ _case_timeout_propaga_124() {
   [ "$rc" = 124 ] || {
     echo "    timeout devolvió exit=$rc, no 124 · stderr del runner:"
     sed 's/^/      | /' runner-err.txt 2>/dev/null; return 1; }
-  [ "$elapsed" -lt 5 ] || {
-    echo "    ${elapsed}s DESPUÉS de arrancado el backend; el watchdog no corta a tiempo"; return 1; }
+  [ "$elapsed" -lt "$_AR_CORTE_MAX" ] || {
+    echo "    ${elapsed}s tras arrancar el backend (timeout=${_AR_TIMEOUT}s, máx=${_AR_CORTE_MAX}s); el watchdog no corta a tiempo"; return 1; }
 }
 test_timeout_corta_y_propaga_exit_124() { _ar_repo _case_timeout_propaga_124; }
 
@@ -111,7 +137,7 @@ _case_review_timeout_propaga_124() {
   printf '#!/usr/bin/env bash\ntouch review-ready.marker\nexec sleep 30\n' > slow-review.sh; chmod +x slow-review.sh
   local runner started elapsed rc
   FAKE_REVIEW_SCRIPT="$PWD/slow-review.sh" bash tools/agent-runner.sh review --backend fake \
-    --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout 1 \
+    --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout "$_AR_TIMEOUT" \
     >/dev/null 2>review-err.txt &
   runner=$!
   _espera_archivo review-ready.marker "$runner" || true
@@ -121,18 +147,21 @@ _case_review_timeout_propaga_124() {
   [ "$rc" = 124 ] || {
     echo "    timeout de review devolvió exit=$rc, no 124 · stderr del runner:"
     sed 's/^/      | /' review-err.txt 2>/dev/null; return 1; }
-  [ "$elapsed" -lt 5 ] || {
-    echo "    review: ${elapsed}s después de arrancado el backend; el watchdog no corta"; return 1; }
+  [ "$elapsed" -lt "$_AR_CORTE_MAX" ] || {
+    echo "    review: ${elapsed}s tras arrancar el backend (timeout=${_AR_TIMEOUT}s, máx=${_AR_CORTE_MAX}s); el watchdog no corta a tiempo"; return 1; }
 }
 test_review_tambien_respeta_timeout() { _ar_repo _case_review_timeout_propaga_124; }
 
 _proceso_sigue_vivo() { kill -0 "$1" 2>/dev/null; }
 
 _espera_proceso_muerto() {
+  # 10s, no 2s: al proceso se le manda TERM, se le da gracia y luego KILL, y
+  # en un runner cargado esa secuencia no cabe en dos segundos. Esperar de menos
+  # aquí produce "quedó vivo el descendiente" sobre un proceso que sí murió.
   local pid="$1" i
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  for i in $(seq 1 50); do
     _proceso_sigue_vivo "$pid" || return 0
-    sleep 0.1
+    sleep 0.2
   done
   return 1
 }
@@ -141,7 +170,7 @@ _case_timeout_mata_descendientes() {
   printf '#!/usr/bin/env bash\ntrap "" TERM HUP\n( trap "" TERM HUP; sleep 30 ) &\necho "$!" > child.pid\nwait\n' \
     > tree.sh; chmod +x tree.sh
   FAKE_RUN_SCRIPT="$PWD/tree.sh" bash tools/agent-runner.sh run --backend fake \
-    --prompt-file prompt.md --cwd "$PWD" --timeout 1 >/dev/null 2>&1
+    --prompt-file prompt.md --cwd "$PWD" --timeout "$_AR_TIMEOUT" >/dev/null 2>&1
   local rc=$? child
   [ "$rc" = 124 ] || { echo "    timeout del árbol devolvió $rc"; return 1; }
   child="$(cat child.pid 2>/dev/null)"
@@ -254,7 +283,7 @@ _case_sigchld_ignorado_no_apaga_el_gate() {
   # y bajo el mismo entorno hostil el timeout sigue siendo 124
   printf '#!/usr/bin/env bash\nsleep 30\n' > lento-ign.sh; chmod +x lento-ign.sh
   FAKE_RUN_SCRIPT="$PWD/lento-ign.sh" python3 ignora-sigchld.py bash -c \
-    'bash tools/agent-runner.sh run --backend fake --prompt-file prompt.md --cwd "$PWD" --timeout 1 >/dev/null 2>&1; echo "$?" > rc-observado.txt'
+    'bash tools/agent-runner.sh run --backend fake --prompt-file prompt.md --cwd "$PWD" --timeout '"$_AR_TIMEOUT"' >/dev/null 2>&1; echo "$?" > rc-observado.txt'
   rc="$(cat rc-observado.txt 2>/dev/null)"
   [ "$rc" = 124 ] || { echo "    con SIGCHLD ignorado el timeout devolvió [${rc:-nada}], no 124"; return 1; }
 }
@@ -288,7 +317,7 @@ _case_review_timeout_mata_descendientes() {
   printf '#!/usr/bin/env bash\ntrap "" TERM HUP\n( trap "" TERM HUP; sleep 30 ) &\necho "$!" > review-tree-child.pid\nwait\n' \
     > review-tree.sh; chmod +x review-tree.sh
   FAKE_REVIEW_SCRIPT="$PWD/review-tree.sh" bash tools/agent-runner.sh review --backend fake \
-    --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout 1 >/dev/null 2>&1
+    --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout "$_AR_TIMEOUT" >/dev/null 2>&1
   local rc=$? child
   [ "$rc" = 124 ] || { echo "    timeout review del árbol devolvió $rc"; return 1; }
   child="$(cat review-tree-child.pid 2>/dev/null)"
@@ -314,7 +343,7 @@ _case_backend_lento_en_instalar_sesion_no_escapa() {
     > tarde.sh; chmod +x tarde.sh
   local rc lider
   AR_TEST_SETSID_DELAY=3 FAKE_RUN_SCRIPT="$PWD/tarde.sh" bash tools/agent-runner.sh run \
-    --backend fake --prompt-file prompt.md --cwd "$PWD" --timeout 1 >/dev/null 2>&1
+    --backend fake --prompt-file prompt.md --cwd "$PWD" --timeout "$_AR_TIMEOUT" >/dev/null 2>&1
   rc=$?
   [ "$rc" = 124 ] || { echo "    backend lento en instalarse devolvió exit=$rc, no 124"; return 1; }
   [ -e tarde.marker ] || { echo "    el backend nunca ejecutó: el reloj del watchdog corrió DURANTE la instalación"; return 1; }
