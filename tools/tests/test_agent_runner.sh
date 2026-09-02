@@ -110,6 +110,27 @@ _espera_archivo() {
   return 1
 }
 
+# Igual que el de arriba pero exigiendo CONTENIDO, para el fixture que escribe
+# el pid de su descendiente: crea el archivo y escribe despues, asi que un `-e`
+# puede leerlo vacio y `cat` devolver nada.
+#
+# 15s, no 2s. Los dos tests de cancelacion tenian su propio bucle de
+# `for i in 1..20; sleep 0.1` escrito a mano —2 segundos— en vez de usar este
+# helper, asi que el arreglo de f-wf01 no los alcanzo. El gate 0a lo destapo en
+# la corrida 4 de 30: "el fixture no arranco", que NO es el bug que el test dice
+# buscar sino la misma carrera contra el arranque de procesos. En un runner
+# cargado, poner el trap + forkear + escribir el pid no cabe en dos segundos.
+_espera_pid_de_hijo() {  # _espera_pid_de_hijo <archivo> <pid-del-runner>
+  local i=0
+  while [ "$i" -lt 150 ]; do
+    [ -s "$1" ] && return 0
+    kill -0 "$2" 2>/dev/null || return 1
+    sleep 0.1
+    i=$((i+1))
+  done
+  return 1
+}
+
 _case_timeout_propaga_124() {
   # El fixture toca ready.marker ANTES de dormir: el reloj del test arranca
   # con el backend ya vivo, no con el spawn del runner. Al fallar se imprime
@@ -187,12 +208,10 @@ _case_cancelacion_propaga_y_limpia() {
     > cancel-tree.sh; chmod +x cancel-tree.sh
   FAKE_RUN_SCRIPT="$PWD/cancel-tree.sh" bash tools/agent-runner.sh run --backend fake \
     --prompt-file prompt.md --cwd "$PWD" --timeout 20 >/dev/null 2>&1 &
-  local runner=$! child='' i rc
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    [ -s cancel-child.pid ] && { child="$(cat cancel-child.pid)"; break; }
-    sleep 0.1
-  done
-  [ -n "$child" ] || { kill -9 "$runner" 2>/dev/null; echo "    el fixture no arrancó"; return 1; }
+  local runner=$! child='' rc
+  _espera_pid_de_hijo cancel-child.pid "$runner" \
+    || { kill -9 "$runner" 2>/dev/null; echo "    el fixture no arrancó (o el runner murió antes)"; return 1; }
+  child="$(cat cancel-child.pid)"
   kill -TERM "$runner" 2>/dev/null
   wait "$runner"; rc=$?
   [ "$rc" = 143 ] || { echo "    cancelación devolvió $rc, no 143"; return 1; }
@@ -209,12 +228,10 @@ _case_cancelacion_review_propaga_y_limpia() {
   FAKE_REVIEW_SCRIPT="$PWD/cancel-review-tree.sh" bash tools/agent-runner.sh review --backend fake \
     --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout 20 \
     >/dev/null 2>&1 &
-  local runner=$! child='' i rc
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    [ -s review-cancel-child.pid ] && { child="$(cat review-cancel-child.pid)"; break; }
-    sleep 0.1
-  done
-  [ -n "$child" ] || { kill -9 "$runner" 2>/dev/null; echo "    el fixture review no arrancó"; return 1; }
+  local runner=$! child='' rc
+  _espera_pid_de_hijo review-cancel-child.pid "$runner" \
+    || { kill -9 "$runner" 2>/dev/null; echo "    el fixture review no arrancó (o el runner murió antes)"; return 1; }
+  child="$(cat review-cancel-child.pid)"
   kill -TERM "$runner" 2>/dev/null
   wait "$runner"; rc=$?
   [ "$rc" = 143 ] || { echo "    cancelación review devolvió $rc, no 143"; return 1; }
