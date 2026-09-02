@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **70** · Cerrados: 162 · Total: 232
+Abiertos: **71** · Cerrados: 164 · Total: 235
 
 ## Abiertos
 
@@ -14,6 +14,7 @@ Abiertos: **70** · Cerrados: 162 · Total: 232
 | `f-1caf51c6` | high | owner-decision | `tools/check-ring3.sh:169 (rama timeout) + tools/tests/test_ring3.sh` | check-ring3: _con_limite bifurca por plataforma y la rama de CI no escala a KILL, asi que el limite no limita en Linux |
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
+| `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
 | `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
@@ -246,3 +247,5 @@ Abiertos: **70** · Cerrados: 162 · Total: 232
 | `f-cbf21371` | fixed | Arreglado en d98d0a8. Los dos avisos usan ahora _SST_FILL_ERE='<!--[[:space:]]*FILL([[:space:]:>]|-- |
 | `f-e2a65344` | fixed | CHECK 4 deja de correr run-tests.sh entero. Ahora: (a) bash -n sobre cada .sh tocado —la rotura cata |
 | `f-4b971920` | fixed | Los tres workflows instalan ahora semgrep + gitleaks antes de la suite (harness-ci job suite, harnes |
+| `f-6cc1f3b4` | fixed | reviewer-gate.sh extrae REVIEWER_OVERRIDE/_REASON del PREFIJO VAR=val del segmento que es un git com |
+| `f-7a8d1fbe` | fixed | reviewer-gate.sh une las continuaciones de linea (_join_cont, un awk que pega la linea siguiente cua |
