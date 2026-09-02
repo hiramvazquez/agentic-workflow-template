@@ -20,9 +20,17 @@
 #   - líneas de hallazgo con prefijo ❌ (error) o ⚠️ (warning)
 #   - última línea EXACTA:  DRIFT_SUMMARY errors=<N> warns=<M>
 set -uo pipefail
+# El lib se resuelve desde la UBICACION de este script, antes del `cd`: tomarlo
+# relativo a la raiz del repo dejaria de encontrarlo en cuanto el harness viva
+# en un subdirectorio (la leccion de f-6b761f06).
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init check-drift
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
-ERRORS=0; WARNS=0
+ERRORS=0; WARNS=0; TARGETS=0
 err() { echo "❌ $1"; ERRORS=$((ERRORS+1)); }
 warn(){ echo "⚠️  $1"; WARNS=$((WARNS+1)); }
 
@@ -63,6 +71,7 @@ HARD=${DRIFT_FILE_HARD:-400}
 if [ -n "$EXISTING" ]; then
   while IFS= read -r f; do
     [ -z "$f" ] && continue
+    TARGETS=$((TARGETS+1))
     n=$(wc -l < "$f" 2>/dev/null | tr -d ' ')
     [ "${n:-0}" -gt "$HARD" ] && err "Archivo > $HARD líneas: $f ($n líneas)"
   done < <(find $EXISTING -type f \
@@ -113,6 +122,10 @@ fi
 # -->
 
 echo ""
+# `targets` son los archivos de codigo que este agregado llego a mirar. Un
+# DRIFT_SUMMARY con errors=0 y targets=0 no es "el proyecto esta limpio": es
+# "no habia nada que medir", y ese cero alimenta un trinquete que solo baja.
+command -v detector_targets >/dev/null 2>&1 && detector_targets "$TARGETS"
 echo "DRIFT_SUMMARY errors=$ERRORS warns=$WARNS"
 # exit 0 siempre: el GATE lo aplica drift-ratchet (delta), no este script.
 exit 0

@@ -14,16 +14,32 @@
 #   bash tools/check-layers.sh          # reporta y sale 1 si hay violaciones
 #   DRIFT_SRC_DIRS="app lib" bash …     # acota dónde buscar
 set -uo pipefail
+# El lib se resuelve desde la UBICACION de este script, antes del `cd`: tomarlo
+# relativo a la raiz del repo dejaria de encontrarlo en cuanto el harness viva
+# en un subdirectorio — la misma clase de fallo que este detector protagoniza.
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init check-layers
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 CONF="${LAYERS_CONF:-tools/layers.conf}"
 ERRORS=0
+FILES=0
 
+# Las DOS salidas de abajo son las que hacian indistinguible "mire y esta
+# limpio" de "no tenia nada que mirar". Siguen saliendo 0 —cambiar eso es un
+# cambio de contrato que va aparte (f-6b761f06)— pero ya no son mudas: la
+# primera registra targets:null (sin conf, ni siquiera se que es un objetivo) y
+# la segunda targets:0 (se contarlos y hay cero). Son estados distintos.
 [ -f "$CONF" ] || { echo "LAYERS_SUMMARY errors=0"; exit 0; }
 
 SRC_DIRS="${DRIFT_SRC_DIRS:-ios android web src app lib Sources}"
 EXISTING=""; for d in $SRC_DIRS; do [ -d "$d" ] && EXISTING="$EXISTING $d"; done
-[ -z "$EXISTING" ] && { echo "LAYERS_SUMMARY errors=0"; exit 0; }
+[ -z "$EXISTING" ] && {
+  command -v detector_targets >/dev/null 2>&1 && detector_targets 0
+  echo "LAYERS_SUMMARY errors=0"; exit 0; }
 
 # ── Extracción de imports REALES ────────────────────────────────────
 # Solo cuenta una directiva de import al INICIO de línea. Un `// import X`
@@ -63,6 +79,7 @@ extract_imports() {
 # ── Recorrido: por cada archivo, contra cada regla que aplique ──────
 while IFS= read -r file; do
   [ -z "$file" ] && continue
+  FILES=$((FILES+1))
   rel="./${file#./}"
   imports=""
 
@@ -96,6 +113,7 @@ done < <(find $EXISTING -type f \
               -o -name '*.py' -o -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' \) \
            2>/dev/null)
 
+command -v detector_targets >/dev/null 2>&1 && detector_targets "$FILES"
 echo "LAYERS_SUMMARY errors=$ERRORS"
 [ "$ERRORS" -eq 0 ] && exit 0
 echo "   Las capas son un contrato (AGENTS.md §3). Invierte la dependencia o mueve el archivo."

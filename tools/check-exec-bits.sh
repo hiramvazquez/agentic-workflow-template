@@ -37,6 +37,14 @@
 # Contrato: exit 0 = todo correcto (o reparado en --fix) · 1 = hay .sh sin +x.
 # Contrato de stdout:  EXECBITS_SUMMARY missing=<N>
 set -uo pipefail
+# El lib se resuelve desde la UBICACION de este script, antes del `cd`: tomarlo
+# relativo a la raiz del repo dejaria de encontrarlo en cuanto el harness viva
+# en un subdirectorio (la leccion de f-6b761f06).
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init check-exec-bits
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 MODE="${1:---staged}"
@@ -49,15 +57,19 @@ _candidates() {
   fi
 }
 
-BAD=""
+BAD=""; TARGETS=0
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   [ -f "$f" ] || continue
+  TARGETS=$((TARGETS+1))
   case "$f" in */lib/*) continue ;; esac   # se sourcean, no se ejecutan
   [ -x "$f" ] || BAD="${BAD}${f}"$'\n'
 done < <(_candidates)
 
 N="$(printf '%s' "$BAD" | grep -c . || true)"
+# En --staged lo normal es targets=0 (el commit no toca ningun .sh) y eso es
+# correcto; el dato sirve para no leer ese missing=0 como "los revise todos".
+command -v detector_targets >/dev/null 2>&1 && detector_targets "$TARGETS"
 echo "EXECBITS_SUMMARY missing=${N:-0}"
 [ "${N:-0}" -eq 0 ] && exit 0
 

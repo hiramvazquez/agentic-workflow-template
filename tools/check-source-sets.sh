@@ -71,6 +71,12 @@
 # estado, que es lo que la fase 2 de este harness ya hace con las capacidades:
 # `no-aplica` y `operational` son hechos distintos y se dicen distinto.
 set -uo pipefail
+# Lib resuelto desde la UBICACION del script, antes del `cd` (leccion f-6b761f06).
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init check-source-sets
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 # Sin esto, semgrep intenta un version-check de red al arrancar y en redes
@@ -97,7 +103,14 @@ export SEMGREP_SEND_METRICS=off
 # EXIT no toca la disposición de señales, así que la terminabilidad se conserva
 # y la limpieza es best-effort, que es lo correcto para un fichero de /tmp.
 _SS_TMP_REGLA=""; _SS_TMP_SALIDA=""
-trap 'rm -f "$_SS_TMP_REGLA" "$_SS_TMP_SALIDA" 2>/dev/null' EXIT
+# Registrada, no un `trap ... EXIT` propio: ese trap pisaba el del registro de
+# ejecucion (que se instala arriba del todo para cubrir las salidas tempranas) y
+# dejaba mudo a este detector. Fallback identico si el lib no esta.
+if command -v detector_run_cleanup >/dev/null 2>&1; then
+  detector_run_cleanup 'rm -f "$_SS_TMP_REGLA" "$_SS_TMP_SALIDA" 2>/dev/null'
+else
+  trap 'rm -f "$_SS_TMP_REGLA" "$_SS_TMP_SALIDA" 2>/dev/null' EXIT
+fi
 
 CONF="${SOURCE_SETS_CONF:-tools/source-sets.conf}"
 
@@ -138,6 +151,10 @@ COMMON="$(find . -type d -name commonMain -not -path './.git/*' 2>/dev/null)"
 # con `while read`; al pasar a lista había que conservar esa propiedad.
 COMMON_DIRS=()
 while IFS= read -r _d; do [ -n "$_d" ] && COMMON_DIRS+=("$_d"); done <<< "$COMMON"
+# `targets` son los source sets commonMain examinados. "no-aplica" con 0 y un
+# "limpio" con 0 eran la misma linea de salida; ahora se distinguen en el
+# registro sin tocar el contrato de stdout.
+command -v detector_targets >/dev/null 2>&1 && detector_targets "${#COMMON_DIRS[@]}"
 if [ -z "$COMMON" ]; then
   echo "SOURCE_SETS estado=no-aplica violaciones=0"
   echo "ℹ️  check-source-sets: este repo no tiene source sets de KMP (sin commonMain/)."

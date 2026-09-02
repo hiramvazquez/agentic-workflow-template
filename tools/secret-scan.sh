@@ -12,17 +12,38 @@
 # Si gitleaks no está instalado: avisa cómo instalarlo y NO bloquea (failure-open
 # en local; en CI deberías hacerlo obligatorio — ver ci/run-gates.sh).
 set -uo pipefail
+# Lib resuelto desde la UBICACION del script, antes del `cd` (leccion f-6b761f06).
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init secret-scan
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 MODE="${1:---staged}"
 
+# Cuando gitleaks no esta, este detector examina CERO ficheros y sale 0 (una
+# decision documentada mas abajo: con exit 3 moria el primer push de todo
+# adoptante). El registro de ejecucion deja ese estado visible sin tocar el
+# contrato: `targets:0, exit:0` no se confunde con un scan limpio de verdad.
 if ! command -v gitleaks >/dev/null 2>&1; then
+  command -v detector_targets >/dev/null 2>&1 && detector_targets 0
   cat >&2 <<'EOF'
 ⚠️  gitleaks no está instalado — secret-scan OMITIDO en local.
    Instálalo:  brew install gitleaks   |   https://github.com/gitleaks/gitleaks
    (En CI el scan SÍ es obligatorio; ver ci/run-gates.sh.)
 EOF
   exit 0
+fi
+
+# En --staged si sabemos contra cuantos ficheros se corre; en los demas modos
+# el alcance lo decide gitleaks (historial, rango) y se deja sin declarar en vez
+# de inventar un numero.
+if [ "$MODE" = "--staged" ] && command -v detector_targets >/dev/null 2>&1; then
+  # `grep -c .` sale 1 con entrada vacia, asi que el `|| echo 0` de la primera
+  # version anadia una SEGUNDA linea y el helper recibia "0\n0" — ni un numero:
+  # targets quedaba en null justo en el caso mas comun. `wc -l` cuenta y sale 0.
+  detector_targets "$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | wc -l | tr -d ' ')"
 fi
 
 BASE=""; [ -f .gitleaks-baseline.json ] && BASE="--baseline-path .gitleaks-baseline.json"

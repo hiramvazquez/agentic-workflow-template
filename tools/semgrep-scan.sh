@@ -32,6 +32,12 @@
 #
 # Contrato de stdout:  SEMGREP_SUMMARY errors=<N> warns=<M>
 set -uo pipefail
+# Lib resuelto desde la UBICACION del script, antes del `cd` (leccion f-6b761f06).
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init semgrep-scan
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
 # Sin esto, semgrep intenta un version-check de red al arrancar y en redes
@@ -83,12 +89,19 @@ _staged_targets() {
   done < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
 }
 
+# En los modos que NO son --staged, `TARGETS` queda vacio a proposito y semgrep
+# decide el alcance sobre el repo entero. Por eso ahi el registro de ejecucion
+# deja `targets:null`: "no lo declare" es la verdad, y poner un numero seria
+# inventar la medicion que este registro existe para hacer honesta.
 TARGETS=()
 if [ "$MODE" = "--staged" ]; then
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     TARGETS+=("$f")
   done < <(_staged_targets)
+  # Antes del corte por lista vacia: un scan sin objetivos tiene que registrarse
+  # como targets=0, que es justo el estado que su SUMMARY en cero no distingue.
+  command -v detector_targets >/dev/null 2>&1 && detector_targets "${#TARGETS[@]}"
   [ ${#TARGETS[@]} -eq 0 ] && { echo "SEMGREP_SUMMARY errors=0 warns=0"; exit 0; }
 fi
 TARGET_SNAPSHOT="$(printf '%s\n' "${TARGETS[@]}")"
@@ -122,12 +135,21 @@ CURRENT_TARGET_SNAPSHOT="$(_staged_targets)"
 if [ "$MODE" = "--staged" ] && [ "$CURRENT_TARGET_SNAPSHOT" != "$TARGET_SNAPSHOT" ]; then
   TARGETS=()
   while IFS= read -r f; do [ -n "$f" ] && TARGETS+=("$f"); done <<< "$CURRENT_TARGET_SNAPSHOT"
+  command -v detector_targets >/dev/null 2>&1 && detector_targets "${#TARGETS[@]}"
   TARGET_SNAPSHOT="$CURRENT_TARGET_SNAPSHOT"
   CACHE_ALLOWED=0
   CACHE_KEY=""
 fi
 
-OUT="$(mktemp)"; trap 'rm -f "$OUT"' EXIT
+OUT="$(mktemp)"
+# La limpieza se REGISTRA en vez de instalar un `trap ... EXIT` propio: ese trap
+# pisaba el del registro de ejecucion y dejaba mudo a este detector. El
+# fallback conserva el comportamiento exacto si el lib no esta.
+if command -v detector_run_cleanup >/dev/null 2>&1; then
+  detector_run_cleanup 'rm -f "$OUT"'
+else
+  trap 'rm -f "$OUT"' EXIT
+fi
 
 # --error hace que semgrep salga !=0 con findings; lo gestionamos nosotros.
 # `--no-git-ignore` a propósito (queremos ver archivos no trackeados), pero

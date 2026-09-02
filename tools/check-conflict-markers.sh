@@ -19,16 +19,24 @@
 #
 # Contrato §14.3: exit 0 = limpio · 1 = marcadores commiteándose.
 set -uo pipefail
+# Lib resuelto desde la UBICACION del script, antes del `cd` (leccion f-6b761f06).
+_DET_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/detector-run.sh"
+# shellcheck source=tools/lib/detector-run.sh
+. "$_DET_LIB" 2>/dev/null || true
+command -v detector_run_init >/dev/null 2>&1 && detector_run_init check-conflict-markers
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
-BAD=""
+BAD=""; TARGETS=0
 while IFS= read -r f; do
   [ -z "$f" ] && continue
+  TARGETS=$((TARGETS+1))
   if git show ":$f" 2>/dev/null | grep -qE '^<{7} ' \
      && git show ":$f" 2>/dev/null | grep -qE '^>{7} '; then
     BAD="${BAD}${f}"$'\n'
   fi
 done < <(git diff --cached --name-only --diff-filter=ACM)
+command -v detector_targets >/dev/null 2>&1 && detector_targets "$TARGETS"
 
 if [ -z "$BAD" ]; then
   echo "✅ conflict-markers: sin marcadores de conflicto en lo staged."
