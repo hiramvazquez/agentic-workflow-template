@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **71** · Cerrados: 164 · Total: 235
+Abiertos: **70** · Cerrados: 165 · Total: 235
 
 ## Abiertos
 
@@ -16,7 +16,6 @@ Abiertos: **71** · Cerrados: 164 · Total: 235
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
-| `f-787568d2` | high | owner-decision | `.github/workflows + gobierno del harness` | El Anillo 3 no ejecuta desde que se agoto el presupuesto de GitHub Actions — el backstop anunciado no existe |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
@@ -217,6 +216,7 @@ Abiertos: **71** · Cerrados: 164 · Total: 235
 | `f-a6d21f84` | fixed | (1) El contrato pasa a estar escrito al reves de como estaba: la ruta SI puede traer tabuladores, lo |
 | `f-2e94db73` | fixed | (1) Dos tests end-to-end nuevos que pasan por los hooks REALES con un tabulador en el nombre: test_e |
 | `f-fb03e5d1` | fixed | writes_mark barre los temporales al dejar la marca, con 'find -mmin +10 -delete'. El umbral NO es co |
+| `f-787568d2` | fixed | OBSOLETO por cambio de estado, verificado el 2026-09-02: el repo se hizo publico, los runners volvie |
 | `f-bedac76b` | fixed | Arreglado en el mismo cambio. check-ring3.sh ya no acepta un workflow manual-only: exige disparador  |
 | `f-54470c4d` | fixed | PRD 0007 v2.2 (2026-08-25): la evidencia TDD de 1b deja de exigir un commit rojo imposible — la veri |
 | `f-8928fa5b` | fixed | PRD 0007 v2.2 (2026-08-25): la fase 3 entrega DOS verticales autonomas consecutivas, el modulo de re |

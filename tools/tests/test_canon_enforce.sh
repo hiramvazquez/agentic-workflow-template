@@ -249,6 +249,35 @@ _case_lock_rancio_se_ignora() {
 }
 test_un_lock_rancio_no_desactiva_check4() { _ce_sandbox _case_lock_rancio_se_ignora; }
 
+# ── 2b. Un mtime que no es un numero falla CERRADO ──────────────────
+# Lo pidio el review con un mutante que sobrevivia: quitar la validacion
+# numerica dejaba los 21 tests en verde. El caso no es teorico — es exactamente
+# lo que hacia GNU antes del arreglo del orden: `stat -f %m` devolvia el PUNTO
+# DE MONTAJE ("/") con exit 0, asi que la aritmetica del TTL operaba sobre
+# basura. Con `set -u` y `[ "$edad" -lt ... ]` sobre un no-numero, bash da error
+# y el resultado depende del azar del entorno; lo que NO puede pasar es que
+# suspenda CHECK 4, porque eso es fail-open silencioso.
+#
+# El stub de `stat` se pone DELANTE en el PATH: es la unica forma de reproducir
+# la semantica de GNU en un macOS sin fingir el bug con un mock del propio
+# canon-enforce.
+_case_mtime_no_numerico_falla_cerrado() {
+  printf '#!/usr/bin/env bash\nif [ 1 = 1 ; then echo roto\n' > scripts/agent-hooks/zzz-roto.sh
+  git add -A 2>/dev/null
+  _ce_lock
+  mkdir -p stubbin
+  printf '#!/usr/bin/env bash\necho "/"\nexit 0\n' > stubbin/stat
+  chmod +x stubbin/stat
+  local rc
+  PATH="$PWD/stubbin:$PATH" bash scripts/agent-hooks/canon-enforce.sh >/dev/null 2>&1 <<< '{}'; rc=$?
+  [ "$rc" = "2" ] || {
+    echo "    con un mtime NO NUMERICO el lock siguio suspendiendo CHECK 4 (exit=$rc)"
+    echo "    Es fail-open silencioso: exactamente lo que hacia GNU devolviendo el"
+    echo "    punto de montaje con exit 0 antes de arreglar el orden del stat."
+    return 1; }
+}
+test_un_mtime_no_numerico_no_desactiva_check4() { _ce_sandbox _case_mtime_no_numerico_falla_cerrado; }
+
 # ── 3. Sin lock, todo sigue como antes: el gate muerde ──────────────
 # El guard no puede ser una amnistia. Sin declaracion, un .sh roto bloquea.
 _case_sin_lock_sigue_bloqueando() {

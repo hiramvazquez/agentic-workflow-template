@@ -132,30 +132,44 @@ test_los_detectores_emiten_su_contrato() {
 # a pasar es la ley de siempre: una regla implementada tres veces diverge. Esto
 # la convierte en mecanica.
 test_stat_lee_gnu_primero_y_bsd_despues() {
+  # ── SEGUNDA VERSION. La primera cerro un finding sin poder detectar ─
+  # `f-stat-f-orden-invertido` se cerro como "fixed" con la resolucion "Detector
+  # nuevo que BARRE TODO EL REPO". No barria: miraba `tools/tests/*.sh` y nada
+  # mas. Y aunque hubiera mirado, su desnudado de comillas rompia el caso real:
+  # ante `mtime="$(stat -f %m "$f" || ...)"` el `s/"[^"]*"//g` empareja de
+  # izquierda a derecha, se traga `$(stat -f %m ` dentro del primer par y deja
+  # `mtime=$f$f` — sin rastro de `stat`. El 2026-09-02 la MISMA trampa volvio a
+  # publicar main en rojo desde `scripts/agent-hooks/canon-enforce.sh`, un
+  # fichero que ese detector no leia y en una forma que no sabia leer.
+  #
+  # O sea: cuarta aparicion, y la primera en la que el detector que debia
+  # impedirla ya existia. Una resolucion de ledger que afirma cobertura es tan
+  # peligrosa como un comentario que la afirma (f-74be77fe).
+  #
+  # Esta version cambia las dos cosas:
+  #   · Mira scripts/ tools/ ci/ ENTEROS, tests incluidos.
+  #   · No desnuda comillas. La regla es posicional y no necesita parsear: si en
+  #     una linea aparece `stat -f`, tiene que haber un `stat -c` ANTES en esa
+  #     misma linea. Eso caza tambien el fallback partido en dos sentencias
+  #     —la evasion que encontro el review— porque la linea del `stat -f`
+  #     tampoco lleva un `-c` delante.
+  #
+  # Exencion unica y declarada: ESTE fichero, que imprime la forma incorrecta en
+  # su propio mensaje de error. Es la exencion minima; la version anterior
+  # intento ser lista con las comillas y ahi es donde perdio el caso real.
   local hits
-  # Se salta lo que es TEXTO, no sintaxis, por dos vias:
-  #   · los COMENTARIOS — los dos archivos que documentan esta trampa la NOMBRAN
-  #     en prosa ("`stat -f` de GNU NO falla").
-  #   · las CADENAS ENTRECOMILLADAS — este mismo test imprime la forma incorrecta
-  #     en su mensaje de error, y se caza a si mismo en la primera pasada. Sexta
-  #     vez que pasa en este repo, y aqui la exencion SI es legitima: quien
-  #     dictamina que lo entrecomillado es dato no es nuestro criterio, es el
-  #     parser de bash. La forma real `stat -f '%Lp' "$f"` sobrevive al desnudado
-  #     porque el flag va FUERA de las comillas; solo el formato va dentro.
-  hits="$(_shell_files "$PROJECT_ROOT"/tools/tests/*.sh | xargs perl -ne '
-      next if /^\s*#/;
-      $probe = $_; $probe =~ s/#.*$//;
-      $probe =~ s/"[^"]*"//g; $probe =~ s/\x27[^\x27]*\x27//g;
-      print "$ARGV:$.: $_" if $probe =~ /stat\s+-f/ && $probe !~ /stat\s+-c.*stat\s+-f/;
-      close ARGV if eof;
-    ' 2>/dev/null)"
+  hits="$(find "$PROJECT_ROOT/scripts" "$PROJECT_ROOT/tools" "$PROJECT_ROOT/ci" \
+            -name '*.sh' -not -name 'test_shell_hygiene.sh' 2>/dev/null \
+          | xargs grep -nE 'stat[[:space:]]+-f' 2>/dev/null \
+          | grep -vE ':[0-9]+:[[:space:]]*#' \
+          | grep -vE 'stat[[:space:]]+-c.*stat[[:space:]]+-f' || true)"
   [ -z "$hits" ] && return 0
   echo "    \`stat -f\` sin un \`stat -c\` DELANTE en la misma linea:"
-  printf '%s\n' "$hits" | sed 's/^/      /'
+  printf '%s\n' "$hits" | sed 's|^.*/||' | sed 's/^/      /'
   echo "    En GNU, \`stat -f\` NO falla: imprime el estado del FILESYSTEM con exit 0,"
   echo "    asi que el fallback nunca corre y en Linux lees basura. Orden correcto:"
   echo "      stat -c '%a' \"\$f\" 2>/dev/null || stat -f '%Lp' \"\$f\" 2>/dev/null"
-  echo "    Verde en macOS, rojo en CI — asi se publico main en rojo."
+  echo "    Verde en macOS, rojo en CI — asi se publico main en rojo dos veces."
   return 1
 }
 

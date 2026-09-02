@@ -166,7 +166,18 @@ _ce_mutacion_declarada() {
   local edad ahora mtime
   ahora="$(date +%s 2>/dev/null)" || return 1
   # `stat` difiere entre BSD (macOS) y GNU; se prueban las dos formas.
-  mtime="$(stat -f %m "$_CE_LOCK" 2>/dev/null || stat -c %Y "$_CE_LOCK" 2>/dev/null)" || return 1
+  # GNU PRIMERO, BSD despues. El orden no es cosmetico: en Linux `stat -f` es
+  # --file-system y NO falla —%m ahi es el punto de montaje—, asi que probarlo
+  # primero devuelve "/" con exit 0 y el fallback jamas corre. Con el orden
+  # inverso, los tres tests del lock morian en ubuntu y pasaban en macOS; lo
+  # cazo el Anillo 3. check-review-marker.sh y check-verify-marker.sh ya lo
+  # llevaban bien y documentado — la leccion existia en prosa y no impidio
+  # repetirla, que es por lo que ahora hay un detector:
+  # test_canon_enforce.sh::test_stat_gnu_antes_que_bsd_en_todo_el_harness.
+  mtime="$(stat -c %Y "$_CE_LOCK" 2>/dev/null || stat -f %m "$_CE_LOCK" 2>/dev/null)" || return 1
+  # Y se valida que sea un numero: si un dia ninguna de las dos formas aplica,
+  # la aritmetica de abajo no puede operar sobre basura en silencio.
+  case "$mtime" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$mtime" ] || return 1
   edad=$(( ahora - mtime ))
   # `-lt`, no `-le`: así un TTL de 0 significa "el lock no vale nunca", que es
