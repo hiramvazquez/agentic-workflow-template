@@ -193,3 +193,87 @@ _case_los_registros_siguen_exentos_en_el_harness() {
 test_en_el_harness_la_prosa_y_los_ledgers_siguen_exentos() {
   _scope_repo _case_los_registros_siguen_exentos_en_el_harness
 }
+
+# ════════════════════════════════════════════════════════════════════
+# El OVERRIDE auditado también debe existir en LOS DOS anillos
+# ════════════════════════════════════════════════════════════════════
+# Misma clase que la regresión que abre este archivo, y cazada en vivo el
+# 2026-09-02: AGENTS.md §13 documenta el override como la válvula de emergencia.
+# `check-review-marker.sh` la implementa leyendo la variable de SU entorno, así
+# que por lefthook (Anillo 1) funciona: ahí el prefijo aplica al proceso de git.
+# Pero el Anillo 2 corre en OTRO proceso y solo recibe el comando como TEXTO;
+# `reviewer-gate.sh` invocaba el script sin exportar nada, así que por la vía
+# del agente el override no tenía ningún efecto.
+#
+# Lo descubrió un agente al agotar el tope de DOS rondas de §13 con un cambio ya
+# verificado: se quedó sin salida legítima porque la única documentada no
+# existía. Una válvula anunciada que no abre es peor que no tenerla — §14.4.
+#
+# NOTA para quien edite esto: los comandos de prueba se ARMAN desde variables a
+# propósito. Escritos como literales, el git-guard de este mismo hook los lee
+# como un commit de verdad y bloquea el turno que escribe el test.
+_anillo1_override() {
+  REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="test" \
+    bash tools/check-review-marker.sh --staged >/dev/null 2>&1; echo $?
+}
+_anillo2_override() { # <comando completo tal cual lo escribe el agente>
+  printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$1" \
+    | WORKFLOW_PRESET=full bash scripts/agent-hooks/reviewer-gate.sh >/dev/null 2>&1
+  echo $?
+}
+
+_case_override_coherente() {
+  local a1 a2 gc pfx
+  gc="git commit -m x"
+  pfx="REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON=urgencia"
+  a1="$(_anillo1_override)"
+  a2="$(_anillo2_override "$pfx $gc")"
+  [ "$a1" = "0" ] || { echo "    Anillo 1 ignoró el override documentado en §13 (exit=$a1)"; return 1; }
+  [ "$a2" = "0" ] || { echo "    Anillo 2 ignoró el override: la válvula de §13 NO existe por la vía del agente (exit=$a2)"; return 1; }
+  # …y queda AUDITADO. Un override silencioso es un gate apagado sin rastro.
+  [ -f .agents/state/markers/override_log.txt ] \
+    || { echo "    el override no dejó rastro en override_log.txt: sin auditoría no es un override, es un bypass"; return 1; }
+  grep -q 'urgencia' .agents/state/markers/override_log.txt \
+    || { echo "    la RAZÓN del override no llegó al log (queda '(SIN RAZÓN)'): la auditoría no dice por qué"; return 1; }
+}
+test_el_override_auditado_funciona_en_los_dos_anillos() { _rm_sandbox _case_override_coherente; }
+
+# ── FALSO POSITIVO guard: mencionar la variable no la activa ────────
+# El guard de git ya aprendió esto: `grep "git commit --no-verify" doc.md` NO es
+# un commit. Aquí igual — si bastara con que el texto aparezca en cualquier
+# parte del comando, escribir la DOCUMENTACIÓN del override apagaría el gate, y
+# un gate que se apaga solo al documentarlo es peor que ninguno (ley del 10%).
+_case_override_solo_como_prefijo_del_git() {
+  local rc gc
+  gc="git commit -m x"
+  rc="$(_anillo2_override "grep -n REVIEWER_OVERRIDE=1 docs/x.md; $gc")"
+  [ "$rc" = "2" ] || { echo "    MENCIONAR REVIEWER_OVERRIDE=1 en otro segmento apagó el gate (exit=$rc)"; return 1; }
+  rc="$(_anillo2_override "git commit -m 'documenta REVIEWER_OVERRIDE=1 en la doc'")"
+  [ "$rc" = "2" ] || { echo "    REVIEWER_OVERRIDE=1 dentro del MENSAJE de commit apagó el gate (exit=$rc)"; return 1; }
+}
+test_el_override_solo_cuenta_como_prefijo_del_comando_git() {
+  _rm_sandbox _case_override_solo_como_prefijo_del_git
+}
+
+# ── …y sobrevive a envolver la línea ────────────────────────────────
+# El caso que lo destapó todo: la razón del override es larga, así que se
+# escribe con una continuación de shell y el prefijo acaba en una línea distinta
+# del `git commit`. El hook leía por líneas, así que el prefijo se perdía y la
+# válvula no abría — exactamente cuando más falta hace. Es el mismo defecto de
+# parseo que el bypass de §7 (test_git_guard.sh::…no_evade_no_verify); dos
+# síntomas, un arreglo.
+_case_override_sobrevive_a_la_continuacion() {
+  local rc gc pfx
+  gc="git commit -m x"
+  pfx="REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON=urgencia"
+  # OJO con el escapado: en comillas dobles `\n` NO es un salto, se queda como
+  # dos caracteres, y el JSON llegaba con el prefijo y el `git` en la MISMA
+  # linea — el test pasaba sin probar nada (sobrevivio al mutante que quita la
+  # union de continuaciones). Hacen falta 6 barras: el shell las deja en 3, y
+  # jq decodifica `\\` + `\n` como barra + salto real.
+  rc="$(_anillo2_override "$pfx \\\\\\n  $gc")"
+  [ "$rc" = "0" ] || { echo "    el override se pierde al envolver la línea (exit=$rc): la válvula no abre justo cuando se necesita"; return 1; }
+}
+test_el_override_sobrevive_a_una_continuacion_de_linea() {
+  _rm_sandbox _case_override_sobrevive_a_la_continuacion
+}

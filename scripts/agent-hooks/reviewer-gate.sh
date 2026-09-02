@@ -43,15 +43,68 @@ GATE_T0="$(date +%s 2>/dev/null || echo 0)"
 # un comando prohibido no es el comando (falso positivo real de la v1; ley del
 # 10%). Límite conocido: `git -C /ruta commit` no se detecta como commit.
 # Duro en ambos presets: son prohibiciones absolutas, no gates de calidad.
+# ── Continuaciones de linea: se unen ANTES de partir ────────────────
+# El bucle de abajo parte por `;&|` y LEE POR LINEAS, asi que un salto de linea
+# del propio comando tambien separa segmentos. Con una continuacion de shell
+# (`\` al final), el subcomando queda en un segmento y sus flags en otro, y
+# ninguno contiene los dos: el guard no ve nada que prohibir.
+#
+# Medido el 2026-09-02 en el sandbox de test_git_guard.sh, con el marker en
+# verde y preset full: `git commit \<salto> --no-verify -m x` salia 0 —permitido—
+# mientras la MISMA orden en una linea salia 2. Igual con `--amend`. El defecto
+# estaba en el bucle, asi que alcanzaba a TODAS las prohibiciones de §7, y no hay
+# capa detras: este guard existe porque permissions.deny no puede expresarlas
+# (f-3c027a85). Se descubrio al ver que el mismo corte hacia desaparecer el
+# prefijo VAR=val del override (f-6cc1f3b4): un defecto de parseo, dos sintomas.
+#
+# Unir la continuacion es lo que hace el shell de verdad, asi que el guard pasa a
+# leer el comando LOGICO. `test_unir_continuaciones_no_inventa_prohibiciones`
+# fija la otra mitad: pegar lineas no puede hacer aparecer un `git` en posicion
+# de comando donde no lo habia — un guard que bloquea lo legitimo se desactiva
+# entero (ley del 10%, §14.2).
+_join_cont() { awk '{ if (sub(/\\$/, "")) printf "%s ", $0; else print }'; }
+CMD_LOGICO="$(printf '%s' "$CMD" | _join_cont)"
+
 _GIT_CMD_RE='^[[:space:]]*\(*[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*git[[:space:]]+'
 _seg_is_git_sub() { # _seg_is_git_sub <segmento> <subcomando>
   printf '%s' "$1" | grep -qE "${_GIT_CMD_RE}(-[^[:space:]]+[[:space:]]+)*$2([[:space:]]|\$)"
 }
+# El override auditado de §13 viaja como PREFIJO `VAR=val` del propio `git`
+# (`REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...`). Por
+# lefthook ese prefijo llega al proceso de git y `check-review-marker.sh` lo lee
+# de su entorno; por AQUI no, porque el hook es otro proceso que solo recibe el
+# comando como TEXTO. Sin esto, la valvula que AGENTS.md §13 documenta no existe
+# por la via del agente — y una valvula anunciada que no abre es la clase de
+# defensa fantasma que §14.4 declara el unico pecado de este harness. Cazado en
+# vivo al agotar el tope de DOS rondas con un cambio ya verificado: no quedaba
+# salida legitima.
+#
+# Se lee SOLO del prefijo anterior al `git` del segmento, con la misma
+# disciplina que el guard: mencionar la variable en un `grep`, en otro segmento
+# o dentro del mensaje de commit NO la activa. Si bastara con que el texto
+# apareciera, documentar el override apagaria el gate.
+# Arranca del ENTORNO del hook y el prefijo solo puede AÑADIR. Son dos rutas
+# legitimas: un cliente o un wrapper puede exportar la variable al hook, y el
+# agente la escribe en el comando. Inicializar en 0 a secas pisaba la primera
+# —lo cazo test_ratchets.sh::test_override_relaja_marker_pero_queda_auditado, que
+# la ejercita— y habria cambiado una via rota por otra.
+OVR="${REVIEWER_OVERRIDE:-0}"; OVR_REASON="${REVIEWER_OVERRIDE_REASON:-}"
+_ovr_from_prefix() { # <segmento que ya se sabe que es un git commit>
+  local pfx="${1%%git *}"
+  case "$pfx" in *REVIEWER_OVERRIDE=1*) : ;; *) return 1 ;; esac
+  OVR=1
+  OVR_REASON="$(printf '%s' "$pfx" | sed -n \
+    -e 's/.*REVIEWER_OVERRIDE_REASON="\([^"]*\)".*/\1/p' \
+    -e "s/.*REVIEWER_OVERRIDE_REASON='\([^']*\)'.*/\1/p" \
+    -e 's/.*REVIEWER_OVERRIDE_REASON=\([^"'"'"'[:space:]][^[:space:]]*\).*/\1/p' | head -1)"
+}
+
 IS_COMMIT=0; HAS_ADD=0
 while IFS= read -r seg; do
   [ -z "$seg" ] && continue
   if _seg_is_git_sub "$seg" commit; then
     IS_COMMIT=1
+    _ovr_from_prefix "$seg" || true
     case "$seg" in
       *--no-verify*) hook_block "🛑 git-guard: \`--no-verify\` está PROHIBIDO (AGENTS.md §7). Los hooks de git son el Anillo 1; saltárselos deja el commit sin gates. Si un gate te bloquea injustamente, arregla el gate — no lo evadas." ;;
       *--amend*)     hook_block "🛑 git-guard: \`--amend\` requiere orden EXPLÍCITA del owner (AGENTS.md §7). Reescribir historia publicada rompe a los demás; crea un commit nuevo." ;;
@@ -76,7 +129,7 @@ while IFS= read -r seg; do
     esac
   fi
   _seg_is_git_sub "$seg" add && HAS_ADD=1
-done <<< "$(printf '%s' "$CMD" | tr ';&|' '\n')"
+done <<< "$(printf '%s' "$CMD_LOGICO" | tr ';&|' '\n')"
 
 # ── 0c. LA MATRIZ DE SKILLS TAMBIÉN VIGILA BASH ─────────────────────
 # El agujero: `skill-reminder` cuelga de `PreToolUse Edit|Write`, así que la
@@ -227,7 +280,9 @@ fi
 if [ "$HAS_ADD" -eq 1 ]; then
   hook_block_or_warn "🛑 reviewer-gate: \`git add\` y \`git commit\` en el MISMO comando evaden la validación del diff staged (el gate corre antes del add). Sepáralo: stagea primero, revisa, y commitea en un comando aparte."
 fi
-if printf '%s' "$CMD" | grep -qE 'git commit[^;|&]*(\s-a[m]?(\s|$)|--all)'; then
+# CMD_LOGICO por la misma razon que el bucle: grep es por lineas, asi que sin
+# unir la continuacion un `git commit \<salto> -am x` no casaba.
+if printf '%s' "$CMD_LOGICO" | grep -qE 'git commit[^;|&]*(\s-a[m]?(\s|$)|--all)'; then
   hook_block_or_warn "🛑 reviewer-gate: \`git commit -a/-am\` stagea en el momento del commit — el marker de review liga el sha del diff que YA estaba staged, no ese. Stagea explícito, revisa, y commitea sin \`-a\`."
 fi
 
@@ -286,7 +341,11 @@ fi
 # de preset vivía aquí, lefthook (Anillo 1) llamaba al script directo y bloqueaba
 # igual en `lite`: el Anillo 2 daba luz verde y el commit fallaba después.
 # Una regla implementada en dos sitios diverge — vive en uno solo.
-if ! out="$(bash tools/check-review-marker.sh --staged 2>&1)"; then
+# El override se pasa en linea, NO se exporta: asi no puede alcanzar al
+# trinquete ni a las capas, que AGENTS.md §9 declara imposibles de relajar con
+# el. La restriccion es estructural, no una promesa en un comentario.
+if ! out="$(REVIEWER_OVERRIDE="$OVR" REVIEWER_OVERRIDE_REASON="$OVR_REASON" \
+            bash tools/check-review-marker.sh --staged 2>&1)"; then
   hook_block "$out"
 fi
 printf '%s\n' "$out" | grep -q '^⚠️' && { printf '%s\n' "$out" >&2; hook_allow; }

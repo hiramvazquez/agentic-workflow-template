@@ -142,3 +142,67 @@ _case_bloqueo_de_reset_hard_tambien_se_registra() {
     return 1; }
 }
 test_reset_hard_bloqueado_tambien_se_registra() { _gg_sandbox _case_bloqueo_de_reset_hard_tambien_se_registra; }
+
+# ════════════════════════════════════════════════════════════════════
+# Una CONTINUACIÓN DE LÍNEA no puede partir una prohibición en dos
+# ════════════════════════════════════════════════════════════════════
+# Bypass reproducido en vivo el 2026-09-02, con marker VÁLIDO y preset full.
+# El hook parte el comando con `tr ';&|' '\n'` y lo lee con `read -r seg`, así
+# que los saltos de línea del propio comando también separan segmentos. Con una
+# continuación de shell, el subcomando queda en un segmento y sus flags en otro,
+# y NINGUNO contiene los dos: el guard no ve nada que prohibir.
+#
+# Medido: el mismo commit con --no-verify daba exit 2 en una línea y exit 0
+# —"detectores verdes + marker válido. Commit permitido"— partido en dos. La
+# prohibición nº1 de §7 se evadía pulsando Enter, y no hay capa detrás: este
+# guard existe porque permissions.deny no puede expresarla (f-3c027a85).
+#
+# Se probaron dos flags a propósito: el defecto está en el BUCLE, así que
+# alcanza a todas las prohibiciones por igual, no solo a la más famosa.
+# El sandbox BORRA check-review-marker.sh, asi que sin esto cualquier `git
+# commit` devuelve 2 —el hook falla al invocar un script que no esta— y el test
+# pasaria sin distinguir el guard del marker. Con el marker en verde, un commit
+# permitido sale 0 y solo una prohibicion real saca 2. La asercion de control
+# de abajo es la que demuestra que el sandbox sabe decir que si.
+_gg_marker_verde() { stub tools/check-review-marker.sh '#!/usr/bin/env bash\nexit 0\n'; }
+
+_case_continuacion_no_parte_no_verify() {
+  _gg_marker_verde
+  local ctrl; ctrl="$(_gate 'git commit \\\n  -m x' full)"
+  [ "$ctrl" = "0" ] || { echo "    control: un commit multilínea LEGÍTIMO fue bloqueado (exit $ctrl) — el sandbox no distingue"; return 1; }
+  local rc; rc="$(_gate 'git commit \\\n  --no-verify -m x' full)"
+  [ "$rc" = "2" ] || { echo "    --no-verify tras una continuación de línea ATRAVESÓ el guard (exit $rc)"; return 1; }
+}
+test_una_continuacion_de_linea_no_evade_no_verify() {
+  _gg_sandbox _case_continuacion_no_parte_no_verify
+}
+
+_case_continuacion_no_parte_amend() {
+  _gg_marker_verde
+  local rc; rc="$(_gate 'git commit \\\n  --amend -m x' full)"
+  [ "$rc" = "2" ] || { echo "    --amend tras una continuación de línea ATRAVESÓ el guard (exit $rc)"; return 1; }
+  # El detector de `-a/-am` es OTRO sitio del hook (un grep sobre el comando
+  # entero, no el bucle de segmentos) y tenía el mismo punto ciego: grep razona
+  # por líneas. Se comprueba aquí para que el arreglo cubra los dos.
+  rc="$(_gate 'git commit \\\n  -am x' full)"
+  [ "$rc" = "2" ] || { echo "    -am tras una continuación de línea ATRAVESÓ el detector de staging implícito (exit $rc)"; return 1; }
+}
+test_una_continuacion_de_linea_no_evade_amend() {
+  _gg_sandbox _case_continuacion_no_parte_amend
+}
+
+# ── FALSO POSITIVO guard: unir continuaciones no puede inventar comandos ──
+# Al pegar las líneas, dos segmentos inocentes pasan a ser uno. Si eso hiciera
+# aparecer un `git` en posición de comando donde no lo había, el arreglo sería
+# peor que el bug: un guard que bloquea comandos legítimos se desactiva entero.
+_case_unir_no_inventa_prohibiciones() {
+  _gg_marker_verde
+  local rc
+  rc="$(_gate 'echo "documentando git commit --no-verify" \\\n  >> notas.md' full)"
+  [ "$rc" = "0" ] || { echo "    un echo multilínea que MENCIONA el flag fue bloqueado (exit $rc)"; return 1; }
+  rc="$(_gate 'ls -la \\\n  tools/' full)"
+  [ "$rc" = "0" ] || { echo "    un comando multilínea inocente fue bloqueado (exit $rc)"; return 1; }
+}
+test_unir_continuaciones_no_inventa_prohibiciones() {
+  _gg_sandbox _case_unir_no_inventa_prohibiciones
+}
