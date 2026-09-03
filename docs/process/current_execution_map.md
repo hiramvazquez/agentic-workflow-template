@@ -147,8 +147,23 @@
 >
 > **PRD 0008 COMPLETO** (fases 3a, 2 y 1). Sigue el `0009`, bloqueado por sus cinco OQ.
 >
-> **Decisión pendiente del owner:** qué se hace con check-layers, check-drift y
-> check-source-sets, que corren en cada commit sin nada que mirar en este repo.
+> **DECISIÓN TOMADA (owner, 2026-09-03): los tres se RETIRAN de este repo.**
+> `check-layers`, `check-drift` y `check-source-sets` declaran `no-aplica` cuando
+> `project_kind: harness`, y el trinquete deja de tomar su cero por un techo medido — la
+> misma distinción que `mutation-ratchet.json` expresa con `measured: false`. **No se retiran
+> del template**: `tools/*.sh` viaja por SYNC_GLOBS y un adoptante con iOS o web reales los
+> sigue teniendo; un test de falso positivo lo fija. Efecto medido: `drift-ratchet` baja de
+> 3,3 s a 104 ms en cada pre-commit.
+>
+> Se comprobó antes la alternativa —apuntarlos al código del harness— y no sirve:
+> `check-drift` solo mide extensiones de app, así que apuntado a `tools scripts ci` también
+> da cero. Re-apuntar exigiría enseñarle shell.
+>
+> **La retirada exige que la declaración Y la evidencia estén de acuerdo.** La primera versión
+> miraba solo `project_kind` y el design-review reprodujo el agujero: un repo que declara
+> `harness` Y tiene código de app real perdía los tres detectores en silencio — y ese es el
+> caso probable, porque el template VIENE declarando `harness`. Ahora, con una sola fuente de
+> app en el árbol, se mide. Fail-closed: retirar reduce protección, así que necesita las dos.
 
 
 - **DECISIÓN DEL OWNER 2026-08-24 — el freeze de gates nuevos (PRD 0005 §3) sigue VIGENTE y se

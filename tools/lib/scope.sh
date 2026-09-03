@@ -237,3 +237,38 @@ _scope_verifica_declaracion() {
   return 0
 }
 _scope_verifica_declaracion
+
+# ── ¿Aplican aquí los detectores de código de APP? ──────────────────
+# `check-layers`, `check-drift` y `check-source-sets` buscan fuentes de
+# aplicación (`ios android web src app lib Sources`, `commonMain/`). En un repo
+# cuyo producto es el propio harness no tienen NADA de su competencia, y su
+# `errors=0` no es una medición: es la ausencia de una.
+#
+# Se retiró en este repo el 2026-09-03 por decisión del owner, con el dato del
+# lector del denominador: check-layers llevaba 80 corridas con cero objetivos,
+# check-drift 46 con cero, check-source-sets 8 con cero. No se retiran del
+# TEMPLATE —`tools/*.sh` viaja por SYNC_GLOBS y un adoptante con iOS o web
+# reales sí los necesita—: se retiran de los repos que DECLARAN ser el harness.
+#
+# La declaración se lee con `_scope_project_kind`, que ya resuelve la parte
+# difícil: leer del ÍNDICE y no del árbol de trabajo. Esa distinción no es
+# cosmética — leerla del disco abriría el mismo bypass reproducido en vivo con
+# el gate de review (editas la conf, no la stageas, y el gate cambia de opinión
+# sobre un diff que no la contiene).
+# ⚠️ Hacen falta LAS DOS: la declaración y la evidencia. La primera versión
+# miraba solo `project_kind`, y el review reprodujo el agujero: un repo que
+# declara `harness` Y tiene código de app real perdía los tres detectores EN
+# SILENCIO. No es un rincón — **el template viene declarando `harness`**, así
+# que el adoptante que copia y empieza a meter código antes de acordarse del
+# flip se queda sin protección justo cuando empieza a necesitarla, y el propio
+# comentario de `project.conf` da esa transición por cubierta.
+#
+# Por qué aquí la evidencia SÍ manda, si en el gate de scope NO: clasificar
+# scope no reduce protección —decide qué exige review— y por eso la declaración
+# puede gobernar sin riesgo. RETIRAR un detector sí la reduce, así que va
+# fail-closed: con una sola fuente de app en el árbol, se mide.
+scope_detectores_de_app_aplican() { # → 0 si aplican, 1 si no
+  [ "$(_scope_project_kind)" = "harness" ] || return 0
+  [ -n "$(_scope_fuentes_de_app)" ] && return 0
+  return 1
+}

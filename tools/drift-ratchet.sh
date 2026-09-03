@@ -25,12 +25,26 @@ MODE="${1:---check}"
 
 read_counts() {
   local out; out="$(bash tools/check-drift.sh 2>/dev/null | grep '^DRIFT_SUMMARY' | tail -1)"
+  # `estado=no-aplica` NO es una medición de cero: es la ausencia de medición.
+  # Tomarla por un techo fijaría el suelo en cero de forma permanente en un repo
+  # donde nadie contó nada — y este trinquete SOLO BAJA, así que ese cero no se
+  # podría deshacer. Es la misma distinción que `mutation-ratchet.json` expresa
+  # con `measured: false`, y la razón por la que el nivel 4 se declara DORMIDO
+  # en vez de fingir un score.
+  case "$out" in *"estado=no-aplica"*) SIN_MEDICION=1 ;; *) SIN_MEDICION=0 ;; esac
   CUR_E="$(echo "$out" | sed -nE 's/.*errors=([0-9]+).*/\1/p')"
   CUR_W="$(echo "$out" | sed -nE 's/.*warns=([0-9]+).*/\1/p')"
 }
 ceil() { sed -nE "s/.*\"$1\"[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p" "$JSON" | head -1; }
 
 read_counts
+if [ "${SIN_MEDICION:-0}" = "1" ]; then
+  echo "ℹ️  drift-ratchet: SIN MEDICIÓN — check-drift declara que no aplica en este"
+  echo "   repo (project_kind: harness, sin código de app que medir)."
+  echo "   El techo NO se compara ni se actualiza: un piso de cero que nadie midió"
+  echo "   es peor que ninguno, y este trinquete solo baja."
+  exit 0
+fi
 [ -z "${CUR_E:-}" ] || [ -z "${CUR_W:-}" ] && { echo "drift-ratchet: no pude leer counts (infra) — paso."; exit 0; }
 
 if [ "$MODE" = "--update" ]; then

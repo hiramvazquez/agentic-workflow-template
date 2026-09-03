@@ -24,6 +24,29 @@ command -v detector_run_init >/dev/null 2>&1 && detector_run_init check-layers
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
+# ── ¿Aplico en este repo? (decisión del owner, 2026-09-03) ──────────
+# En un repo cuyo producto es el propio harness no hay codigo de app que mirar,
+# y un `errors=0` que nadie midio alimenta un trinquete que SOLO BAJA. Se
+# declara "no aplica" y se sale 0: NO es exit 3, que significa "no pude mirar" —
+# aqui el detector funciona perfectamente, es que no hay nada de su competencia.
+_DET_SCOPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/scope.sh"
+# shellcheck source=tools/lib/scope.sh
+if [ -f "$_DET_SCOPE" ]; then
+  # El stderr NO se manda a /dev/null: `_scope_verifica_declaracion` corre al
+  # sourcear y es quien AVISA de una contradiccion declarado-vs-evidencia.
+  # Silenciarlo hacia que en CI el detector saliera 3 con la salida vacia:
+  # un gate que corta sin decir por que.
+  . "$_DET_SCOPE" || true
+  if command -v scope_detectores_de_app_aplican >/dev/null 2>&1 \
+     && ! scope_detectores_de_app_aplican; then
+    echo "LAYERS_SUMMARY estado=no-aplica errors=0"
+    echo "ℹ️  check-layers: no aplica — este repo declara project_kind: harness, y aqui no"
+    echo "   hay codigo de app que mirar. No se retiro del template: un adoptante"
+    echo "   con fuentes reales lo sigue teniendo."
+    exit 0
+  fi
+fi
+
 CONF="${LAYERS_CONF:-tools/layers.conf}"
 ERRORS=0
 FILES=0
