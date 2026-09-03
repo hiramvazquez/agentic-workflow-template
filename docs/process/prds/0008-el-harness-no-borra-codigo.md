@@ -1,6 +1,6 @@
 # PRD — El harness no borra código, y sus detectores dicen qué miran
 
-> **Tipo:** Forward · **Status:** Draft
+> **Tipo:** Forward · **Status:** In progress — **las tres fases entregadas**; la única línea de la DoD que queda es una decisión del owner (§10)
 > **Autor:** sesión de auditoría (Claude Opus 5) · **Fecha:** 2026-09-03
 > **Design-review:** dos rondas sobre el PRD 0008 original, las dos **RED** (11 y 18 hallazgos). El remedio de §13 —"la tercera no se revisa: se parte"— produjo este documento y el `0009`.
 
@@ -301,6 +301,7 @@ hard limit de §4 · gitleaks limpio.
 
 | Fecha | Cambio | Quién |
 |---|---|---|
+| 2026-09-03 | **Las tres fases entregadas.** 3a: deny en Anillo 0, verificado en vivo (`7e3f89f`). 2: bootstrap propone en vez de borrar, y al reescribir su bloque salió que **nunca reemplazó los placeholders en macOS** — `grep -Z` no emite NUL en BSD (`55692d1`). 1: el lector del denominador, cuya primera corrida contra el log real da **check-layers 80 corridas con cero objetivos, check-drift 46 con cero y 4s de p95, check-source-sets 8 con cero**. Queda pendiente la decisión keep/tune/retire sobre esos tres, que es del owner. | sesión de auditoría |
 | 2026-09-03 | Nace al partir el PRD 0008 original por el remedio de §13, tras dos design-reviews RED. Recoge sus tres fases con diseño cerrado (3a, 2, 1) con los hallazgos aplicados. OQ-5 resuelta por el owner: bootstrap propone, no ejecuta — lo que elimina la heurística de discriminación y dos goldens. | sesión de auditoría |
 
 ## 18. Gaps detectados (llenar post-ship)

@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **75** · Cerrados: 168 · Total: 243
+Abiertos: **76** · Cerrados: 168 · Total: 244
 
 ## Abiertos
 
@@ -83,6 +83,7 @@ Abiertos: **75** · Cerrados: 168 · Total: 243
 | `f-bd45663` | low | auto-fix | `tools/upgrade.sh:484,522` | upgrade.sh recomienda git add -A al usuario en dos mensajes de conflicto |
 | `f-c59f9bf1` | low | auto-fix | `tools/lesson-detector-link.sh` | lesson-detector-link no ata las lineas de continuacion de Detector: a un archivo concreto |
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
+| `f-cbdd8e70` | low | auto-fix | `tools/lib/detector-run.sh + tools/tests/test_detector_runs.sh` | Un fixture de test puede escribir en el log de metricas REAL si olvida DETECTOR_RUNS_LOG, y nada lo detecta |
 | `f-e10aa746` | low | owner-decision | `tools/check-finding-refs.sh (CITA vs resuelve)` | check-finding-refs perdona abreviaturas en source pero las exige exactas en los .md |
 
 ## Cerrados

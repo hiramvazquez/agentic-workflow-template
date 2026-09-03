@@ -137,7 +137,18 @@
 > BSD, así que bootstrap **nunca reemplazó los placeholders en macOS** anunciando que sí —
 > registrado, arreglado, y con detector nuevo para la clase.
 >
-> **Siguiente:** fase 1 (lector del denominador).
+> **Fase 1 ENTREGADA:** `tools/metrics/detector-runs.sh` lee el registro de ejecución. Su
+> primera corrida contra el log real da el dato que faltaba: **check-layers 80 corridas con
+> CERO objetivos, check-drift 46 corridas con cero y 4 s de p95, check-source-sets 8 con
+> cero**; en cambio check-exec-bits mira 145 y semgrep-scan 10. Eso confirma `f-6b761f06` con
+> ochenta puntos de datos en vez de uno, y es lo que `f-wf09-ventana-de-valor` pedía para
+> decidir keep/tune/retire. La columna de disparos sale `n/a` **con su conteo**, porque los
+> vocabularios de `source` de los dos logs son disjuntos (queda como OQ-4 en el `0009`).
+>
+> **PRD 0008 COMPLETO** (fases 3a, 2 y 1). Sigue el `0009`, bloqueado por sus cinco OQ.
+>
+> **Decisión pendiente del owner:** qué se hace con check-layers, check-drift y
+> check-source-sets, que corren en cada commit sin nada que mirar en este repo.
 
 
 - **DECISIÓN DEL OWNER 2026-08-24 — el freeze de gates nuevos (PRD 0005 §3) sigue VIGENTE y se
