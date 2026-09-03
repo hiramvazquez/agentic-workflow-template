@@ -1,65 +1,59 @@
 # <PROJECT> — Reglas de trabajo con agentes (FUENTE CANÓNICA)
 
-> Este archivo es la **única fuente de verdad** de las reglas del proyecto para agentes de IA.
-> Lo leen nativamente **Cursor, Codex, Copilot, Gemini y otros**. Claude Code lo recibe vía
-> `CLAUDE.md` (que hace `@AGENTS.md`). Si una regla aquí choca con cualquier otra fuente, **gana esta**.
+> Única fuente de verdad de las reglas para agentes de IA. La leen nativamente
+> **Cursor, Codex, Copilot, Gemini y otros**; Claude Code la recibe vía
+> `CLAUDE.md`. Si una regla aquí choca con otra fuente, **gana esta**.
 >
-> Mantenlo **terso**. El detalle vive en `.agents/skills/` y en `docs/process/`. El racional
-> histórico / post-mortems mecanizados van en `docs/process/lessons_archive.md`, NO aquí.
+> **Terso a propósito.** Este fichero entra en el contexto de cada turno, así que
+> aquí va la REGLA y el nombre de quien la hace cumplir; el **racional** (las
+> mediciones y los incidentes que la produjeron) está en
+> `docs/process/agents-rationale.md`, y el detalle en `.agents/skills/`.
+> Una regla sin detector se escribe entera: leerla es lo único que la cumple.
 
 ---
 
 ## 0. Antes de escribir código
 
-1. Lee la parte viva de `docs/process/lessons_learned.md` — detente en “Lecciones mecanizadas
-   (índice)”. El índice y `lessons_archive.md` se consultan solo si una señal relevante exige
-   su racional; el histórico no se carga por defecto. Si cazas un patrón nuevo, agrégalo aquí.
+1. Lee la parte viva de `docs/process/lessons_learned.md` — detente en “Lecciones mecanizadas (índice)”.
+   El índice y `lessons_archive.md` se consultan solo si una señal relevante
+   exige su racional; el histórico no se carga por defecto. Si cazas un patrón
+   nuevo, agrégalo.
 2. Lee `docs/process/current_execution_map.md` — fase actual y próximo paso.
-3. Carga **solo** la skill del área que tocas (ver §11 matriz path→lectura).
-4. Si la skill no cubre tu caso: **NO improvises** — pregunta al owner y actualiza la skill antes de seguir.
+3. Carga **solo** la skill del área que tocas (§11).
+4. Si la skill no cubre tu caso: **NO improvises** — pregunta al owner y actualiza la skill.
 5. Feature mediana/grande → **PRD obligatorio antes del primer commit** (§12).
 
 ## 1. Las reglas de oro (filosofía no negociable)
 
 1. **Detectar no basta — CERRAR.** Cada hallazgo llega a estado terminal y visible (`tools/findings/`).
 2. **Defensa en capas.** Detector mecánico + design-review + reviewer + juez + lecciones. Ninguno solo basta.
-3. **El que toca, cierra lo que bloquea.** Tocas un módulo con findings abiertos → los `high` de tu scope los arreglas en el mismo PR; el resto se registra y NO bloquea (§10).
+3. **El que toca, cierra lo que bloquea.** Los `high` de tu scope, en el mismo PR; el resto se registra (§10).
 4. **Open Question > suposición silenciosa.** Si no sabes (una columna, un catálogo, un contrato), preguntas; no inventas un default.
-5. **Scope = lo explícitamente pedido.** Nada de "aprovechar el viaje" para refactorizar lo de al lado (§8).
+5. **Scope = lo explícitamente pedido.** Nada de "aprovechar el viaje" (§8).
 
 ## 2. Stack y comandos
 
-<!-- FILL: el agente NO puede inferir esto. Sin esta sección, vuela a ciegas. -->
-
 - **Plataformas:** <!-- FILL: ios / android / web / backend -->
 - **Lenguajes / versiones:** <!-- FILL: ej. Swift 6 / Kotlin 2 / TypeScript 5 -->
-- **Build:** `<!-- FILL: comando de build -->`
-- **Tests:** `<!-- FILL: comando de tests -->`
-- **Lint/format:** `<!-- FILL -->`
-- **Backend/DB:** <!-- FILL: ej. Supabase / Postgres / Firebase / propio -->
-- **Idiomas de la app (i18n):** <!-- FILL: ej. ES + EN. Afecta reglas de §3. -->
+- **Build:** `<!-- FILL -->`  ·  **Tests:** `<!-- FILL -->`  ·  **Lint/format:** `<!-- FILL -->`
+- **Backend/DB:** <!-- FILL -->  ·  **Idiomas de la app (i18n):** <!-- FILL -->
 - **Modo estricto (nivel 0 — OBLIGATORIO):** `<!-- FILL: los flags de tu stack. Ej.:
   Swift: -warnings-as-errors + StrictConcurrency=complete · TS: "strict": true +
   noUncheckedIndexedAccess · Kotlin: allWarningsAsErrors · Python: mypy --strict -->`
-  El compilador es el primer reviewer y el único que no se cansa: un agente que **no puede
-  expresar** el estado inválido no lo escribe. Ningún gate posterior compensa una API donde el
-  mal uso compila. Prioriza hacer el error imposible por tipo antes que detectarlo después.
+  El compilador es el primer reviewer y el único que no se cansa. Prioriza hacer
+  el error **imposible por tipo** antes que detectarlo después: un agente que no
+  puede expresar el estado inválido no lo escribe.
 
 ## 3. Arquitectura (capas + límites)
 
-<!-- FILL: define TU arquitectura. Detalle en .agents/skills/architecture/SKILL.md. -->
-<!-- OPINIÓN: separa SIEMPRE presentación / orquestación / lógica-pura en archivos distintos.
-     La lógica de negocio testeable NO vive en la capa de UI ni en el orquestador. Toda
-     dependencia que cruza capa va por interfaz/protocolo + inyección por constructor. -->
-
-- **Patrón de pantalla/módulo:** <!-- FILL: ej. View+ViewModel+Logic / MVVM / MVI / Clean -->
-- **Navegación:** <!-- FILL -->  ·  **Inyección de dependencias:** <!-- FILL -->
-- **Dominio aislado:** las entidades, puertos de repositorio y errores de dominio NO dependen de UI ni de infraestructura (DB/SDK).
-- **i18n:** NUNCA ramifiques lógica sobre texto en lenguaje natural (`if texto == "diaria"`). Eso rompe en otros idiomas — clasifica en el servidor/LLM o con tablas keyed por idioma.
+- **Patrón de pantalla/módulo:** <!-- FILL -->  ·  **Navegación:** <!-- FILL -->  ·  **DI:** <!-- FILL -->
+- **Dominio aislado:** entidades, puertos de repositorio y errores de dominio NO
+  dependen de UI ni de infraestructura. — `tools/check-layers.sh`
+- **i18n:** NUNCA ramifiques lógica sobre texto en lenguaje natural
+  (`if texto == "diaria"`). Eso rompe en otros idiomas — clasifica en el
+  servidor/LLM o con tablas keyed por idioma.
 
 ## 4. Límites de tamaño (soft = revisar / hard = dividir en el mismo PR)
-
-<!-- OPINIÓN: defaults razonables; ajusta a tu lenguaje. -->
 
 | Tipo | Soft | Hard |
 |---|---:|---:|
@@ -67,135 +61,106 @@
 | Función | 40 | 60 |
 | Clase orquestadora (ViewModel/Controller) | 150 | 250 |
 
+— `tools/check-drift.sh`
+
 ## 5. TDD obligatorio + aserciones (🔴 red → 🟢 green → ♻️ refactor)
 
-**Ninguna lógica/orquestación nueva sin un test que falle PRIMERO.** Ciclo: escribe el test y
-míralo fallar → implementación mínima que lo pasa → refactor en verde. La matriz de tests sale
-del contrato y el riesgo: happy path si existe + cada rama que cambie comportamiento observable,
-recuperación, permisos o límites. No inventes casos para cumplir una cuota. Bug fix = primero un
-test que reproduce el bug (falla), luego el fix. Antes de marcar terminado: tests del área + build verde + `bash tools/check-drift.sh`
-sin errores nuevos. Playbook + ejemplos iOS: `.agents/skills/process/references/tdd-workflow.md`.
+**Ninguna lógica/orquestación nueva sin un test que falle PRIMERO.** Escribe el
+test y míralo fallar → implementación mínima → refactor en verde. La matriz de
+tests sale del contrato y del riesgo: happy path si existe + cada rama que
+cambie comportamiento observable, recuperación, permisos o límites. No inventes
+casos para cumplir una cuota. Bug fix = primero un test que reproduce el bug.
+Antes de marcar terminado: tests del área + build verde + `bash tools/check-drift.sh`
+sin errores nuevos. Playbook: `.agents/skills/process/references/tdd-workflow.md`.
 
-- **Un test que pasa con cualquier implementación no es un test.** La prueba de bolsillo: *si
-  rompo a propósito la lógica que dice cubrir, ¿falla?*
-  *Mecanismo real, y se declara como lo que es:* **mutantes dirigidos, a mano**. Quien escribe
-  el test rompe a propósito la línea que dice cubrir y comprueba que el test muere; lo hace por
-  cada afirmación de cobertura que el cambio haga, y **escribe en el PR qué mutantes lanzó y
-  cuáles murieron**. El `reviewer` lo verifica (ítem "Calidad del test") y su encargo incluye
-  buscar un mutante que **sobreviva** — el valor está en el que al autor no se le ocurrió.
-  > Esto decía que el veredicto lo daba el **mutation score** de `tools/mutation-score.sh`, "el
-  > gate que distingue un test que verifica de uno escrito para que pase". Esa frase **nunca ha
-  > sido verdad en este repo**: `tools/mutation-ratchet.json` lleva `measured: false` desde el
-  > día uno y no hay runner de mutación para shell, que es el lenguaje del harness
-  > (`f-mutation-score-nunca-medido`, `f-298e3cd2`). Un nivel de la pirámide anunciado y mudo es
-  > peor que uno ausente: da por cubierto lo que nadie mide. La maquinaria se queda —es honesta:
-  > `--update` se niega a escribir un piso de 0 y el script sale 3 sin runner— pero **hasta que
-  > mida, el árbitro es el de arriba**. Práctica validada el 2026-09-01: cinco mutantes dirigidos
-  > contra `canon-enforce`, los cinco muertos, y el `reviewer` encontró un sexto vivo.
-- **Aserciones / Design by Contract:** toda frontera pública expresa las precondiciones e
-  invariantes que realmente tiene; una función sin precondición no inventa dos. Las aserciones
-  son para errores de programación/invariantes, sin efectos secundarios. Input recuperable se
-  valida con tipos/errores explícitos, no con un crash. Prioriza siempre hacer el estado inválido
-  **imposible por tipo** antes que verificarlo en runtime.
-  *Mecanismo (declarado, no implícito):* la valida el **checklist del `reviewer`** (ítem DbC) y
-  la mide indirectamente el **mutation score** — un contrato sin verificar deja mutantes vivos.
-  NO hay detector por grep a propósito: contar aserciones sin un parser real por lenguaje
-  produciría ruido, y un detector ruidoso se descarta entero (ley del 10%, §14).
-- **Invariantes → property-based tests.** Si la regla vale para todos los valores, no la
-  compruebes con tres ejemplos.
+- **Un test que pasa con cualquier implementación no es un test.** La prueba de
+  bolsillo: *si rompo a propósito la línea que dice cubrir, ¿falla?*
+  El mecanismo son **mutantes dirigidos, a mano**: quien escribe el test rompe
+  esa línea, comprueba que el test muere, y **escribe en el PR qué mutantes
+  lanzó y cuáles murieron**. El `reviewer` lo verifica y busca uno que
+  **sobreviva** — el valor está en el que al autor no se le ocurrió.
+  ⚠️ El mutation score automático está **DORMIDO** y nunca ha medido; el árbitro
+  es este. Racional: `docs/process/agents-rationale.md` §5.
+- **Aserciones / Design by Contract:** toda frontera pública expresa las
+  precondiciones e invariantes que realmente tiene; una función sin precondición
+  no inventa dos. Sin efectos secundarios. Input recuperable se valida con
+  tipos/errores explícitos, no con un crash. — checklist del `reviewer` (ítem DbC).
+- **Invariantes → property-based tests.** Si la regla vale para todos los
+  valores, no la compruebes con tres ejemplos.
 - **Todo fake pasa la MISMA suite de conformidad que el adapter real** (`domain/SKILL.md`).
 
 ## 6. Seguridad (gate de cada commit)
 
-> El Anillo 1 (`lefthook` + `gitleaks`) bloquea secretos mecánicamente. Estas reglas son lo
-> que el scanner no ve y el `security-reviewer` sí. Detalle en `.agents/skills/security/SKILL.md`.
+> El Anillo 1 (`lefthook` + `gitleaks`) bloquea secretos mecánicamente. Esto es
+> lo que el scanner no ve y el `security-reviewer` sí. Detalle en `.agents/skills/security/SKILL.md`.
 
-- **Cero secretos en código.** API keys, tokens, claves privadas, connection strings → variables de entorno / secret manager. Nunca hardcoded, nunca en commits.
+- **Cero secretos en código.** API keys, tokens, claves privadas, connection
+  strings → variables de entorno / secret manager. Nunca hardcoded.
 - **Cero secretos en logs / telemetría / mensajes de error** que lleguen al cliente.
-- **Datos sensibles (PII/PHI) al almacenamiento seguro** de la plataforma (Keychain/Keystore/cifrado), nunca a almacenamiento en claro (UserDefaults/SharedPreferences/localStorage planos).
-- **DB:** RLS/authz por fila donde aplique; cifrado at-rest (default del proveedor) verificado; sin tablas sensibles sin política de acceso.
+- **Datos sensibles (PII/PHI) al almacenamiento seguro** de la plataforma
+  (Keychain/Keystore/cifrado), nunca en claro (UserDefaults/localStorage planos).
+- **DB:** RLS/authz por fila donde aplique; cifrado at-rest verificado; sin
+  tablas sensibles sin política de acceso.
 - **Dependencias:** sin paquetes no auditados para manejar secretos/cripto; revisa el lockfile.
-- **Authn/authz, cripto y validación sensible fallan cerradas:** ante error o duda, deniega;
-  nunca continúes con permisos/defaults permisivos. Los fallos de observabilidad se hacen
-  visibles (sin datos sensibles) y solo pueden preservar la operación principal si hacerlo
-  sigue siendo seguro. Fail-silent nunca.
+- **Authn/authz, cripto y validación sensible fallan cerradas:** ante error o duda, deniega; nunca continúes con permisos o defaults permisivos. Los fallos de observabilidad se hacen visibles (sin datos sensibles) y solo pueden preservar la operación principal si sigue siendo seguro. Fail-silent nunca.
 
 ## 7. Convenciones Git (duras)
 
-- Jamás `git commit --amend` sin orden explícita del owner. Jamás `--no-verify`, `--force` a main, ni `git add -A` con cambios fuera de scope.
+- Jamás `git commit --amend` sin orden explícita del owner. Jamás `--no-verify`,
+  `--force` a main, ni `git add -A` con cambios fuera de scope. — git-guard (`reviewer-gate.sh`)
 - Un cambio coherente = un commit. `git push` solo con aprobación explícita del owner.
-- Formato de mensaje: `<tipo>(<área>): <qué hizo>` — tipos: feat/fix/refactor/docs/chore/sec/test.
+- Formato: `<tipo>(<área>): <qué hizo>` — feat/fix/refactor/docs/chore/sec/test.
 
 ## 8. Disciplina de scope
 
-El agente que ejecuta una tarea/PRD tiene scope **limitado a lo que el PRD/prompt lista explícitamente**.
-Prohibido sin aprobación del owner: tocar tooling compartido (`tools/`, `ci/`, `lefthook.yml`),
-meta-doc (este archivo, `.agents/skills/**`, `_template.md`), o refactorizar archivos fuera de scope.
-**Errores preexistentes: se reportan al ledger, NO se silencian ni se "arreglan de paso".**
+Scope **limitado a lo que el PRD/prompt lista explícitamente**. Prohibido sin
+aprobación del owner: tocar tooling compartido (`tools/`, `ci/`, `lefthook.yml`),
+meta-doc (este archivo, `.agents/skills/**`, `_template.md`), o refactorizar
+archivos fuera de scope. **Errores preexistentes: se reportan al ledger, NO se
+silencian ni se "arreglan de paso".**
 
 ## 9. Drift policy + trinquetes
 
-- Cambio que toca un **enum/contrato compartido** o un **puerto de repositorio** → actualiza
-  todas las capas afectadas + su doc en el **mismo PR**.
-- **Los trinquetes tienen una dirección fija y no se editan a mano.** Solo los actualiza su
-  propio script; están en `permissions.deny` de escritura a propósito. Un número que se puede
-  aflojar no es un trinquete: es una sugerencia.
+- Cambio que toca un **enum/contrato compartido** o un **puerto de repositorio**
+  → actualiza todas las capas afectadas + su doc en el **mismo PR**.
+- **Los trinquetes tienen dirección fija y NO se editan a mano.** Solo los
+  actualiza su propio script; están en `permissions.deny` de escritura.
 
 | Archivo | Métrica | Dirección | Actualiza con |
 |---|---|---|---|
 | `tools/drift-ratchet.json` | errores + warnings | **solo baja** | `tools/drift-ratchet.sh --update` |
-| `tools/mutation-ratchet.json` | mutation score | **solo sube** | `tools/mutation-score.sh --update` — ⚠️ **DORMIDO**: `measured:false`, nunca ha medido. No es un piso de 0, es la ausencia de veredicto (§5). |
+| `tools/mutation-ratchet.json` | mutation score | **solo sube** | `tools/mutation-score.sh --update` — ⚠️ **DORMIDO** (§5) |
 
-- Ni el preset `lite` ni `REVIEWER_OVERRIDE` relajan un trinquete. Ese override existe para el
-  **marker de review** (juicio humano), nunca para un detector mecánico. Está fijado por
-  `tools/tests/test_ratchets.sh`.
+- Ni el preset `lite` ni `REVIEWER_OVERRIDE` relajan un trinquete. Ese override
+  es para el **marker de review** (juicio humano), nunca para un detector
+  mecánico. — `tools/tests/test_ratchets.sh`
 
 ## 10. Cero-deuda-nueva (ownership de findings)
 
-"No es mío, lo dejo" está **prohibido**: cualquier gap que detectes (incluido uno preexistente)
-queda **registrado en el ledger** con tier+área (`tools/findings/`). Reportar = loguear al ledger,
-no solo mencionarlo en prosa.
+"No es mío, lo dejo" está **prohibido**: cualquier gap que detectes (incluido uno
+preexistente) queda **registrado en el ledger** con tier+área (`tools/findings/`).
+Reportar = loguear al ledger, no mencionarlo en prosa.
 
-**Pero registrar no es arreglar, y solo una clase de hallazgo bloquea el turno:** el que es
-`high` **y** cae dentro del scope declarado del encargo. Todo lo demás —severidad menor, o fuera
-de scope— se registra y el turno **sigue**.
+**Pero registrar no es arreglar, y solo una clase bloquea el turno:** el que es
+`high` **y** cae dentro del scope declarado. Todo lo demás —severidad menor, o
+fuera de scope— se registra y el turno **sigue**.
 
-> Esta regla decía "se resuelve en el mismo turno: o lo arreglas, o lo registras", sin distinguir
-> severidad ni scope. Esa versión es el motor documentado de la divergencia del ledger: revisar
-> produce hallazgos → cerrarlos cambia el diff → el marker ligado a `sha256(diff staged)` se
-> invalida → hay que volver a revisar, que produce hallazgos. **Medido en este repo:** del 5 al 15
-> de agosto de 2026 se cerraba lo que se abría; desde el 19 se abrió 2–3× más de lo que se cerró y
-> la brecha no volvió a cerrarse (el 31 de agosto: 226 entradas REGISTRADAS y 155 cerradas, o sea
-> 71 sin cerrar — 67 `open` + 4 `accepted`). La causa próxima ya
-> estaba nombrada en `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`: *"muchas de esas
-> rondas existían solo porque el marker se invalidaba tras un cambio de una línea en el ledger"*.
+**Y un hallazgo de revisión no es trabajo hasta que sobrevive a una refutación.**
+Antes de entrar al ledger, todo hallazgo de un agente revisor pasa por un intento
+explícito de tumbarlo: **¿hay un caso concreto —entradas y estado— en el que el
+código haga lo que el hallazgo afirma?** Sin ese caso, no entra.
 
-**Y un hallazgo de revisión no es trabajo hasta que sobrevive a una refutación.** Antes de entrar
-al ledger, todo hallazgo emitido por un agente revisor (`reviewer`, `design-reviewer`, jueces) pasa
-por un intento explícito de tumbarlo: **¿hay un caso concreto —entradas y estado— en el que el
-código haga lo que el hallazgo afirma?** Sin ese caso, no entra. Un revisor al que se le pide
-encontrar huecos encuentra huecos aunque el trabajo esté bien: es exactamente lo que se le pidió, y
-es el modo de fallo que la literatura de 2026 mide como sobre-corrección sistemática. El filtro de
-refutación es lo que separa un revisor de alta precisión de un generador de ruido.
-
-**Y toda lección aprendida se convierte en un detector.** `docs/process/lessons_learned.md`
-exige el campo `Detector:` y `tools/lesson-detector-link.sh` lo verifica en CI; cuando ese
-detector es un test del Anillo 3, `tools/lessons-rotate.sh --apply` mueve el racional al archivo
-histórico y conserva un índice compacto. Sin detector,
-las lecciones son prosa que nadie relee y que el agente pierde en la primera compactación.
-Con él, cada error cometido una vez se vuelve mecánicamente imposible la segunda — que es el
-único mecanismo por el que la necesidad de revisión humana **decrece** en vez de mantenerse
-plana. Excepción legítima y explícita: `n/a-manual — <razón>`.
+**Y toda lección aprendida se convierte en un detector.**
+`docs/process/lessons_learned.md` exige el campo `Detector:` y
+`tools/lesson-detector-link.sh` lo verifica en CI. Excepción legítima y
+explícita: `n/a-manual — <razón>`. Racional: `agents-rationale.md` §10.
 
 ## 11. Skills enforcement — matriz path → lectura obligatoria
 
-Antes de editar un archivo, debes haber leído la referencia que aplica. La **fuente única**
-de la matriz es `tools/skill-matrix.conf` — el hook `skill-reminder` (Anillo 2) la lee en
-runtime y bloquea. Esta tabla es la **vista humana** de ese conf: si cambias el conf,
-actualiza la tabla en el mismo commit (antes la matriz vivía en cinco sitios y divergía;
-`test_skill_matrix.sh` fija que toda ref citada exista).
-
-<!-- iOS de referencia. Ajusta los globs a tus carpetas reales si difieren. -->
+Antes de editar un archivo, debes haber leído la referencia que aplica. La
+**fuente única** es `tools/skill-matrix.conf`, que el hook `skill-reminder` lee
+en runtime y con la que BLOQUEA. Esta tabla es su **vista humana**; si cambias el
+conf, actualiza la tabla en el mismo commit. — `tools/check-skill-matrix-doc.sh`
 
 | Path que vas a editar | Reference obligatorio |
 |---|---|
@@ -205,95 +170,68 @@ actualiza la tabla en el mismo commit (antes la matriz vivía en cinco sitios y 
 | `**/Data/**`, `<migraciones-db>/**` | `domain/SKILL.md` (puertos) + `security/SKILL.md` |
 | `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |
 
-**Esta tabla es exactamente el conf, ni una fila más.** La coherencia entre ambos la verifica
-`tools/check-skill-matrix-doc.sh` comparando el conjunto de referencias de los dos lados; si
-añades una lectura obligatoria aquí y no al conf, falla. Y falla *en esa dirección a propósito*:
-una fila aquí sin respaldo en el conf es una defensa **anunciada que no existe**, que es el
-único pecado que este harness no comete (§14.4).
-
-> Tocar `tools/**`, `ci/**` o `scripts/agent-hooks/**` **no** está en la tabla, y no es un
-> olvido: `skill-reminder` excluye esas rutas a propósito (editar la doc o el tooling de un área
-> no es editar el código de ese área — era un falso positivo real, fijado por
-> `test_skill_reminder.sh`). Su gate es otro y es más fuerte: §8 exige **aprobación explícita del
-> owner** para tocar tooling compartido. La lectura recomendada antes de hacerlo sigue siendo
-> `process/references/verification-loop.md`, pero es una recomendación, no un bloqueo — y
-> decirlo así es la diferencia entre documentar un gate y fingirlo.
-
-> El **gate duro** es el hook `skill-reminder` (lee `tools/skill-matrix.conf`). Como camino
-> feliz, `.claude/rules/*.md` puede inyectar recordatorios por path en Claude Code. Nota
-> honesta: la carga automática por `paths:` en el frontmatter de una skill NO es parte del
-> estándar portable de skills (agentskills) — no dependas de ella para clientes distintos
-> de Claude Code; el conf + el hook son lo que de verdad se cumple.
+**Exactamente el conf, ni una fila más.** Tocar `tools/**`, `ci/**` o
+`scripts/agent-hooks/**` NO está en la tabla a propósito; su gate es §8.
+Racional: `agents-rationale.md` §11.
 
 ## 12. PRD obligatorio para features medianas/grandes
 
-Criterio "mediano/grande" (≥2 de): >3 días dev · >1 módulo · cambia schema · cambia contrato
-de API · decisión de privacy/security/pricing · decisión arquitectónica reusable.
-Flujo completo en `.agents/skills/process/references/feature-workflow.md`. Template:
-`docs/process/prds/_template.md`. **El design-review del CÓMO (sub-agente `design-reviewer`)
-es un gate distinto del "Approved" del owner** — no es salteable para cambios de arquitectura o PHI.
+Criterio (≥2 de): >3 días dev · >1 módulo · cambia schema · cambia contrato de
+API · decisión de privacy/security/pricing · decisión arquitectónica reusable.
+Flujo: `.agents/skills/process/references/feature-workflow.md`. Template:
+`docs/process/prds/_template.md`. **El design-review del CÓMO (`design-reviewer`)
+es un gate distinto del "Approved" del owner** — no salteable para arquitectura o PHI.
 
 ## 13. Reviewer-gate pre-commit
 
-Todo commit que toque código de producto requiere ejecución previa del sub-agente `reviewer`.
+Todo commit que toque código de producto requiere ejecución previa del
+sub-agente `reviewer`.
 
-**Tope de DOS rondas por unidad de trabajo. La tercera no se revisa: se parte.** Un cambio que
-llega en rojo a la tercera ronda no tiene un problema que una ronda más vaya a encontrar — tiene un
-lote demasiado grande o un diseño equivocado. En ese punto, o se **divide por naturaleza**
-(`bash tools/check-diff-nature.sh`) y cada mitad entra limpia, o se sube un nivel y se revisa el
-**DISEÑO** (`design-reviewer`, §12) en vez del código. Los tres datos que fijan el tope, todos de
-este repo y recalculables:
+**Tope de DOS rondas por unidad de trabajo. La tercera no se revisa: se parte.**
+O se **divide por naturaleza** (`bash tools/check-diff-nature.sh`) y cada mitad
+entra limpia, o se sube un nivel y se revisa el **DISEÑO** (`design-reviewer`,
+§12) en vez del código. Los datos que fijan el tope: `agents-rationale.md` §13.
 
-- De **107** unidades de trabajo revisadas, solo **29 (27%)** pasaron en verde a la primera —
-  `.agents/state/review-history.jsonl`, campo `verdict`: 53 GREEN · 52 AMBER · 28 RED.
-- Un mismo encargo llegó a **17 rondas** y otro a 9.
-- El `reviewer` rinde **0,84** hallazgos por invocación y el `design-reviewer` **4–9**; en la sesión
-  de las ocho rondas, lo que el reviewer no podía encontrar ronda a ronda (un diseño fail-open) lo
-  encontró el design-review en una. Fuente: `docs/process/reviews/2026-08-24-valor-por-gate-fase3.md`.
+**El `reviewer` reporta solo lo que rompe algo:** corrección, seguridad, o un
+requisito explícito del encargo. Preferencias de estilo, refactors oportunistas y
+defensas para casos que no pueden ocurrir se mencionan en una línea como
+opcionales y **no generan findings ni bloquean**. Esta regla es canónica aquí;
+`.claude/agents/reviewer.md` la implementa y si divergen, gana esta.
 
-**Y el `reviewer` reporta solo lo que rompe algo:** corrección, seguridad, o un requisito explícito
-del encargo. Preferencias de estilo, refactors oportunistas y defensas para casos que no pueden
-ocurrir se mencionan en una línea como opcionales y **no generan findings ni bloquean**. Esta regla
-es canónica aquí; `.claude/agents/reviewer.md` la implementa y si divergen, gana esta.
+**El veredicto no lo emite el modelo, lo deriva el sistema.** El `reviewer`
+termina con `VERDICT: GREEN|AMBER|RED` y el hook `SubagentStop` escribe el marker
+a partir de esa línea real. `tools/check-review-marker.sh` solo acepta markers
+con `source: hook`.
 
-**El veredicto no lo emite el modelo, lo deriva el sistema.** El `reviewer` termina su mensaje
-con `VERDICT: GREEN|AMBER|RED`, y el hook `SubagentStop` escribe el marker a partir de esa línea
-real. `tools/check-review-marker.sh` solo acepta markers con `source: hook`; un marker escrito a
-mano se rechaza. (`scripts/mark-reviewer-run.sh` existe solo como fallback para clientes sin
-hooks, y queda auditado.)
+**Y el mismo invariante para los TESTS.** `tools/verify-run.sh` ejecuta el
+comando de `tools/verify.conf` y, solo si sale 0, firma ese diff;
+`tools/check-verify-marker.sh` lo exige.
 
-Lo verifican los **tres anillos**: `lefthook` (Anillo 1, cubre humanos y cualquier cliente),
-`reviewer-gate` (Anillo 2 — en Claude Code nativo; en Cursor y Codex vía
-`scripts/agent-hooks/adapters/gate-adapter.sh`) y `ci/run-gates.sh` + `ci/ai-review.sh`
-(Anillo 3). **Flujo que el gate exige:** stagea → invoca al `reviewer` → commitea en un
-comando aparte. El marker liga `sha256(diff staged)`: `git add X && git commit` en una línea
-o `commit -a/-am` evaden esa validación y el gate los rechaza. Override de emergencia auditado:
-`REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..." git commit ...` — **relaja el marker, nunca
-un trinquete** (§9).
+**Flujo (el mismo para los dos):** stagea → invoca al `reviewer` / corre
+`verify-run` → commitea en un comando aparte. Los markers ligan
+`sha256(diff staged)`, así que `git add X && git commit` en una línea o
+`commit -a/-am` los evaden y el gate los rechaza.
 
-**Y el mismo invariante para los TESTS, no solo para el reviewer.** El marker de review se liga a
-`sha256(diff staged)`; durante meses ninguna ejecución de build o de tests se ligaba a ese mismo
-diff, así que se podía commitear un árbol que **nadie llegó a compilar** con todo en verde — el
-reviewer no compila, los trinquetes no compilan y las capas no compilan. `tools/verify-run.sh`
-ejecuta el comando de `tools/verify.conf` (fuente única, compartida con el paso 6 del Anillo 3) y,
-solo si sale 0, firma ese diff; `tools/check-verify-marker.sh` lo exige. Flujo: **stagea →
-`bash tools/verify-run.sh` → commitea**, el mismo que ya pedía el review. Override auditado:
-`VERIFY_OVERRIDE=1 VERIFY_OVERRIDE_REASON="..."`.
+Overrides auditados, que relajan el marker y **nunca** un trinquete (§9):
+`REVIEWER_OVERRIDE=1 REVIEWER_OVERRIDE_REASON="..."` y `VERIFY_OVERRIDE=1
+VERIFY_OVERRIDE_REASON="..."`.
 
-**Presets:** con `tools/preset = lite` (uso personal) este gate y el `skill-reminder` AVISAN en vez
-de bloquear; los trinquetes, las capas y `canon-enforce` siguen duros. `full` (equipo) es el default.
+Lo verifican los **tres anillos**: `lefthook` (1), `reviewer-gate` (2, vía
+`gate-adapter.sh` en Cursor y Codex) y `ci/run-gates.sh` + `ci/ai-review.sh` (3).
 
-## 14. El bucle de verificación (cómo sabemos que el código está bien)
+**Presets:** con `tools/preset = lite` este gate y el `skill-reminder` AVISAN en
+vez de bloquear; trinquetes, capas y `canon-enforce` siguen duros. `full` es el default.
+
+## 14. El bucle de verificación
 
 Referencia completa: **`.agents/skills/process/references/verification-loop.md`**.
 
-Dos principios que gobiernan todo lo demás:
-
-1. **Cázalo en la capa más barata.** Cada nivel que un defecto sube sin detectarse multiplica
-   ~10× el coste. Un error que el compilador podía cazar y que llega a un juez de IA no es un
-   error del agente: es un fallo de diseño del harness.
-2. **El que escribe nunca es el que aprueba, y "aprobar" es presentar evidencia.** Un veredicto
-   es la salida de un comando, un exit code o un score — nunca una afirmación del modelo.
+1. **Cázalo en la capa más barata.** Cada nivel que un defecto sube sin
+   detectarse multiplica ~10× el coste. Un error que el compilador podía cazar y
+   llega a un juez de IA es un fallo de diseño del harness, no del agente.
+2. **El que escribe nunca es el que aprueba, y "aprobar" es presentar
+   evidencia.** Un veredicto es la salida de un comando, un exit code o un
+   score — nunca una afirmación del modelo.
 
 ```
 9 Métricas + lección→detector     8 Gate por evidencia      7 Review adversarial de IA
@@ -302,33 +240,23 @@ Dos principios que gobiernan todo lo demás:
 0 Imposibilitar (tipos)
 ```
 
-**La ley del 10% (§14.2):** un detector con más de ~10% de falsos positivos se descarta — y un
-agente además aprende a evadirlo. Por eso los patrones van en Semgrep (AST) y no en `grep`.
-Prefiere 5 reglas exactas a 50 ruidosas.
-
-**El contrato de exit codes de los detectores (§14.3):** `0` = limpio · `1` = tu código tiene
-un problema (bloquea, sin excepción) · `3` = **el detector no pudo mirar** (ausente, reglas
-rotas, crash). El 3 AVISA en local y BLOQUEA en CI (`GATES_REQUIRE_*=1`): bloquear en local
-crearía un deadlock — un typo en las reglas impediría hasta el commit que lo arregla — pero
-tratarlo como éxito convertiría un scanner roto en luz verde permanente. Corolario: **un bug
-del hook nunca debe trabar el commit en local; un gate que no corrió nunca debe parecer un
-gate que pasó.**
-
-**§14.4 — El Anillo 3 es OBLIGATORIO en preset `full`, y esto no es burocracia: es lo que
-hace verdadera la frase anterior.** Todo el fail-open local de §14.3 está justificado *por*
-la existencia del backstop. Sin Anillo 3, un exit 3 no es "avisa y luego CI bloquea": es
-**fail-open definitivo y silencioso**, y el razonamiento de todos los niveles se cae con él.
-Lo verifica `tools/check-ring3.sh` (remoto + config de CI que ejecute los gates), y lo exige
-`validate-harness` en `full`. En `lite` no bloquea, pero se DECLARA en cada arranque de
-sesión — porque el pecado que este harness no comete es anunciar una defensa que no existe.
+- **§14.2 — La ley del 10%:** un detector con más de ~10% de falsos positivos se
+  descarta, y un agente aprende a evadirlo. Patrones en Semgrep (AST), no en `grep`.
+- **§14.3 — Contrato de exit codes:** `0` limpio · `1` tu código tiene un
+  problema (bloquea) · `3` **el detector no pudo mirar** (ausente, reglas rotas,
+  crash). El 3 AVISA en local y BLOQUEA en CI (`GATES_REQUIRE_*=1`). Corolario:
+  un bug del hook nunca debe trabar el commit en local; **un gate que no corrió
+  nunca debe parecer un gate que pasó**.
+- **§14.4 — El Anillo 3 es OBLIGATORIO en preset `full`**, y es lo que hace
+  verdadero el fail-open de §14.3. — `tools/check-ring3.sh` + `validate-harness`.
+  En `lite` no bloquea, pero se DECLARA en cada arranque de sesión.
 
 ## 15. Cómo entrar a una sesión nueva
 
-1. Lee este archivo. 2. Lee `docs/process/current_execution_map.md`. 3. Lee solo el tramo vivo de
-`lessons_learned.md` (§0). 4. Carga la skill del área (§11). 5. Abre el PRD/ADR relevante.
+1. Lee este archivo. 2. `docs/process/current_execution_map.md`. 3. El tramo vivo
+de `lessons_learned.md` (§0). 4. La skill del área (§11). 5. El PRD/ADR relevante.
 6. **Verifica los hechos contra el código/DB antes de editar.**
 
-> Si estás retomando tras una compactación de contexto: el hook `SessionStart(source: compact)`
-> te reinyecta el digest de reglas y los findings abiertos (Claude re-inyecta solo el CLAUDE.md
-> raíz; el resto lo repone `post-compact.sh`). Si algo de §11 no lo recuerdas con precisión,
-> reléelo — el `skill-reminder` te lo exigirá de todas formas.
+> Tras una compactación, el hook `SessionStart(source: compact)` reinyecta el
+> digest de reglas y los findings abiertos. Si algo de §11 no lo recuerdas con
+> precisión, reléelo — el `skill-reminder` te lo exigirá igualmente.
