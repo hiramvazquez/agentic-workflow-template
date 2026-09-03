@@ -182,6 +182,16 @@
 > `gh` arranca bien y lo que pasa es que tarda. Ahora tiene rama propia y lo dice. El techo
 > queda además **atado a lo que `/status` promete**: si uno de los dos se mueve, falla la
 > suite — un presupuesto declarado que no se cumple deja de creerse.
+>
+> **Y el mismo patrón, cerrado en los otros dos sitios** (`f-74c528ef`, que el review encontró
+> revisando el arreglo de `gh`). El de `git` era el peor, y no por el timeout sino por lo que
+> escondía: `git()` devolvía cadena vacía tanto cuando git **dice que no** —un `rev-parse`
+> sobre una ref inexistente sale 1, y eso es una respuesta legítima— como cuando **no
+> responde**. Colapsadas, un git colgado salía como "¿repo sin commits?" sobre un repo lleno de
+> ellos. Por eso el arreglo es una excepción (`GitLento`) y no un centinela: un valor de
+> retorno habría vuelto a juntar las dos situaciones que el bug demuestra que hay que separar.
+> Las ventanas bajan con el criterio del owner para `gh`: git es local y de milisegundos,
+> `escape-rate.sh` está medido en centésimas.
 
 > **2026-09-03 · PRD 0009 arrancado.** Las cinco Open Questions resueltas: tres cerradas
 > investigando el código, dos decididas por el owner. La de OQ-10 **cambió la fase 3b** —no hay
