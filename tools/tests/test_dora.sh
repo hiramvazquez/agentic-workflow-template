@@ -369,3 +369,40 @@ _case_gh_lento() {
     return 1; }
 }
 test_un_gh_lento_se_declara_como_espera_agotada() { _dora_sandbox _case_gh_lento; }
+
+# ── 21. Un `git` colgado no es "repo sin commits" ────────────────────
+# Cierre de `f-74c528ef`, que el review encontró al revisar el arreglo de `gh`:
+# el mismo patrón quedaba en otros dos sitios. Este es el peor de los dos.
+#
+# `git()` devuelve cadena vacía tanto si git DIJO QUE NO (un `rev-parse` sobre
+# una ref inexistente sale 1, y eso es una respuesta legítima) como si NO
+# RESPONDIÓ. Aguas abajo, `tronco()` no distingue y la métrica salía como "no
+# pude determinar la rama del tronco (¿repo sin commits?)" — la razón falsa
+# otra vez, sobre un repo con commits y un git que simplemente colgaba.
+_case_git_colgado() {
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\nsleep 5\n' > bin/git; chmod +x bin/git
+  local out rc
+  out="$(PATH="$PWD/bin:$PATH" DORA_GIT_TIMEOUT=1 bash tools/metrics/dora.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || { echo "    un git colgado tumbó el informe (exit $rc)"; return 1; }
+  local l; l="$(printf '%s\n' "$out" | grep -i 'frecuencia')"
+  printf '%s' "$l" | grep -qiE 'no respondió|tard' || {
+    echo "    un git que no responde se declara mal:"
+    echo "      $l"
+    echo "    '¿repo sin commits?' es falso: hay commits, git no contestó."
+    return 1; }
+}
+test_un_git_colgado_no_se_confunde_con_repo_vacio() { _dora_sandbox _case_git_colgado; }
+
+# ── 22. Y lo mismo para el script de la tasa de fallo ───────────────
+# El tercer sitio del patrón, y el de la ventana MÁS grande (120 s, mayor que
+# los 60 originales de `gh`) — también en el camino de `/status`.
+_case_escape_colgado() {
+  printf '#!/usr/bin/env bash\nsleep 5\n' > tools/metrics/escape-rate.sh
+  chmod +x tools/metrics/escape-rate.sh
+  local l
+  l="$(DORA_ESCAPE_TIMEOUT=1 bash tools/metrics/dora.sh 2>&1 | grep -i 'tasa de fallo')"
+  printf '%s' "$l" | grep -qiE 'no respondió|tard' || {
+    echo "    escape-rate colgado se declara mal: $l"; return 1; }
+}
+test_un_escape_rate_colgado_se_declara_como_espera() { _dora_sandbox _case_escape_colgado; }

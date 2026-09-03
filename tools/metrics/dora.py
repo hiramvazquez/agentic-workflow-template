@@ -30,6 +30,7 @@ from pathlib import Path
 
 _GIT = runpy.run_path(str(Path(__file__).with_name("dora_git.py")))
 _git, _tronco, _desfase_local = _GIT["git"], _GIT["tronco"], _GIT["desfase_local"]
+_GitLento = _GIT["GitLento"]
 
 SERIE = Path(".agents/state/metrics/series.jsonl")
 ROLLUP = Path("docs/process/metrics-weekly.md")
@@ -46,6 +47,13 @@ try:
     TIMEOUT_GH = max(1, int(os.environ.get("DORA_GH_TIMEOUT", "20")))
 except ValueError:
     TIMEOUT_GH = 20
+
+# `escape-rate.sh` es local y se mide en centésimas; 120 s era la ventana más
+# grande de las tres, mayor incluso que los 60 s originales de `gh`.
+try:
+    TIMEOUT_ESCAPE = max(1, int(os.environ.get("DORA_ESCAPE_TIMEOUT", "30")))
+except ValueError:
+    TIMEOUT_ESCAPE = 30
 
 
 class Metrica:
@@ -69,18 +77,21 @@ def frecuencia(dias: int) -> Metrica:
     """En un repo-plantilla, `main` ES el artefacto: el adoptante clona y
     actualiza desde ahí. No hay despliegue aparte que medir, y esperarlo
     dejaría muda una métrica que aquí sí tiene evento."""
-    tronco = _tronco()
-    if not tronco:
-        return Metrica("frecuencia de entrega", razon="no pude determinar la rama del tronco: ninguna de origin/HEAD, main, master, trunk ni la rama actual resuelve (¿repo sin commits?)")
-    log = _git("log", "--first-parent", tronco, f"--since={_desde(dias)}", "--format=%H")
-    n = len([x for x in log.splitlines() if x.strip()])
-    if not n:
-        return Metrica("frecuencia de entrega",
-                       razon=f"0 commits en `{tronco}` en {dias} días")
-    por_semana = n / (dias / 7.0)
-    # La rama se NOMBRA. Sin eso el lector no puede saber si se midió lo que cree.
-    return Metrica("frecuencia de entrega", por_semana,
-                   f"{por_semana:.1f} /semana  ({n} commits en `{tronco}`, {dias} días)")
+    try:
+        tronco = _tronco()
+        if not tronco:
+            return Metrica("frecuencia de entrega", razon="no pude determinar la rama del tronco: ninguna de origin/HEAD, main, master, trunk ni la rama actual resuelve (¿repo sin commits?)")
+        log = _git("log", "--first-parent", tronco, f"--since={_desde(dias)}", "--format=%H")
+        n = len([x for x in log.splitlines() if x.strip()])
+        if not n:
+            return Metrica("frecuencia de entrega",
+                           razon=f"0 commits en `{tronco}` en {dias} días")
+        por_semana = n / (dias / 7.0)
+        # La rama se NOMBRA. Sin eso el lector no puede saber si se midió lo que cree.
+        return Metrica("frecuencia de entrega", por_semana,
+                       f"{por_semana:.1f} /semana  ({n} commits en `{tronco}`, {dias} días)")
+    except _GitLento as lento:
+        return Metrica("frecuencia de entrega", razon=str(lento))
 
 
 # ── 2. Lead time ────────────────────────────────────────────────────
@@ -89,30 +100,33 @@ def lead_time(dias: int) -> Metrica:
     trabajo directo sobre main esa ventana es CERO POR CONSTRUCCIÓN, y un
     '0.0 h' se leería como entrega instantánea en vez de como ausencia de
     medición. Por eso el hueco se declara en vez de calcularse."""
-    tronco = _tronco()
-    if not tronco:
-        return Metrica("lead time", razon="no pude determinar la rama del tronco: ninguna de origin/HEAD, main, master, trunk ni la rama actual resuelve (¿repo sin commits?)")
-    merges = [m for m in _git("log", tronco, f"--since={_desde(dias)}",
-                              "--merges", "--format=%H").splitlines() if m.strip()]
-    if not merges:
-        total = len([x for x in _git("log", tronco, "--format=%H").splitlines() if x.strip()])
-        return Metrica("lead time", razon=(
-            f"0 merges en {total} commits: el trabajo va directo a `{tronco}`, "
-            "así que no hay ventana entre el commit y su llegada"))
-    horas, sin_datar = [], 0
-    for m in merges:
-        fin = _git("show", "-s", "--format=%ct", m)
-        rama = [c for c in _git("log", "--format=%ct", f"{m}^1..{m}^2").splitlines() if c.strip()]
-        if fin and rama:
-            horas.append((int(fin) - int(rama[-1])) / 3600.0)
-        else:
-            sin_datar += 1
-    if not horas:
-        return Metrica("lead time",
-                       razon=f"hay {len(merges)} merges y no pude datar la rama de ninguno")
-    med = statistics.median(horas)
-    cola = f"; {sin_datar} sin datar" if sin_datar else ""
-    return Metrica("lead time", med, f"{med:.1f} h (mediana de {len(horas)} merges{cola})")
+    try:
+        tronco = _tronco()
+        if not tronco:
+            return Metrica("lead time", razon="no pude determinar la rama del tronco: ninguna de origin/HEAD, main, master, trunk ni la rama actual resuelve (¿repo sin commits?)")
+        merges = [m for m in _git("log", tronco, f"--since={_desde(dias)}",
+                                  "--merges", "--format=%H").splitlines() if m.strip()]
+        if not merges:
+            total = len([x for x in _git("log", tronco, "--format=%H").splitlines() if x.strip()])
+            return Metrica("lead time", razon=(
+                f"0 merges en {total} commits: el trabajo va directo a `{tronco}`, "
+                "así que no hay ventana entre el commit y su llegada"))
+        horas, sin_datar = [], 0
+        for m in merges:
+            fin = _git("show", "-s", "--format=%ct", m)
+            rama = [c for c in _git("log", "--format=%ct", f"{m}^1..{m}^2").splitlines() if c.strip()]
+            if fin and rama:
+                horas.append((int(fin) - int(rama[-1])) / 3600.0)
+            else:
+                sin_datar += 1
+        if not horas:
+            return Metrica("lead time",
+                           razon=f"hay {len(merges)} merges y no pude datar la rama de ninguno")
+        med = statistics.median(horas)
+        cola = f"; {sin_datar} sin datar" if sin_datar else ""
+        return Metrica("lead time", med, f"{med:.1f} h (mediana de {len(horas)} merges{cola})")
+    except _GitLento as lento:
+        return Metrica("lead time", razon=str(lento))
 
 
 # ── 3. Tasa de fallo del cambio ─────────────────────────────────────
@@ -125,7 +139,10 @@ def tasa_fallo() -> Metrica:
     cero sin denominador que `detector_runs.py` existe para separar."""
     try:
         r = subprocess.run(["bash", "tools/metrics/escape-rate.sh", "--days", str(VENTANA)],
-                           capture_output=True, text=True, timeout=120)
+                           capture_output=True, text=True, timeout=TIMEOUT_ESCAPE)
+    except subprocess.TimeoutExpired:
+        return Metrica("tasa de fallo",
+                       razon=f"`escape-rate.sh` no respondió en {TIMEOUT_ESCAPE} s")
     except (OSError, subprocess.SubprocessError):
         return Metrica("tasa de fallo", razon="no pude ejecutar escape-rate.sh")
     if r.returncode != 0:
@@ -320,7 +337,10 @@ def informar(dias: int, serie: bool = True) -> int:
     for m in metricas:
         print(m.linea())
 
-    aviso = _desfase_local(_tronco())
+    try:
+        aviso = _desfase_local(_tronco())
+    except _GitLento:
+        aviso = ""   # las métricas ya lo declararon; no se repite en un aviso
     if aviso:
         print("")
         print(aviso)

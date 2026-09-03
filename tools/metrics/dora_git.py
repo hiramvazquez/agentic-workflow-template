@@ -11,12 +11,39 @@ Las funciones públicas no llevan guion bajo: `dora.py` las consume por nombre.
 """
 from __future__ import annotations
 
+import os
 import subprocess
+
+# Las llamadas a git son LOCALES y de milisegundos; 30 s era una espera pensada
+# para nada. Y esta librería está en el camino de `/status`, que declara su
+# presupuesto. Mismo criterio que el owner fijó para `gh` (`f-7a219330`).
+try:
+    TIMEOUT_GIT = max(1, int(os.environ.get("DORA_GIT_TIMEOUT", "10")))
+except ValueError:
+    TIMEOUT_GIT = 10
+
+
+class GitLento(Exception):
+    """git no respondió a tiempo.
+
+    Existe porque `git()` devuelve cadena vacía en dos situaciones que NO son la
+    misma: git **dijo que no** (un `rev-parse` sobre una ref inexistente sale 1,
+    y eso es una respuesta legítima que hay que tratar como tal) y git **no
+    respondió**. Colapsarlas hacía que un git colgado saliera aguas abajo como
+    "no pude determinar la rama del tronco (¿repo sin commits?)" — una razón
+    falsa sobre un repo lleno de commits, que es justo lo que la lección
+    [2026-09-03] dice que es peor que no decir nada.
+    """
 
 
 def git(*args) -> str:
     try:
-        r = subprocess.run(("git",) + args, capture_output=True, text=True, timeout=30)
+        r = subprocess.run(("git",) + args, capture_output=True, text=True,
+                           timeout=TIMEOUT_GIT)
+    except subprocess.TimeoutExpired as e:
+        # ANTES de la genérica: `TimeoutExpired` ES un `SubprocessError`.
+        raise GitLento(f"`git {args[0] if args else ''}` no respondió en "
+                       f"{TIMEOUT_GIT} s") from e
     except (OSError, subprocess.SubprocessError):
         return ""
     return r.stdout.strip() if r.returncode == 0 else ""

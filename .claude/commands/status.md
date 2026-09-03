@@ -48,8 +48,10 @@ bash tools/metrics/dora.sh --sin-serie
 ```
 
 `dora` es lo más lento de la lista (~3 s, casi todo esperando a `gh` por red; **hasta 20 s**
-si `gh` no responde, y entonces esa métrica sale `n/a` diciendo que se agotó la espera) y el
-único que podría **escribir**: apunta una fila a la serie en cada corrida, y esa serie alimenta el rollup
+si `gh` no responde, y entonces esa métrica sale `n/a` diciendo que se agotó la espera). Ese
+techo es el de `gh`, no el total: las esperas locales —`git` y `escape-rate.sh`— están acotadas
+aparte y también salen `n/a` **nombrando la espera**, nunca disfrazadas de "no hay datos".
+`dora` es además el único de la lista que podría **escribir**: apunta una fila a la serie en cada corrida, y esa serie alimenta el rollup
 versionado. **`--sin-serie` no es opcional aquí** — sin él, mirar el estado falsearía la media
 semanal de un fichero que se commitea. Si no hay red, `dora` declara `n/a` en la métrica que
 dependía de `gh` y sigue con las otras; no aborta.
