@@ -147,6 +147,21 @@
 > propósito, porque uno simétrico no discrimina estadísticos. Sus dos notas no bloqueantes
 > (ventanas mezcladas en una misma fila, merge de pulpo) están en el ledger.
 >
+> **Cerrado el descarte silencioso** (`f-94384693`), que semgrep marcó como aviso sobre código
+> del propio commit de la fase 5 — el patrón exacto de la lección que ese commit añadía. Se
+> cerró en los CUATRO sitios del fichero, no solo en el denunciado. Y buscándolo apareció uno
+> peor: la rama del tronco estaba escrita a mano, así que en un repo con `master` o `trunk`
+> el informe decía "0 commits en `main`" — un `n/a` cuya RAZÓN es falsa, que es peor que el 0
+> al que sustituye, porque el 0 no afirma nada sobre el motivo. Ahora se deriva y **se nombra
+> en la salida**. Lección propia, con sus dos detectores. El arreglo cruzó el hard limit de 400
+> líneas, así que el rollup salió a su propio módulo en el mismo cambio (§4).
+>
+> **Y el primer arreglo de esa rama tampoco bastó, por su propia razón.** Derivaba de
+> `origin/HEAD` y devolvía el nombre pelado, que solo resuelve si existe la rama LOCAL —
+> borrarla es rutina—, así que el mismo `n/a` mentiroso volvía por otra puerta. Lo cazó la
+> ronda 1 con el repro completo, y esa rama de la función no tenía ni un test. Ahora ningún
+> candidato se devuelve sin comprobar que apunta a algo, y si ninguno resuelve se dice.
+>
 > **Lo que sigue sin resolverse:** hay que acordarse de ejecutar `dora.sh`. `/status` no lo
 > llama y eso queda registrado en el ledger como decisión del owner — es la misma
 > observabilidad *pull* que el estudio de paridad marca como nuestra brecha frente a la

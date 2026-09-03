@@ -11,6 +11,36 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-09-03] Un `n/a` con la razón falsa es peor que el 0 que vino a sustituir
+
+- **Qué pasó:** `dora.py` tenía la rama del tronco escrita a mano como `main`. En un repo cuya
+  rama es `master` —el defecto de git— o `trunk`, imprimía **"0 commits en `main` en 90 días"**
+  y **"0 merges en 0 commits"**. No es que no hubiera commits: es que se miró una rama que no
+  existe. Y esto es una plantilla que se distribuye, así que le pasaba a cualquier adoptante
+  que no usara `main`.
+- **Causa raíz:** todo el diseño de ese informe se apoya en que `n/a` sea más honesto que `0`
+  porque **trae su razón**. Si la razón es falsa, el `n/a` es peor que el `0`: el 0 al menos no
+  afirma nada sobre por qué. Aquí el lector recibía una explicación convincente y equivocada, y
+  no tenía forma de dudar de ella — la salida no decía **contra qué** había medido.
+- **Regla:** un `n/a` es una afirmación, y se verifica como tal. Lo que el informe buscó y no
+  encontró **se nombra en la salida** (la rama, el fichero, el comando), para que el lector
+  pueda ver que se buscó en el sitio equivocado. Y ningún nombre de rama, remoto o ruta de
+  convención se codifica a mano en algo que otros van a clonar: se deriva, y si no se puede
+  derivar, eso también se dice.
+- **Y el primer arreglo no bastó, por la misma razón.** Derivaba la rama de `origin/HEAD` y
+  cortaba el prefijo para devolver `main` pelado — que **solo resuelve si existe la rama
+  LOCAL**. Borrarla es rutina, y entonces reaparecía el mismo "0 commits en `main`" por otra
+  puerta. Lo cazó el review con el repro completo. El fallo de fondo: seguí devolviendo un
+  nombre sin comprobar que apuntara a algo. Un `n/a` es una afirmación, y una afirmación se
+  VERIFICA — también cuando eres tú quien acaba de escribir la regla.
+- **Detector:** `tools/tests/test_dora.sh::test_el_tronco_se_deriva_no_se_codifica` (mide en un
+  repo con rama `trunk` y exige que la salida la nombre) +
+  `::test_el_tronco_no_es_la_rama_actual` (derivarla de `HEAD` mediría tu feature branch y lo
+  llamaría entrega) + `::test_el_tronco_devuelto_tiene_que_resolver` (origin/HEAD sin rama
+  local) + `::test_sin_tronco_que_medir_se_declara` (si ninguna candidata resuelve, se dice).
+- **Área:** `tools/metrics/dora.py` — aplica a cualquier herramienta del template que asuma un
+  nombre convencional del repo del adoptante.
+
 ### [2026-09-03] Un agregador que filtra en silencio borra el dato y deja un hueco idéntico al de "no medido"
 
 - **Qué pasó:** `dora.sh` imprimía `tasa de fallo 0% (denominador: 41 findings)` en pantalla,

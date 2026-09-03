@@ -54,6 +54,43 @@ def _git(*args) -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def _resuelve(ref: str) -> bool:
+    """¿Este nombre apunta a algo? La pregunta que faltaba."""
+    return bool(ref) and bool(_git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"))
+
+
+def _tronco() -> str:
+    """La rama que hace de tronco, DERIVADA y VERIFICADA. Cadena vacía si
+    ninguna candidata resuelve.
+
+    Estaba escrita a mano como `main`, y en un repo con `master` o `trunk` eso
+    producía "0 commits en main en 90 días": un `n/a` cuya razón declarada es
+    falsa —no es que no hubiera commits, es que se miró un sitio que no
+    existe—. Esta es una plantilla que se distribuye, así que le pasaba a
+    cualquier adoptante que no usara `main`.
+
+    Y la primera versión de este arreglo cortaba el prefijo de `origin/HEAD`
+    para devolver el nombre pelado, que **solo resuelve si existe la rama
+    LOCAL**. Borrarla es rutina, y entonces reaparecía exactamente el mismo
+    bug por otra puerta. Lo cazó el review con el repro completo. De ahí que
+    aquí no se devuelva ningún nombre sin comprobar antes que apunta a algo:
+    la lección es que un `n/a` es una AFIRMACIÓN, y una afirmación se verifica.
+    """
+    remoto = _git("symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if remoto.startswith("origin/"):
+        corto = remoto[len("origin/"):]
+        # El pelado primero (es lo que el usuario reconoce), pero solo si existe
+        # de verdad; si no, la referencia remota completa, que es inequívoca.
+        for cand in (corto, remoto):
+            if _resuelve(cand):
+                return cand
+    for nombre in ("main", "master", "trunk"):
+        if _resuelve(nombre):
+            return nombre
+    actual = _git("rev-parse", "--abbrev-ref", "HEAD")
+    return actual if _resuelve(actual) else ""
+
+
 def _desde(dias: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=dias)).strftime("%Y-%m-%d")
 
@@ -63,13 +100,18 @@ def frecuencia(dias: int) -> Metrica:
     """En un repo-plantilla, `main` ES el artefacto: el adoptante clona y
     actualiza desde ahí. No hay despliegue aparte que medir, y esperarlo
     dejaría muda una métrica que aquí sí tiene evento."""
-    log = _git("log", "--first-parent", "main", f"--since={_desde(dias)}", "--format=%H")
+    tronco = _tronco()
+    if not tronco:
+        return Metrica("frecuencia de entrega", razon="no pude determinar la rama del tronco: ninguna de origin/HEAD, main, master, trunk ni la rama actual resuelve (¿repo sin commits?)")
+    log = _git("log", "--first-parent", tronco, f"--since={_desde(dias)}", "--format=%H")
     n = len([x for x in log.splitlines() if x.strip()])
     if not n:
-        return Metrica("frecuencia de entrega", razon=f"0 commits en main en {dias} días")
+        return Metrica("frecuencia de entrega",
+                       razon=f"0 commits en `{tronco}` en {dias} días")
     por_semana = n / (dias / 7.0)
+    # La rama se NOMBRA. Sin eso el lector no puede saber si se midió lo que cree.
     return Metrica("frecuencia de entrega", por_semana,
-                   f"{por_semana:.1f} /semana  ({n} commits en {dias} días)")
+                   f"{por_semana:.1f} /semana  ({n} commits en `{tronco}`, {dias} días)")
 
 
 # ── 2. Lead time ────────────────────────────────────────────────────
@@ -78,23 +120,30 @@ def lead_time(dias: int) -> Metrica:
     trabajo directo sobre main esa ventana es CERO POR CONSTRUCCIÓN, y un
     '0.0 h' se leería como entrega instantánea en vez de como ausencia de
     medición. Por eso el hueco se declara en vez de calcularse."""
-    merges = [m for m in _git("log", "main", f"--since={_desde(dias)}",
+    tronco = _tronco()
+    if not tronco:
+        return Metrica("lead time", razon="no pude determinar la rama del tronco: ninguna de origin/HEAD, main, master, trunk ni la rama actual resuelve (¿repo sin commits?)")
+    merges = [m for m in _git("log", tronco, f"--since={_desde(dias)}",
                               "--merges", "--format=%H").splitlines() if m.strip()]
     if not merges:
-        total = len([x for x in _git("log", "main", "--format=%H").splitlines() if x.strip()])
+        total = len([x for x in _git("log", tronco, "--format=%H").splitlines() if x.strip()])
         return Metrica("lead time", razon=(
-            f"0 merges en {total} commits: el trabajo va directo a main, "
+            f"0 merges en {total} commits: el trabajo va directo a `{tronco}`, "
             "así que no hay ventana entre el commit y su llegada"))
-    horas = []
+    horas, sin_datar = [], 0
     for m in merges:
         fin = _git("show", "-s", "--format=%ct", m)
         rama = [c for c in _git("log", "--format=%ct", f"{m}^1..{m}^2").splitlines() if c.strip()]
         if fin and rama:
             horas.append((int(fin) - int(rama[-1])) / 3600.0)
+        else:
+            sin_datar += 1
     if not horas:
-        return Metrica("lead time", razon="hay merges pero no pude datar sus ramas")
+        return Metrica("lead time",
+                       razon=f"hay {len(merges)} merges y no pude datar la rama de ninguno")
     med = statistics.median(horas)
-    return Metrica("lead time", med, f"{med:.1f} h (mediana de {len(horas)} merges)")
+    cola = f"; {sin_datar} sin datar" if sin_datar else ""
+    return Metrica("lead time", med, f"{med:.1f} h (mediana de {len(horas)} merges{cola})")
 
 
 # ── 3. Tasa de fallo del cambio ─────────────────────────────────────
@@ -166,10 +215,14 @@ def recuperacion() -> Metrica:
     # `gate-0a-macos` "recuperado" por un verde de `harness-ci` casi 27 h
     # después. Lo cazó el review, y el número contaminado ya estaba commiteado.
     por_wf: dict[str, list] = {}
-    vistos = 0
+    vistos = descartadas = 0
     for c in corridas:
         cuando = _ts(c.get("updatedAt"))
         if cuando is None:
+            # Se CUENTA. Antes se hacía `continue` a secas: la corrida salía del
+            # denominador sin que nadie lo dijera, que es el patrón de la
+            # lección [2026-09-03] cometido en el commit que la añadió.
+            descartadas += 1
             continue
         vistos += 1
         por_wf.setdefault(str(c.get("name") or "?"), []).append((cuando, c.get("conclusion")))
@@ -186,11 +239,13 @@ def recuperacion() -> Metrica:
             elif resultado == "success" and roto is not None:
                 horas.append((cuando - roto).total_seconds() / 3600.0)
                 roto = None
+    cola = f"; {descartadas} descartada(s) por fecha ilegible" if descartadas else ""
     if not horas:
-        return Metrica("tiempo de recuperación",
-                       razon=f"ninguna corrida roja recuperada en las últimas {vistos}")
+        return Metrica("tiempo de recuperación", razon=(
+            f"ninguna corrida roja recuperada en las últimas {vistos}{cola}"))
     med = statistics.median(horas)
-    return Metrica("tiempo de recuperación", med, f"{med:.1f} h (mediana de {len(horas)})")
+    return Metrica("tiempo de recuperación", med,
+                   f"{med:.1f} h (mediana de {len(horas)}{cola})")
 
 
 # ── 5. Tasa de aceptación ───────────────────────────────────────────
@@ -205,11 +260,23 @@ def aceptacion() -> Metrica:
         return Metrica("tasa de aceptación", razon="aún no hay review-history.jsonl")
     api = runpy.run_path(str(Path(__file__).with_name("read-events.py")))
     primero: dict[str, str] = {}
+    sin_sha = sin_veredicto = 0
     try:
         for ev in api["read"](REVIEWS):
             sha = str(ev.get("staged_sha") or "").strip()
             veredicto = str(ev.get("verdict") or "").strip().upper()
-            if sha and veredicto and sha not in primero:
+            if veredicto and not sha:
+                # No es una unidad de trabajo y NO debe contar. Pero que no
+                # cuente y que nadie lo diga son cosas distintas: una review que
+                # ocurrió y no se pudo atribuir a un diff es un dato.
+                sin_sha += 1
+            elif not veredicto:
+                # Ni veredicto ni forma de atribuirlo. Hoy es latente —el único
+                # escritor real nunca deja el veredicto vacío— pero dejar un
+                # descarte mudo en el cambio cuyo propósito es que no los haya
+                # es la contradicción que este harness castiga en todo lo demás.
+                sin_veredicto += 1
+            elif sha not in primero:
                 primero[sha] = veredicto
     except (ValueError, OSError) as e:
         return Metrica("tasa de aceptación", razon=f"review-history ilegible ({e})")
@@ -222,8 +289,14 @@ def aceptacion() -> Metrica:
         aviso = "  ⚠️ >45%: la industria lo lee como aceptación acrítica"
     elif pct < 25:
         aviso = "  ⚠️ <25%: por debajo del rango sano"
+    partes = []
+    if sin_sha:
+        partes.append(f"{sin_sha} sin diff que firmar")
+    if sin_veredicto:
+        partes.append(f"{sin_veredicto} sin veredicto")
+    cola = "; " + ", ".join(partes) if partes else ""
     return Metrica("tasa de aceptación", pct,
-                   f"{pct:.0f}% ({verdes}/{len(primero)} unidades verdes a la primera){aviso}")
+                   f"{pct:.0f}% ({verdes}/{len(primero)} unidades verdes a la primera{cola}){aviso}")
 
 
 # ── 6. Tasa de retrabajo ────────────────────────────────────────────
@@ -269,79 +342,10 @@ def informar(dias: int) -> int:
     return 0
 
 
-# ── El rollup semanal, que es lo que se commitea ────────────────────
-def rollup() -> int:
-    """La decisión del owner (OQ-2): el crudo se queda local y volátil, el
-    resumen semanal se commitea. Y por eso es IDEMPOTENTE y no lleva fecha de
-    generación: un fichero versionado que cambia en cada corrida llena el diff
-    de ruido, y un diff ruidoso se deja de leer."""
-    if not SERIE.exists():
-        print(f"⚠️  dora --rollup: no hay serie que resumir ({SERIE}).", file=sys.stderr)
-        return 3
-    api = runpy.run_path(str(Path(__file__).with_name("read-events.py")))
-    semanas: dict[str, dict[str, list[float]]] = {}
-    try:
-        for ev in api["read"](SERIE):
-            if ev.get("kind") != "dora":
-                continue
-            try:
-                cuando = datetime.fromisoformat(str(ev.get("ts", "")).replace("Z", "+00:00"))
-            except ValueError:
-                continue
-            iso = cuando.isocalendar()
-            sem = semanas.setdefault(f"{iso[0]}-W{iso[1]:02d}", {})
-            for k, v in (ev.get("metricas") or {}).items():
-                if isinstance(v, (int, float)) and not isinstance(v, bool):
-                    sem.setdefault(k, []).append(float(v))
-    except (ValueError, OSError) as e:
-        print(f"⚠️  dora --rollup: serie ilegible — {e}", file=sys.stderr)
-        return 3
-    if not semanas:
-        print("⚠️  dora --rollup: la serie no tiene ni una fila legible.", file=sys.stderr)
-        return 3
-
-    # Las columnas SALEN DE LOS DATOS, en orden de primera aparición. Escribir
-    # aquí la lista de nombres a mano creaba un drift silencioso de los caros:
-    # renombrar una métrica no rompía nada, solo dejaba su columna en `n/a`
-    # para siempre — un hueco que parece un hueco legítimo.
-    columnas: list[str] = []
-    for sem in sorted(semanas):
-        for c in semanas[sem]:
-            if c not in columnas:
-                columnas.append(c)
-    if not columnas:
-        print("⚠️  dora --rollup: la serie no trae ni una métrica con valor.", file=sys.stderr)
-        return 3
-    lineas = ["# Métricas de entrega — resumen semanal", "",
-              "> Lo genera `bash tools/metrics/dora.sh --rollup` a partir de",
-              "> `.agents/state/metrics/series.jsonl`. **No se edita a mano.**",
-              "> El crudo es local y volátil; esto es lo que se versiona, así que",
-              "> es idempotente a propósito: sin fecha de generación, para que el",
-              "> diff solo cambie cuando cambian los datos.", "",
-              "> `n/a` = no hay evento que medir en este repo, y la razón está en la",
-              "> salida de `dora.sh`. No es lo mismo que 0.", "",
-              "| semana | " + " | ".join(columnas) + " |",
-              "|---|" + "---|" * len(columnas)]
-    for sem in sorted(semanas):
-        celdas = []
-        for c in columnas:
-            vals = semanas[sem].get(c)
-            celdas.append(f"{statistics.mean(vals):.1f}" if vals else "n/a")
-        lineas.append(f"| {sem} | " + " | ".join(celdas) + " |")
-
-    try:
-        ROLLUP.parent.mkdir(parents=True, exist_ok=True)
-        ROLLUP.write_text("\n".join(lineas) + "\n", encoding="utf-8")
-    except OSError as e:
-        print(f"⚠️  dora --rollup: no pude escribir {ROLLUP} — {e}", file=sys.stderr)
-        return 3
-    print(f"✅ rollup: {len(semanas)} semana(s) en {ROLLUP}")
-    return 0
-
-
 def main(argv: list[str]) -> int:
     if "--rollup" in argv:
-        return rollup()
+        api = runpy.run_path(str(Path(__file__).with_name("dora_rollup.py")))
+        return api["rollup"](SERIE, ROLLUP)
     dias = VENTANA
     if "--days" in argv:
         try:

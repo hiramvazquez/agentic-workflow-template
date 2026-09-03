@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════
-# Las seis métricas: las que se pueden medir aquí, y las que NO
+# Las métricas: las que se pueden medir aquí, y las que NO
 # ════════════════════════════════════════════════════════════════════
 # PRD 0009 fase 5. Las cuatro DORA más aceptación y retrabajo son la referencia
 # de 2026 porque miden RESULTADOS de entrega, no actividad: son difíciles de
@@ -16,26 +16,9 @@
 # **una métrica sin evento definido en ESTE repo sale `n/a` CON su razón**, nunca
 # 0. Un cero que nadie midió es peor que un hueco declarado.
 
-_dora_sandbox() { # <función>
-  local d; d="$(mktemp -d)" A=add C=commit
-  mkdir -p "$d/tools/metrics" "$d/.agents/state/metrics"
-  cp "$PROJECT_ROOT/tools/metrics/dora.sh" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/dora.py" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/read-events.py" "$d/tools/metrics/" 2>/dev/null
-  (
-    cd "$d" || exit 1
-    git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
-    echo x > a.txt; git "$A" -A 2>/dev/null; git "$C" -qm "primero" 2>/dev/null
-    "$1"
-  )
-  local rc=$?; rm -rf "$d"; return $rc
-}
-
-_dora_review() { # <verdict> <sha>
-  printf '{"ts":"2026-09-01T10:00:00Z","agent":"reviewer","verdict":"%s","staged_sha":"%s"}\n' \
-    "$1" "$2" >> .agents/state/review-history.jsonl
-}
-_dora() { bash tools/metrics/dora.sh 2>&1; }
+_DORA_LIB="$PROJECT_ROOT/tools/tests/lib/dora-sandbox.sh"
+# shellcheck source=/dev/null
+. "$_DORA_LIB"
 
 # ── 1. Lo que no se puede medir sale n/a CON su razón ───────────────
 # El corazón del asunto. Sin merges no hay lead time, y el campo `area` del
@@ -94,37 +77,6 @@ _case_sin_gh_no_aborta() {
 }
 test_sin_gh_declara_y_sigue() { _dora_sandbox _case_sin_gh_no_aborta; }
 
-# ── 4. La serie es append-only ──────────────────────────────────────
-# Es lo que la convierte en serie y no en foto. Si una corrida pisa a la
-# anterior, no hay histórico que comparar.
-_case_serie_append_only() {
-  _dora >/dev/null 2>&1
-  local n1; n1="$(grep -c . .agents/state/metrics/series.jsonl 2>/dev/null || echo 0)"
-  [ "$n1" = "1" ] || { echo "    la primera corrida no dejó UNA fila (dejó $n1)"; return 1; }
-  _dora >/dev/null 2>&1
-  local n2; n2="$(grep -c . .agents/state/metrics/series.jsonl 2>/dev/null || echo 0)"
-  [ "$n2" = "2" ] || { echo "    la segunda corrida no APENDIÓ (filas: $n2, esperaba 2)"; return 1; }
-}
-test_la_serie_es_append_only() { _dora_sandbox _case_serie_append_only; }
-
-# ── 5. El rollup semanal es idempotente ─────────────────────────────
-# Decisión del owner (OQ-2): el crudo local, el resumen semanal commiteado. Si
-# correrlo dos veces duplica la semana, el fichero commiteado se llena de ruido
-# y acaba ignorado — que es como mueren estos ficheros.
-_case_rollup_idempotente() {
-  _dora >/dev/null 2>&1
-  bash tools/metrics/dora.sh --rollup >/dev/null 2>&1
-  local h1; h1="$(shasum docs/process/metrics-weekly.md 2>/dev/null | awk '{print $1}')"
-  bash tools/metrics/dora.sh --rollup >/dev/null 2>&1
-  local h2; h2="$(shasum docs/process/metrics-weekly.md 2>/dev/null | awk '{print $1}')"
-  [ -n "$h1" ] || { echo "    --rollup no generó docs/process/metrics-weekly.md"; return 1; }
-  [ "$h1" = "$h2" ] || {
-    echo "    correr --rollup dos veces cambia el fichero: duplica la semana."
-    echo "    Un fichero commiteado que crece con ruido acaba ignorado."
-    return 1; }
-}
-test_el_rollup_semanal_es_idempotente() { _dora_sandbox _case_rollup_idempotente; }
-
 # ── 6. La tasa de fallo ARRASTRA su denominador ─────────────────────
 # 0% sobre 41 clasificados de 247 no es 0%. Publicar la tasa desnuda sería el
 # cero sin denominador que `detector_runs.py` existe para separar.
@@ -144,55 +96,6 @@ FAKE
     return 1; }
 }
 test_la_tasa_de_fallo_arrastra_su_denominador() { _dora_sandbox _case_denominador; }
-
-# ── 7. Las columnas del rollup salen de los datos ───────────────────
-# Si la lista de columnas se escribe a mano, renombrar una métrica no rompe
-# nada: solo deja su columna en n/a para siempre. Un hueco que parece legítimo
-# es el drift más caro que hay.
-_case_columnas_derivadas() {
-  mkdir -p .agents/state/metrics
-  printf '{"ts":"2026-09-01T10:00:00Z","kind":"dora","metricas":{"metrica bautizada hoy":4.2}}\n' \
-    > .agents/state/metrics/series.jsonl
-  bash tools/metrics/dora.sh --rollup >/dev/null 2>&1
-  grep -q 'metrica bautizada hoy' docs/process/metrics-weekly.md 2>/dev/null || {
-    echo "    el rollup ignoró una métrica que SÍ está en la serie:"
-    sed -n '10,20p' docs/process/metrics-weekly.md 2>/dev/null | sed 's/^/      /'
-    echo "    Con la lista de columnas a mano, renombrar una métrica la esconde."
-    return 1; }
-  grep -q '4.2' docs/process/metrics-weekly.md || {
-    echo "    salió la columna pero no su valor"; return 1; }
-}
-test_las_columnas_del_rollup_salen_de_los_datos() { _dora_sandbox _case_columnas_derivadas; }
-
-# ── 8. Todo lo MEDIDO llega al rollup ───────────────────────────────
-# El rollup solo agrega números, así que una métrica medida pero guardada como
-# cadena desaparece de la tabla commiteada — y desaparece EXACTAMENTE igual que
-# una que no se pudo medir. Es el mismo hueco silencioso de la columna a mano,
-# reapareciendo por el tipo del valor. Pasó de verdad: la tasa de fallo salía
-# "0%" en pantalla y no tenía columna en el fichero versionado.
-_case_medido_llega_al_rollup() {
-  cat > tools/metrics/escape-rate.sh <<'FAKE'
-#!/usr/bin/env bash
-echo "ESCAPE RATE: 7% (3/41 findings clasificados)"
-FAKE
-  chmod +x tools/metrics/escape-rate.sh
-  _dora >/dev/null 2>&1
-  local medidas; medidas="$(python3 -c "
-import json,sys
-fila=json.loads(open('.agents/state/metrics/series.jsonl').read().splitlines()[0])
-malas=[k for k,v in fila['metricas'].items() if v is not None and not isinstance(v,(int,float))]
-print(' '.join(malas))")"
-  [ -z "$medidas" ] || {
-    echo "    métricas medidas que NO son numéricas: $medidas"
-    echo "    El rollup solo agrega números: estas desaparecen de la tabla"
-    echo "    commiteada igual que si no se hubieran podido medir."
-    return 1; }
-  bash tools/metrics/dora.sh --rollup >/dev/null 2>&1
-  grep -q 'tasa de fallo' docs/process/metrics-weekly.md || {
-    echo "    'tasa de fallo' está medida pero no tiene columna en el rollup"
-    return 1; }
-}
-test_todo_lo_medido_llega_al_rollup() { _dora_sandbox _case_medido_llega_al_rollup; }
 
 # ── 9. El rojo de un pipeline NO lo recupera el verde de otro ────────
 # Lo cazó el review con el `gh run list` real de este repo: hay tres workflows
@@ -232,3 +135,141 @@ FAKE
     echo "    esperaba 3 pares, uno por workflow; salió: $l"; return 1; }
 }
 test_la_recuperacion_no_cruza_workflows() { _dora_sandbox _case_recuperacion_por_workflow; }
+
+# ── 10. La rama del tronco NO se codifica a mano ─────────────────────
+# `main` estaba escrito en el código. En un repo con rama `trunk` —o `master`,
+# que sigue siendo el defecto de git— dora decía "0 commits en main en 90 días":
+# un n/a cuya RAZÓN es falsa. No es que no hubiera commits; es que miró un sitio
+# que no existe. Peor que callar: miente sobre el motivo. Y esto es una
+# plantilla que se distribuye a adoptantes, así que le pasa a cualquiera.
+_case_tronco_derivado() {
+  git branch -m "$(git rev-parse --abbrev-ref HEAD)" trunk 2>/dev/null
+  local l; l="$(_dora | grep -i 'frecuencia')"
+  printf '%s' "$l" | grep -qi 'n/a' && {
+    echo "    con rama 'trunk' la frecuencia sale n/a: $l"
+    echo "    Hay un commit; lo que no hay es una rama llamada 'main'."
+    return 1; }
+  printf '%s' "$l" | grep -q 'trunk' || {
+    echo "    mide, pero no dice CONTRA QUÉ rama: $l"
+    echo "    Sin nombrarla, el lector no puede saber si midió lo que cree."
+    return 1; }
+}
+test_el_tronco_se_deriva_no_se_codifica() { _dora_sandbox _case_tronco_derivado; }
+
+# ── 11. Lo descartado se declara ────────────────────────────────────
+# El cierre de f-... : `_ts()` devolvía None ante una fecha ilegible y el bucle
+# hacía `continue`. Esa corrida no contaba en el denominador y nadie lo decía.
+# Es el patrón EXACTO de la lección [2026-09-03] sobre agregadores que filtran
+# en silencio, cometido en el mismo commit que la añadió. Un descarte que no se
+# declara no es un filtro: es una pérdida.
+_case_descartes_declarados() {
+  mkdir -p bin
+  cat > bin/gh <<'FAKE'
+#!/usr/bin/env bash
+cat <<'JSON'
+[{"conclusion":"failure","updatedAt":"2026-09-01T10:00:00Z","name":"alfa"},
+ {"conclusion":"success","updatedAt":"2026-09-01T11:00:00Z","name":"alfa"},
+ {"conclusion":"failure","updatedAt":"ayer por la tarde","name":"beta"},
+ {"conclusion":"success","updatedAt":null,"name":"beta"}]
+JSON
+FAKE
+  chmod +x bin/gh
+  local l; l="$(PATH="$PWD/bin:$PATH" bash tools/metrics/dora.sh 2>&1 | grep -i 'recuperaci')"
+  printf '%s' "$l" | grep -q '2 descartada' || {
+    echo "    dos corridas con fecha ilegible desaparecen sin declararse:"
+    echo "      $l"
+    return 1; }
+}
+test_las_corridas_descartadas_se_declaran() { _dora_sandbox _case_descartes_declarados; }
+
+# ── 12. Un veredicto sin diff que firmar también se declara ─────────
+# Mismo patrón en la aceptación: una fila sin `staged_sha` no es una unidad de
+# trabajo y NO debe contar — pero que no cuente y que nadie lo diga son dos
+# cosas distintas. Una review que ocurrió y no se pudo atribuir es un dato.
+_case_reviews_sin_sha() {
+  _dora_review GREEN aaa
+  printf '{"ts":"2026-09-01T10:00:00Z","agent":"reviewer","verdict":"RED"}\n' \
+    >> .agents/state/review-history.jsonl
+  local l; l="$(_dora | grep -i 'aceptaci')"
+  printf '%s' "$l" | grep -q '1 sin diff' || {
+    echo "    la fila sin staged_sha se descarta en silencio: $l"; return 1; }
+}
+test_los_veredictos_sin_sha_se_declaran() { _dora_sandbox _case_reviews_sin_sha; }
+
+# ── 14. Estar en una rama de trabajo no cambia contra qué se mide ────
+# "Lo que llega al tronco" es el tronco, no donde tú estés parado. Derivar la
+# rama de `HEAD` a secas mediría la frecuencia de tu feature branch y la
+# llamaría entrega.
+#
+# (La indirección A=add/C=commit es la misma que usa `_dora_sandbox`: el
+# reviewer-gate lee el texto crudo del comando y ve un `git add` seguido de un
+# `git commit` como una evasión del gate, aunque aquí sean datos de un fixture.)
+_case_tronco_no_es_head() {
+  local base A=add C=commit; base="$(git rev-parse --abbrev-ref HEAD)"
+  git checkout -q -b una-feature 2>/dev/null
+  echo y > b.txt; git "$A" b.txt 2>/dev/null; git "$C" -qm dos 2>/dev/null
+  local l; l="$(_dora | grep -i 'frecuencia')"
+  printf '%s' "$l" | grep -q "$base" || {
+    echo "    parado en 'una-feature', midió contra otra cosa: $l"
+    echo "    Esperaba el tronco ('$base'), no la rama de trabajo."
+    return 1; }
+  printf '%s' "$l" | grep -q 'una-feature' && {
+    echo "    midió contra la rama de trabajo: $l"; return 1; }
+  return 0
+}
+test_el_tronco_no_es_la_rama_actual() { _dora_sandbox _case_tronco_no_es_head; }
+
+# ── 15. El nombre que devuelve `_tronco()` tiene que RESOLVER ───────
+# Lo cazó el review con un repro end-to-end. `origin/HEAD` apunta a
+# `origin/main`, y de ahí se cortaba el prefijo y se devolvía `main` pelado.
+# Pero un nombre pelado solo resuelve si existe la rama LOCAL, y borrarla es
+# rutina (`git branch -D main` tras terminar un trabajo). Resultado: el mismo
+# "0 commits en `main`" que este cambio dice cerrar, por otra puerta. Y la rama
+# de MAYOR prioridad de la función no tenía ni un test.
+_case_origin_sin_rama_local() {
+  local base; base="$(git rev-parse --abbrev-ref HEAD)"
+  git update-ref refs/remotes/origin/main HEAD
+  git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git checkout -q --detach
+  git branch -q -D "$base" 2>/dev/null
+  local l; l="$(_dora | grep -i 'frecuencia')"
+  printf '%s' "$l" | grep -qi 'n/a' && {
+    echo "    con origin/HEAD y sin rama local, la frecuencia sale n/a:"
+    echo "      $l"
+    echo "    Hay un commit alcanzable desde origin/main; el nombre pelado no resuelve."
+    return 1; }
+  printf '%s' "$l" | grep -q 'origin/main' || {
+    echo "    midió, pero no contra la referencia que sí resuelve: $l"; return 1; }
+}
+test_el_tronco_devuelto_tiene_que_resolver() { _dora_sandbox _case_origin_sin_rama_local; }
+
+# ── 16. Si NINGÚN candidato resuelve, se dice — no se inventa uno ───
+# El caso límite del mismo defecto: en un repo sin un solo commit no hay tronco
+# que medir. Devolver un nombre igualmente produce "0 commits en `X`", que
+# vuelve a ser un n/a con la razón equivocada.
+_case_sin_tronco_posible() {
+  local l; l="$(bash tools/metrics/dora.sh 2>&1 | grep -i 'frecuencia')"
+  printf '%s' "$l" | grep -qi 'n/a' || { echo "    esperaba n/a: $l"; return 1; }
+  printf '%s' "$l" | grep -qi 'tronco' || {
+    echo "    dice n/a pero culpa a la ventana, no a que no hay tronco:"
+    echo "      $l"
+    echo "    '0 commits en X' en un repo vacío señala al sitio equivocado."
+    return 1; }
+}
+test_sin_tronco_que_medir_se_declara() { _dora_sandbox_vacio _case_sin_tronco_posible; }
+
+# ── 17. Una fila sin veredicto NI sha tampoco se cae callada ────────
+# El mutante que el review lanzó y SOBREVIVIÓ: `if veredicto and not sha` deja
+# fuera de todo contador a la fila que no tiene ninguno de los dos. Hoy es un
+# hueco latente —el único escritor real nunca produce un veredicto vacío— pero
+# dejar un descarte mudo en el cambio cuyo propósito es que no los haya es la
+# contradicción que este harness castiga en todo lo demás.
+_case_fila_sin_nada() {
+  _dora_review GREEN aaa
+  printf '{"ts":"2026-09-01T10:00:00Z","agent":"reviewer"}\n' \
+    >> .agents/state/review-history.jsonl
+  local l; l="$(_dora | grep -i 'aceptaci')"
+  printf '%s' "$l" | grep -q '1 sin veredicto' || {
+    echo "    la fila sin veredicto ni sha desaparece sin contador: $l"; return 1; }
+}
+test_las_filas_sin_veredicto_ni_sha_se_declaran() { _dora_sandbox _case_fila_sin_nada; }

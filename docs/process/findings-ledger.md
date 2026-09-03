@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **82** · Cerrados: 168 · Total: 250
+Abiertos: **83** · Cerrados: 169 · Total: 252
 
 ## Abiertos
 
@@ -22,6 +22,7 @@ Abiertos: **82** · Cerrados: 168 · Total: 250
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-29b0127a` | medium | auto-fix | `scripts/install-harness.sh (_verificar_clasificacion)` | install-harness: _verificar_clasificacion no expande SYNC_GLOBS, punto ciego dormido del mismo patron que ya fallo |
+| `f-2b1e6145` | medium | owner-decision | `tools/metrics/dora.py:79-86` | _tronco() puede medir contra una rama local desactualizada frente a origin/<rama>, sin declararlo |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3793c17b` | medium | owner-decision | `.claude/settings.json:21 + .agents/ (convencion de rutas de estado)` | Un deny de Edit sobre .agents/state alcanza a las escrituras por Bash del sub-agente, y nada lo declara |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
@@ -264,3 +265,4 @@ Abiertos: **82** · Cerrados: 168 · Total: 250
 | `f-a9e12041` | fixed | scripts/install-harness.sh copia la maquinaria leyendo el mismo inventario que upgrade.sh (SYNC_PATH |
 | `f-970c3590` | fixed | PRD 0008 fase 2. bootstrap.sh ya NO borra: imprime el comando y deja la decision al adoptante (OQ-5, |
 | `f-2c889b68` | fixed | El bloque se reescribio en el mismo commit de la fase 2: 'while IFS= read -r -d' sobre 'git ls-files |
+| `f-94384693` | fixed | Cerrado en los CUATRO sitios donde el fichero descartaba callado, no solo en el que denunciaba semgr |

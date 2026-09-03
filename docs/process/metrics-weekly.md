@@ -11,4 +11,4 @@
 
 | semana | frecuencia de entrega | tasa de fallo | tiempo de recuperación | tasa de aceptación |
 |---|---|---|---|---|
-| 2026-W36 | 12.0 | 0.0 | 2.4 | 25.0 |
+| 2026-W36 | 12.1 | 0.0 | 2.4 | 25.4 |
