@@ -112,6 +112,35 @@
 
 ## Próximo paso
 
+> **2026-09-03 · PRD 0009 arrancado.** Las cinco Open Questions resueltas: tres cerradas
+> investigando el código, dos decididas por el owner. La de OQ-10 **cambió la fase 3b** —no hay
+> aislamiento de sub-agentes por configuración, solo un parámetro por invocación de la tool
+> `Agent`, así que esa fase se degrada de mecanismo a regla— y OQ-11b **aparca la fase 6**: no
+> hay credencial de IA en ningún workflow y `ci/ai-review.sh` falla ABIERTO, de modo que
+> cablear el juez nocturno sin backend daría un badge verde permanente.
+>
+> **Fase 4 ENTREGADA:** `check-execution-map` deriva sus directorios de producto de
+> `project_kind` vía `scope.sh`, en vez de pedir una segunda declaración. Esa lista vacía era
+> la razón de que este detector dijera `stale=0` con el mapa nueve días atrás. Y `lefthook`
+> gana un aviso LOCAL que nunca bloquea: el rojo del mapa es pegajoso —lo produce la
+> comparación de fechas, no el commit— así que enterarse antes de pushear es lo que faltaba.
+> A un proyecto de app no se le impone nada: ahí `tools/` y `scripts/` son andamio.
+>
+> **Primera cifra legible del PRD 0009:** la tasa de aceptación real es **25%** (35 verdes a la
+> primera de 138 unidades de trabajo, de `review-history.jsonl`). El rango sano de la industria
+> es 25–45%, así que estamos en el **borde inferior**.
+>
+> **Y la lección más cara de la fase 4:** la suite **nunca corre con `CI=true`**, y Actions lo
+> exporta en todos los jobs. Eso escondió dos bugs de la misma forma —una consulta a `scope.sh`
+> que tiene efectos al sourcearse, y su `exit 3` bajo CI matando al script entero—, uno de
+> ellos ya pusheado, donde además ENMASCARABA una violación real de capas con una queja de
+> configuración. La suite entera en verde con la CI real a punto de ponerse roja. Arreglado en los
+> cuatro sitios y convertido en detector (`test_scope_sh_no_se_sourcea_sin_aislar`), con la
+> excepción de los dos gates de scope declarada por nombre.
+>
+> **Siguiente:** fase 5 (las seis métricas como serie, con el rollup semanal que decidió OQ-2).
+
+
 > **2026-09-03 — auditoría de dos días y PRD 0008 en curso.** El harness entregó: selftest de
 > rutas (los detectores demuestran que ven aunque el harness cambie de sitio), registro de
 > ejecución en los 7 detectores, suite en paralelo (medido: 379 s → ~150 s, commit `09c7638`),

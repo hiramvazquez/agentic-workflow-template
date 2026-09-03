@@ -66,7 +66,31 @@ BACKLOG_DIR="${EXECUTION_MAP_BACKLOG_DIR:-backlog}"
 #                 backend → "internal/ cmd/"
 #      Un adoptante recién clonado no tiene producto todavía: dejarlo vacío es
 #      el default correcto y NO deja el día 1 en rojo. -->
+# Precedencia: el env manda (para que un adoptante afine sin tocar el script) y,
+# si no lo pone, se DERIVA de `project_kind` vía scope.sh. La version anterior se
+# quedaba en vacio, y esa es la razon —verificada— de que este detector dijera
+# `stale=0` con el mapa nueve dias atras: la dimension existia, faltaba
+# configurarla. Derivar en vez de pedir una segunda declaracion es lo que evita
+# que las dos diverjan.
 PROD_DIRS="${EXECUTION_MAP_PROD_DIRS:-}"
+if [ -z "$PROD_DIRS" ]; then
+  _EM_SCOPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/scope.sh"
+  if [ -f "$_EM_SCOPE" ]; then
+    # ⚠️ En SUBSHELL y con SCOPE_NO_CI_EXIT=1. Las dos cosas, y ninguna es
+    # opcional: `scope.sh` ejecuta `_scope_verifica_declaracion` AL SOURCEARSE,
+    # y esa funcion hace `exit 3` bajo CI cuando la declaracion contradice a la
+    # evidencia. Sourceado directo, ese exit mata a check-execution-map ENTERO —
+    # y GitHub Actions exporta CI=true en todos los jobs, asi que la version
+    # anterior habria puesto la CI real en rojo por una causa que no tiene nada
+    # que ver con la frescura del mapa.
+    #
+    # Aqui esto es una CONSULTA, no un gate de scope, y el repo ya tenia el
+    # patron exacto para eso en scripts/agent-hooks/session-start.sh:148.
+    # Lo cazo el review; el verify-run local no podia verlo porque no exporta CI.
+    PROD_DIRS="$(SCOPE_NO_CI_EXIT=1 bash -c ". '$_EM_SCOPE' 2>/dev/null; \
+      command -v scope_prod_dirs >/dev/null 2>&1 && scope_prod_dirs" 2>/dev/null)"
+  fi
+fi
 
 # <!-- FILL: frases que el mapa NO puede contener cuando ya existe producto.
 #      Una por línea, se comparan literalmente (`grep -F`). La de serie es la

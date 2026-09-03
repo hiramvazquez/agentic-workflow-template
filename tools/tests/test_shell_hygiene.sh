@@ -281,3 +281,60 @@ test_grep_Z_no_alimenta_un_read_nul() {
   echo "    Le pasó a bootstrap.sh: nunca reemplazó los placeholders en macOS."
   return 1
 }
+
+# ── `scope.sh` se CONSULTA aislada, nunca se sourcea suelta ─────────
+# Dos bugs distintos el mismo día, la misma forma. `scope.sh` ejecuta
+# `_scope_verifica_declaracion` AL SOURCEARSE, y esa función hace `exit 3` bajo
+# CI cuando la declaración contradice a la evidencia. Sourceada directa en un
+# script, ese exit lo mata entero:
+#
+#   · `check-execution-map` moría antes de comparar nada.
+#   · Los tres detectores retirados salían 3 y ENMASCARABAN la violación real
+#     de capas con una queja de configuración — y ese ya estaba pusheado.
+#
+# Y ninguno de los dos se veía en local, porque la suite no corre con `CI=true`
+# y GitHub Actions lo exporta en todos los jobs. "827 tests verdes" con la CI
+# real a punto de ponerse roja.
+#
+# El patrón correcto ya existía en `session-start.sh:148`: subshell +
+# `SCOPE_NO_CI_EXIT=1`. Quien necesite la librería para DECIDIR algo (un gate de
+# scope) puede sourcearla directa; quien solo CONSULTA, no.
+# ── La excepción, declarada y con nombre ────────────────────────────
+# `check-review-marker` y `check-verify-marker` SÍ sourcean scope.sh directa, y
+# es correcto: son los GATES DE SCOPE. Usan la librería para DECIDIR qué cuenta
+# como producto, así que el `exit 3` bajo una declaración contradictoria es
+# exactamente lo que deben honrar — un gate que clasifica con una config en la
+# que no puede confiar tiene que parar, no seguir adivinando.
+#
+# La regla es consulta vs decisión: quien pregunta "¿aplico aquí?" aísla; quien
+# decide con la respuesta, no. La lista es cerrada a propósito — si un tercer
+# script necesita entrar, que sea con su razón escrita aquí y no por descuido.
+_SCOPE_GATES_LEGITIMOS='check-review-marker.sh check-verify-marker.sh'
+
+test_scope_sh_no_se_sourcea_sin_aislar() {
+  # La regla es BASTA a propósito: "si usas scope.sh, o eres un gate declarado o
+  # llevas el guard". La versión fina —buscar la línea del `.` con `scope.sh`
+  # dentro— la evadía una variable: `_EM_SCOPE=".../scope.sh"` y luego
+  # `. "$_EM_SCOPE"` no casa el literal. Lo demostró un mutante. Seguir el valor
+  # de una variable con grep de texto no se puede sin falsos positivos (§14.2),
+  # así que se pregunta lo que sí es decidible: ¿este fichero usa la librería, y
+  # aparece el guard en alguna parte?
+  local hits="" f cuerpo
+  while IFS= read -r -d '' f; do
+    cuerpo="$(grep -vE '^[[:space:]]*#' "$f" 2>/dev/null || true)"
+    printf '%s' "$cuerpo" | grep -q 'scope\.sh' || continue
+    printf '%s' "$cuerpo" | grep -q 'SCOPE_NO_CI_EXIT' && continue
+    case " $_SCOPE_GATES_LEGITIMOS " in *" ${f##*/} "*) continue ;; esac
+    hits="$hits $f"
+  done < <(find "$PROJECT_ROOT/tools" "$PROJECT_ROOT/scripts" "$PROJECT_ROOT/ci" \
+             -name '*.sh' -not -path '*/tests/*' -not -name 'scope.sh' -print0 2>/dev/null)
+  [ -z "$hits" ] && return 0
+  echo "    estos scripts sourcean scope.sh SIN SCOPE_NO_CI_EXIT=1:"
+  for f in $hits; do echo "      ${f##*/}"; done
+  echo "    scope.sh corre _scope_verifica_declaracion al sourcearse, y esa función"
+  echo "    hace exit 3 bajo CI ante una contradicción declarado-vs-evidencia."
+  echo "    Sourceada directa, ese exit MATA al script — y Actions exporta CI=true."
+  echo "    Para CONSULTAR usa el patrón de session-start.sh:148:"
+  echo "      X=\"\$(SCOPE_NO_CI_EXIT=1 bash -c '. tools/lib/scope.sh 2>/dev/null; …')\""
+  return 1
+}

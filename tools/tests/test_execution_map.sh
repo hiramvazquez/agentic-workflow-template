@@ -1232,3 +1232,161 @@ _case_ambiguas_en_medio_son_prosa() {
 test_una_ambigua_en_medio_delata_prosa() {
   _em_repo _case_ambiguas_en_medio_son_prosa
 }
+
+# ── El mapa se vigila a sí mismo en el repo del harness ─────────────
+# PRD 0009 fase 4. El mapa es lo PRIMERO que lee cada sesión (§15) y lo que
+# `session-start` imprime en cada arranque, y llegó a estar NUEVE DÍAS atrás
+# mientras su detector decía `stale=0`. La causa no era que le faltara la
+# dimensión —`check-execution-map` ya compara el último commit de producto
+# contra el del mapa— sino que `PROD_DIRS` está vacío por defecto y nadie lo
+# configuraba.
+#
+# Se DERIVA de `project_kind`, que ya existe, en vez de pedir una segunda
+# declaración: una declaración, dos consumidores, cero drift. Es el mismo patrón
+# que cerró la retirada de detectores.
+#
+# Para un repo de APP se deja VACÍO a propósito: inventarle una lista de
+# directorios de producto a un adoptante sería una heurística imponiendo trabajo
+# que él no pidió, y el env var sigue ahí para que la ponga él.
+
+_emk_repo() { # <kind> <función> — nombre distinto del `_em_repo` de arriba A PROPÓSITO:
+                    # ese ya existe con otra firma y redefinirlo rompía los 50
+                    # tests que lo usan (`$2: unbound variable`). Los helpers de
+                    # un fichero de test son globales en cuanto se sourcea.
+  local d; d="$(mktemp -d)" A=add C=commit
+  # `ci/` también: sin él, un typo que lo saque de la derivación (`ci` → `cli`)
+  # sobrevive, porque ningún fixture ejerce esa rama. Lo encontró el review.
+  mkdir -p "$d/tools/lib" "$d/docs/process" "$d/scripts" "$d/ci"
+  cp "$PROJECT_ROOT/tools/check-execution-map.sh" "$d/tools/"
+  cp "$PROJECT_ROOT/tools/lib/scope.sh" "$d/tools/lib/"
+  printf 'project_kind: %s\n' "$1" > "$d/tools/project.conf"
+  printf '# Mapa\n\n## Estado actual\n\nAlgo.\n\n## Próximo paso\n\nOtra cosa.\n' \
+    > "$d/docs/process/current_execution_map.md"
+  printf '#!/usr/bin/env bash\necho hola\n' > "$d/scripts/algo.sh"
+  printf '#!/usr/bin/env bash\necho gate\n' > "$d/ci/algo.sh"
+  local fn="$2"
+  (
+    cd "$d" || exit 1
+    git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
+    # Las fechas se FIJAN, no se duermen: la comparación del detector es `>`
+    # sobre timestamps de git, que tienen resolución de SEGUNDO, así que dos
+    # commits instantáneos empatan y no disparan. Costó descubrirlo — con el
+    # env var explícito también daba stale=0, lo que descartaba la derivación
+    # como causa. `sleep 1` funcionaría y sería un test más lento y más frágil.
+    export GIT_COMMITTER_DATE="2020-01-01T00:00:00" GIT_AUTHOR_DATE="2020-01-01T00:00:00"
+    git "$A" -A 2>/dev/null; git "$C" -qm base 2>/dev/null
+    unset GIT_COMMITTER_DATE GIT_AUTHOR_DATE
+    "$fn"
+  )
+  local rc=$?; rm -rf "$d"; return $rc
+}
+
+# Commit posterior con fecha CONTROLADA, para que el orden sea inequívoco.
+_emk_commit() { # <mensaje> <fecha ISO>
+  local A=add C=commit
+  GIT_COMMITTER_DATE="$2" GIT_AUTHOR_DATE="$2" sh -c "git $A -A 2>/dev/null; git $C -qm '$1' 2>/dev/null"
+}
+
+# ── 1. En el harness, tocar producto sin tocar el mapa lo delata ────
+_case_harness_delata_el_mapa_viejo() {
+  printf '#!/usr/bin/env bash\necho cambiado\n' > scripts/algo.sh
+  _emk_commit "toco producto y NO el mapa" "2021-01-01T00:00:00" 
+  local out rc
+  out="$(bash tools/check-execution-map.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    se tocó scripts/ sin tocar el mapa y el detector dice que está al día (exit $rc):"
+    printf '%s\n' "$out" | grep SUMMARY | sed 's/^/      /'
+    echo "    Es lo que dejó el mapa nueve días atrás con stale=0."
+    return 1; }
+}
+test_en_el_harness_el_mapa_viejo_se_delata() {
+  _emk_repo harness _case_harness_delata_el_mapa_viejo
+}
+
+# ── 2. …y tocar los dos en el mismo commit pasa ─────────────────────
+# Guard del falso positivo: si el detector no se pudiera satisfacer, sería una
+# ceremonia que se acaba desactivando.
+_case_harness_con_el_mapa_al_dia() {
+  printf '#!/usr/bin/env bash\necho cambiado\n' > scripts/algo.sh
+  printf '# Mapa\n\n## Estado actual\n\nAlgo NUEVO.\n\n## Próximo paso\n\nOtra cosa.\n' \
+    > docs/process/current_execution_map.md
+  _emk_commit "producto y mapa en el mismo commit" "2021-01-01T00:00:00" 
+  local rc; bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || { echo "    con el mapa actualizado en el MISMO commit sigue diciendo stale (exit $rc)"; return 1; }
+}
+test_tocar_mapa_y_producto_juntos_pasa() {
+  _emk_repo harness _case_harness_con_el_mapa_al_dia
+}
+
+# ── 3. A un proyecto de APP no se le impone nada ────────────────────
+# Inventarle una lista de directorios de producto sería una heurística
+# imponiendo trabajo que el adoptante no pidió. El env var sigue para él.
+_case_app_no_hereda_la_carga() {
+  printf '#!/usr/bin/env bash\necho cambiado\n' > scripts/algo.sh
+  _emk_commit "toco scripts en un repo de app" "2021-01-01T00:00:00" 
+  local rc; bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    a un proyecto de APP se le exige el mapa por tocar scripts/ (exit $rc)"
+    echo "    Ahí scripts/ es andamio, no producto — es carga que no pidió."
+    return 1; }
+}
+test_un_proyecto_de_app_no_hereda_la_carga() {
+  _emk_repo application _case_app_no_hereda_la_carga
+}
+
+# ── 4. El env var sigue mandando ────────────────────────────────────
+_case_el_env_gana() {
+  printf '#!/usr/bin/env bash\necho cambiado\n' > scripts/algo.sh
+  _emk_commit "toco scripts" "2021-01-01T00:00:00" 
+  local rc
+  EXECUTION_MAP_PROD_DIRS="no-existe-esta-carpeta" bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    el env var no ganó sobre la derivación (exit $rc): un adoptante no puede afinarlo"
+    return 1; }
+}
+test_el_env_var_gana_sobre_la_derivacion() { _emk_repo harness _case_el_env_gana; }
+
+# ── El detector sobrevive a CI con una declaración contradictoria ───
+# Hallazgo RED del review, y la lección va más allá del bug: **la suite corre
+# SIN `CI=true`**, así que toda una rama de comportamiento estaba sin test. El
+# verify-run local daba 827 verdes con la CI real a punto de ponerse roja.
+#
+# El bug: `scope.sh` ejecuta `_scope_verifica_declaracion` AL SOURCEARSE, y esa
+# función hace `exit 3` bajo CI cuando la declaración contradice a la evidencia.
+# Sourceado directo, ese exit mataba a `check-execution-map` entero — y GitHub
+# Actions exporta `CI=true` en todos los jobs. La consulta va ahora en subshell
+# con `SCOPE_NO_CI_EXIT=1`, que es el patrón que el repo ya tenía en
+# `session-start.sh:148` para exactamente este caso.
+_case_sobrevive_a_ci() {
+  # `application` declarado sin fuentes de app ES una contradicción para
+  # scope.sh — el escenario exacto que disparaba el exit 3.
+  local rc
+  CI=true bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" != "3" ] || {
+    echo "    bajo CI=true el detector salió 3 por una contradicción de scope,"
+    echo "    que no tiene NADA que ver con la frescura del mapa. Sourcear"
+    echo "    scope.sh sin aislarlo mata al detector entero, y Actions exporta"
+    echo "    CI=true en todos los jobs: esto pondría la CI real en rojo."
+    return 1; }
+}
+test_el_detector_sobrevive_a_ci_con_declaracion_contradictoria() {
+  _emk_repo application _case_sobrevive_a_ci
+}
+
+# ── Cada directorio derivado se vigila, no solo el primero ──────────
+# El review encontró que cambiar `ci` por `cli` en la derivación sobrevivía:
+# ningún fixture tocaba SOLO `ci/`, así que los demás casos disparaban por
+# `scripts/` y el typo pasaba. Un test que ejercita un elemento de una lista no
+# prueba la lista.
+_case_tocar_solo_ci_tambien_delata() {
+  printf '#!/usr/bin/env bash\necho gate cambiado\n' > ci/algo.sh
+  _emk_commit "toco SOLO ci/ y no el mapa" "2021-01-01T00:00:00"
+  local rc; bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    se tocó SOLO ci/ sin tocar el mapa y no se delató (exit $rc):"
+    echo "    ci/ cablea el Anillo 3 — si sale de la derivación, deja de vigilarse."
+    return 1; }
+}
+test_tocar_solo_ci_tambien_delata_el_mapa() {
+  _emk_repo harness _case_tocar_solo_ci_tambien_delata
+}

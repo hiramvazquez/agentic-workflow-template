@@ -87,13 +87,22 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 _DET_SCOPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/scope.sh"
 # shellcheck source=tools/lib/scope.sh
 if [ -f "$_DET_SCOPE" ]; then
-  # El stderr NO se manda a /dev/null: `_scope_verifica_declaracion` corre al
-  # sourcear y es quien AVISA de una contradiccion declarado-vs-evidencia.
-  # Silenciarlo hacia que en CI el detector saliera 3 con la salida vacia:
-  # un gate que corta sin decir por que.
-  . "$_DET_SCOPE" || true
-  if command -v scope_detectores_de_app_aplican >/dev/null 2>&1 \
-     && ! scope_detectores_de_app_aplican; then
+  # La consulta va en SUBSHELL con SCOPE_NO_CI_EXIT=1, y el stderr SÍ pasa.
+  # Las tres cosas importan y cada una tapa un fallo distinto:
+  #   · subshell + SCOPE_NO_CI_EXIT: `scope.sh` ejecuta
+  #     `_scope_verifica_declaracion` al sourcearse, y bajo CI esa funcion hace
+  #     `exit 3` si la declaracion contradice a la evidencia. Sourceada directa,
+  #     ese exit MATA al detector — y peor: enmascara la violacion real de capas
+  #     con una queja de configuracion. Actions exporta CI=true en todos los jobs.
+  #   · el stderr sin redirigir: ese aviso de contradiccion es justo lo que el
+  #     adoptante necesita leer. Silenciarlo dejaba al detector cortando sin
+  #     decir por que.
+  # El repo ya tenia el patron para una CONSULTA en session-start.sh:148.
+  _DET_APLICAN=0
+  SCOPE_NO_CI_EXIT=1 bash -c ". '$_DET_SCOPE' 2>/dev/null; \
+    command -v scope_detectores_de_app_aplican >/dev/null 2>&1 || exit 0; \
+    scope_detectores_de_app_aplican" || _DET_APLICAN=1
+  if [ "$_DET_APLICAN" = "1" ]; then
     echo "SOURCE_SETS estado=no-aplica violaciones=0"
     echo "ℹ️  check-source-sets: no aplica — este repo declara project_kind: harness, y aqui no"
     echo "   hay codigo de app que mirar. No se retiro del template: un adoptante"

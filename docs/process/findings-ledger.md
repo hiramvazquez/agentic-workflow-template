@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **78** · Cerrados: 168 · Total: 246
+Abiertos: **79** · Cerrados: 168 · Total: 247
 
 ## Abiertos
 
@@ -35,6 +35,7 @@ Abiertos: **78** · Cerrados: 168 · Total: 246
 | `f-7256d194` | medium | auto-fix | `tools/tests/test_e2e_*.sh` | _e2e_repo duplicado en cuatro archivos: cada fix del sandbox se aplica x4 a mano |
 | `f-7498dab2` | medium | owner-decision | `tools/check-execution-map.sh (_es_comando / EVIDENCIA)` | La evidencia del mapa se INFIERE de los backticks, y cinco heuristicas seguidas han tenido fuga |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
+| `f-8639c173` | medium | owner-decision | `tools/tests/run-tests.sh + verify-run.sh (matriz de entornos)` | La suite no corre nunca con CI=true, asi que una rama entera de comportamiento no se verifica en local |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
 | `f-89ef31c4` | medium | owner-decision | `tools/lessons-rotate.sh (criterio de archivado) + docs/process/lessons_archive.md` | El rotador archiva lecciones alegando que su detector corre en el Anillo 3, y en ESTE repo el Anillo 3 no corre |
 | `f-8b74d177` | medium | owner-decision | `tools/check-skill-matrix-doc.sh + AGENTS.md §11` | check-skill-matrix-doc compara CONJUNTOS de refs, asi que mover una lectura de fila a otra es invisible |

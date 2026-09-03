@@ -72,6 +72,27 @@ pre-commit:
     # "resuelve" el index y el commit pasa. Cazado en vivo: un merge concluido
     # así corrompió el ledger de findings. Es además el contrapeso de la
     # exención MERGE_HEAD del review-marker (los merges van menos vigilados).
+    # ── El mapa de ejecución: AVISA en local, bloquea en CI ───────────
+    # `docs/process/current_execution_map.md` es lo PRIMERO que lee cada sesión
+    # y lo que session-start imprime en cada arranque. Llegó a estar NUEVE DÍAS
+    # atrás mientras su detector decía stale=0, porque su lista de directorios
+    # de producto estaba vacía y nadie la configuraba (ahora se deriva de
+    # project_kind vía scope.sh).
+    #
+    # Aquí AVISA y nunca bloquea, a propósito. El gate del Anillo 3 ya existe
+    # (ci/run-gates.sh) y bloquear también en local obligaría a tocar el mapa
+    # ANTES de saber qué escribir en él. El aviso llega cuando aún se puede
+    # arreglar sin que CI se ponga rojo — y eso importa porque el rojo del mapa
+    # es PEGAJOSO: lo produce la comparación de fechas, no el commit, así que
+    # sigue rojo en cada corrida hasta que alguien lo actualice.
+    - name: execution-map
+      run: |
+        bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+        [ "$rc" = "0" ] && exit 0
+        echo "⚠️  el mapa de ejecución se quedó atrás — CI SÍ lo bloqueará."
+        echo "   Actualiza docs/process/current_execution_map.md en este commit."
+        exit 0
+
     - name: conflict-markers
       run: bash tools/check-conflict-markers.sh
 

@@ -272,3 +272,21 @@ scope_detectores_de_app_aplican() { # → 0 si aplican, 1 si no
   [ -n "$(_scope_fuentes_de_app)" ] && return 0
   return 1
 }
+
+# ── Directorios de PRODUCTO, para quien necesite rutas y no un regex ─
+# `_NON_PRODUCT_*` define el producto por EXCLUSIÓN, que sirve para clasificar
+# un path pero no para pasarle rutas a `git log`. Esto lo da en la forma que
+# necesita `check-execution-map`, derivándolo de la MISMA declaración en vez de
+# pedir una segunda (el mapa llegó a estar nueve días atrás con su detector
+# diciendo `stale=0`, porque su lista de directorios estaba vacía y nadie la
+# configuraba).
+#
+# Para un repo de APP devuelve VACÍO a propósito. Inventarle una lista sería una
+# heurística imponiéndole trabajo que no pidió: ahí `scripts/` y `tools/` son
+# andamio, no producto. El adoptante que lo quiera pone `EXECUTION_MAP_PROD_DIRS`.
+scope_prod_dirs() { # → directorios de producto separados por espacio, o vacío
+  [ "$(_scope_project_kind)" = "harness" ] || return 0
+  local d out=""
+  for d in tools scripts ci; do [ -d "$d" ] && out="$out $d"; done
+  printf '%s' "${out# }"
+}

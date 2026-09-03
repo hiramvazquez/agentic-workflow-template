@@ -1,6 +1,6 @@
 # PRD — El harness se cuenta
 
-> **Tipo:** Forward · **Status:** Draft — **con tres decisiones de diseño abiertas**
+> **Tipo:** Forward · **Status:** Draft → listo para `Approved` en las fases 4 y 5; la 6 APARCADA, la 3b degradada a regla, la 7 sigue bloqueada por OQ-1
 > **Autor:** sesión de auditoría (Claude Opus 5) · **Fecha:** 2026-09-03
 > **Design-review:** hereda dos rondas RED del PRD 0008 original. **Este documento agrupa justo lo que hizo que aquellas volvieran rojas**, para que se decida antes de escribir código y no durante.
 
@@ -12,7 +12,10 @@
 > el diseño cerrado se fue a `0008-el-harness-no-borra-codigo.md` y **aquí queda lo que hay que
 > decidir**.
 >
-> **No pasa a `Approved` sin responder OQ-2, OQ-4, OQ-9, OQ-10 y OQ-12.** Un `Approved` hoy
+> **Todas las OQ resueltas el 2026-09-03.** Tres se cerraron investigando el código (OQ-9,
+> OQ-10 y OQ-12; la de OQ-10 **cambió la fase 3b**, que ya no puede ser una configuración),
+> dos las decidió el owner (OQ-2 y OQ-11b, que **aparca la fase 6**) y una queda APLAZADA con
+> su razón escrita (OQ-4). Un `Approved` hoy
 > mandaría al implementador a una configuración sin domicilio y a tres métricas sin fuente.
 
 ## 1. Contexto
@@ -165,23 +168,62 @@ sería una afirmación disfrazada. Los dos que ya se pueden fijar, del aislamien
       espejos**: `.cursor/rules/*.mdc`, `.codex/config.toml` y `CLAUDE.md` quedarían afirmando
       reglas movidas de sitio, más los tres ficheros donde `test_security_contract` exige la
       misma frase de §6.
-- [ ] **OQ-2 (fases 5 y 6, por vías distintas).** ¿La serie y la cola del juez siguen en
-      `.agents/state/` (gitignored, local por máquina) o pasan a un sitio versionado? La 5 lo
-      necesita para tener histórico compartido; la 6, para que un runner de CI pueda ver la cola.
-- [ ] **OQ-4 (la columna de disparos).** ¿De dónde sale la cifra por detector, si los
-      vocabularios de `source` son disjuntos? Emitir detecciones desde los detectores es cambio
-      de contrato compartido (§9); una tabla de alias es deuda permanente.
-- [ ] **OQ-9 (fase 4).** ¿Dónde vive `EXECUTION_MAP_PROD_DIRS` y con qué valor, en un repo cuyo
-      producto **es** el harness? Candidato: `tools/project.conf`, con precedencia
-      `env > conf > vacío`.
-- [ ] **OQ-10 (fase 3b).** ¿Existe la opción de worktree por sub-agente en la versión de Claude
-      Code que usamos? Hasta verificarlo, la fase es una apuesta.
-- [ ] **OQ-11b (fase 6).** ¿Qué backend, con qué credencial en Actions, y quién paga el diff
-      completo cada noche?
-- [ ] **OQ-12 (fase 5).** ¿Cuál es el **evento** de cada métrica en ESTE repo? Entrega = ¿commit
-      a `main`, o tag? Recuperación = `gh run list`, no `git log`. Retrabajo = regla de
-      normalización del campo `area`, o `n/a` con su razón — el mismo tratamiento honesto que se
-      le dio a "disparos".
+> **OQ-2 — CERRADA por el owner el 2026-09-03: crudo local, resumen semanal commiteado.**
+> El JSONL sigue en `.agents/state/` (cada corrida escribe sin ensuciar el árbol) y un rollup
+> semanal agregado SÍ se commitea. Da histórico compartido y visible en CI sin conflictos de
+> merge constantes en un fichero al que todos hacen append — que es como estos ficheros acaban
+> ignorados o borrados. Coste asumido: hay que escribir el agregador y decidir cuándo corre.
+> **OQ-4 — APLAZADA con su razón, no cerrada.** El lector de la fase 1 ya la trata con
+> honestidad: cuenta las filas y, si son 0, imprime `n/a` **con el conteo**, así que el informe
+> dejará de decirlo solo el día que un detector emita su primera detección. Unificar los
+> vocabularios —que los detectores escriban en `detections.jsonl`— es un cambio de contrato
+> compartido (§9) que no cabe en un PRD de solo-lectura, y una tabla de alias sería deuda
+> permanente. Con la fase 6 aparcada, además, baja la urgencia: nadie va a leer esa columna en
+> un informe automático. Se decide cuando alguien la necesite.
+> **OQ-9 — CERRADA el 2026-09-03: no hace falta una clave nueva.** `tools/lib/scope.sh:111`
+> ya declara *"Repo del harness: producto = lo que EJECUTA (tools/, scripts/, ci/, lefthook)"*,
+> y `project_kind` ya distingue harness de application. Así que `check-execution-map` **deriva**
+> los prod dirs de la declaración que ya existe, en vez de pedir una segunda. Es el mismo
+> patrón que cerró la retirada de detectores (commit `2282078`): una declaración, dos
+> consumidores, cero drift. Precedencia: `EXECUTION_MAP_PROD_DIRS` del entorno si está (para
+> que un adoptante pueda afinar), y si no, lo que diga `scope.sh`.
+> **OQ-10 — CERRADA el 2026-09-03, y la respuesta CAMBIA la fase 3b.** Verificado:
+> `.claude/settings.json` solo admite `permissions`, `enabledPlugins` y `hooks` — **no hay
+> aislamiento de sub-agentes por configuración**. El aislamiento existe como parámetro *por
+> invocación* de la tool `Agent` (`isolation: "worktree"`), es decir lo elige quien llama, no
+> el proyecto.
+>
+> Consecuencia: la fase 3b **no puede ser una config**. Lo que se puede entregar es (a) una
+> REGLA en las definiciones de los sub-agentes y en `AGENTS.md` —el trabajo destructivo se
+> enruta por un worktree aislado—, y (b) el camino que ya existe y funciona,
+> `tools/backlog/run.sh`, que corre al agente dentro de un worktree. Una regla no es un
+> mecanismo (§P2 del `0008`), así que la fase se degrada de "aislamiento" a "enrutado
+> declarado", y su valor real baja: el deny del Anillo 0 de la fase 3a sigue siendo la única
+> capa que impide algo.
+> **OQ-11b — CERRADA por el owner el 2026-09-03: la fase 6 se APARCA.** No se cablea el juez
+> nocturno. Verificado que no hay ninguna credencial de IA en los tres workflows y que
+> `ci/ai-review.sh` está escrito para fallar ABIERTO, así que cablearlo sin credencial daría un
+> badge verde permanente — un gate que no corrió con aspecto de gate que pasó (§14.3).
+>
+> Queda escrito lo que se pierde: la eval de trayectoria (`process-judge`) existe y lee lo
+> correcto, pero se invoca a mano, y la práctica de 2026 la considera no opcional. La cola de
+> sesiones sin juzgar sigue creciendo. Reabrir esto exige decidir credencial y presupuesto
+> recurrente.
+> **OQ-12 — CERRADA el 2026-09-03 con las fuentes verificadas una a una:**
+>
+> | Métrica | Evento en ESTE repo | Fuente verificada |
+> |---|---|---|
+> | Frecuencia de entrega | commit que llega a `main` (no hay despliegue: es un template) | `git log main` |
+> | Lead time | primer commit del cambio → su llegada a `main` (**no hay merges**: 0 de 149) | `git log` |
+> | Tasa de fallo del cambio | se DERIVA de `escape-rate`, no se recalcula | ledger |
+> | Tiempo de recuperación | corrida roja → primera verde posterior | **`gh run list --json headSha,conclusion,createdAt`** — verificado que da los tres campos |
+> | Tasa de aceptación | primer veredicto por unidad de trabajo (`staged_sha`) | `.agents/state/review-history.jsonl` — 173 filas, campos `verdict` y `staged_sha` |
+> | Tasa de retrabajo | **`n/a` con su razón** | el campo `area` del ledger es texto libre; normalizarlo es otro trabajo |
+>
+> **Dato ya calculado con la fuente real: 25% de aceptación** (35 verdes a la primera de 138
+> unidades). El rango sano de la industria es 25–45%, así que estamos **en el borde inferior**:
+> por debajo, el harness estorba más de lo que ayuda. Es la primera cifra de este PRD que ya
+> se puede leer, y sale de datos que llevaban meses acumulándose sin que nadie los mirara.
 
 ## 11. Definition of Done
 
