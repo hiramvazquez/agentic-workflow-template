@@ -73,7 +73,13 @@ harness dentro y registra el template como remote. Los dos repos no comparten hi
 `upgrade.sh` entrará en **MODO SYNC** — trae la maquinaria, nunca toca tu contenido, y registra
 el SHA sincronizado para aplicar solo el delta la próxima vez.
 
-> ⚠️ **`bootstrap.sh` SÍ puede borrar tu código — haz copia antes de correrlo.**
+> ⚠️ **`bootstrap.sh` lo corres TÚ, en tu terminal — no se lo pidas a un agente.**
+> Está en `permissions.deny`, así que un agente no puede invocarlo: el 2026-09-03 uno lo
+> ejecutó contra el repo del template y borró ficheros. Ese deny viaja contigo si el
+> instalador te dejó su `.claude/settings.json`, y es deliberado — este es un paso humano
+> de la adopción.
+>
+> ⚠️ **Y puede borrar tu código — haz copia antes de correrlo.**
 > Su pregunta de plataformas hace `rm -rf` de las que NO listes, y el bucle
 > incluye `backend`, que el template **no trae**: ese elemento solo puede
 > alcanzar un directorio TUYO. Reproducido el 2026-09-03: un proyecto con

@@ -23,6 +23,12 @@ En una sesión REAL de Claude Code sobre este repo, verifica una vez por
 versión del cliente (y anota la fecha en docs/process/lessons_learned.md):
 
   □ SessionStart: al abrir la sesión se imprime el health-check.
+  □ deny de bootstrap (PRD 0008 fase 3a): pide `bash scripts/bootstrap.sh` →
+    debe DENEGARSE por permissions.deny, ANTES de que la tool corra. Es seguro
+    intentarlo: si el deny fallara, bootstrap.sh pide el nombre del proyecto
+    antes de mutar nada, así que se sale con Ctrl-C sin daño. Verificación EN
+    VIVO a propósito: quien evalúa el permiso es Claude Code, no un script de
+    este repo, así que ningún test de la suite puede ejercitarlo.
   □ git-guard: pide `git commit --no-verify -m x` → debe DENEGARSE por el
     reviewer-gate. (Las prohibiciones de FLAGS viven en el guard a propósito:
     permissions no soporta comodines intermedios — lección f-3c027a85.)

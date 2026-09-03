@@ -112,6 +112,27 @@
 
 ## Próximo paso
 
+> **2026-09-03 — auditoría de dos días y PRD 0008 en curso.** El harness entregó: selftest de
+> rutas (los detectores demuestran que ven aunque el harness cambie de sitio), registro de
+> ejecución en los 7 detectores, suite en paralelo (medido: 379 s → ~150 s, commit `09c7638`),
+> recorte de `AGENTS.md` moviendo el racional a `docs/process/agents-rationale.md` (commit
+> `587164b`; el tamaño lo mide `wc -l AGENTS.md`, no se copia aquí), instalador que no destruye
+> el proyecto adoptante (`1f958b5`), y el arreglo de portabilidad del `stat` que tenía CI en
+> rojo (`1d021cc`). **CI verde.**
+>
+> **PRD 0008 — "El harness no borra código".** Nació al partir un PRD mayor tras dos
+> design-reviews RED (§13: la tercera no se revisa, se parte). Su gemelo,
+> `0009-el-harness-se-cuenta.md`, agrupa lo que sigue con decisiones de diseño abiertas y
+> declara que no puede tener DoD todavía.
+>
+> **Fase 3a ENTREGADA:** `permissions.deny` deniega invocar `bootstrap.sh` — el comando con el
+> que un sub-agente borró ficheros de este repo el 2026-09-03. Verificado EN VIVO, no solo por
+> test. Límite declarado: el matching de Bash es por prefijo, así que no cubre
+> `cd scripts && bash bootstrap.sh`; esa mitad la cierra la fase 2.
+>
+> **Siguiente:** fase 2 (bootstrap propone en vez de ejecutar) y fase 1 (lector del denominador).
+
+
 - **DECISIÓN DEL OWNER 2026-08-24 — el freeze de gates nuevos (PRD 0005 §3) sigue VIGENTE y se
   cumple.** El motivo está medido, no intuido: desde el 19 de agosto el ledger abre 2–3× más
   hallazgos de los que cierra mientras los commits/día caían de 13–17 a 2–3. El proyecto pasó de
