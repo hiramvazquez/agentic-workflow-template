@@ -36,6 +36,17 @@ ROLLUP = Path("docs/process/metrics-weekly.md")
 REVIEWS = Path(".agents/state/review-history.jsonl")
 VENTANA = 90
 
+# `gh run list` es red, y desde que `/status` lo invoca de rutina está en el
+# camino crítico de un comando que se documenta a ~13 s: 60 s de espera lo
+# convertían en un minuto de pantalla en blanco (`f-7a219330`). 20 s son de
+# sobra para una llamada sana, y si no responde en ese tiempo la respuesta
+# honesta ya es `n/a`. Ajustable por entorno porque una CI lenta es un caso
+# real — y porque es lo que hace TESTEABLE la rama del timeout sin dormir 20 s.
+try:
+    TIMEOUT_GH = max(1, int(os.environ.get("DORA_GH_TIMEOUT", "20")))
+except ValueError:
+    TIMEOUT_GH = 20
+
 
 class Metrica:
     """Un valor medido, o un hueco CON su razón. Nunca las dos cosas."""
@@ -148,9 +159,15 @@ def recuperacion() -> Metrica:
     try:
         r = subprocess.run(["gh", "run", "list", "--limit", "100",
                             "--json", "conclusion,updatedAt,name"],
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, timeout=TIMEOUT_GH)
     except FileNotFoundError:
         return Metrica("tiempo de recuperación", razon="`gh` no está instalado")
+    except subprocess.TimeoutExpired:
+        # ANTES de la rama genérica: `TimeoutExpired` ES un `SubprocessError`,
+        # así que caía ahí y salía como "falló al invocarse" — cierto en vago y
+        # falso en concreto. `gh` arrancó bien; lo que pasó es que tardó.
+        return Metrica("tiempo de recuperación",
+                       razon=f"`gh` no respondió en {TIMEOUT_GH} s (¿red lenta?)")
     except (OSError, subprocess.SubprocessError):
         return Metrica("tiempo de recuperación", razon="`gh` falló al invocarse")
     if r.returncode != 0:

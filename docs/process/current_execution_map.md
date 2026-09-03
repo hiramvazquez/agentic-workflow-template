@@ -175,6 +175,13 @@
 > efectos, y la serie que dora apenda alimenta el rollup versionado, así que *mirar* habría
 > falseado la media semanal de un fichero commiteado. Sigue siendo observabilidad *pull*: hay
 > que pedir `/status`. Lo que ya no hay es que acordarse de una herramienta suelta.
+>
+> **El techo de espera de `gh` bajó por decisión del owner** (`f-7a219330`), y el número era
+> la mitad del arreglo: un `TimeoutExpired` es un `SubprocessError`, así que caía en la rama
+> genérica y salía como "`gh` falló al invocarse" — cierto en vago y falso en concreto, porque
+> `gh` arranca bien y lo que pasa es que tarda. Ahora tiene rama propia y lo dice. El techo
+> queda además **atado a lo que `/status` promete**: si uno de los dos se mueve, falla la
+> suite — un presupuesto declarado que no se cumple deja de creerse.
 
 > **2026-09-03 · PRD 0009 arrancado.** Las cinco Open Questions resueltas: tres cerradas
 > investigando el código, dos decididas por el owner. La de OQ-10 **cambió la fase 3b** —no hay

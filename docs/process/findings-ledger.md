@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **83** · Cerrados: 172 · Total: 255
+Abiertos: **83** · Cerrados: 173 · Total: 256
 
 ## Abiertos
 
@@ -34,6 +34,7 @@ Abiertos: **83** · Cerrados: 172 · Total: 255
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
 | `f-7256d194` | medium | auto-fix | `tools/tests/test_e2e_*.sh` | _e2e_repo duplicado en cuatro archivos: cada fix del sandbox se aplica x4 a mano |
 | `f-7498dab2` | medium | owner-decision | `tools/check-execution-map.sh (_es_comando / EVIDENCIA)` | La evidencia del mapa se INFIERE de los backticks, y cinco heuristicas seguidas han tenido fuga |
+| `f-74c528ef` | medium | owner-decision | `tools/metrics/dora_git.py:20 + tools/metrics/dora.py (tasa_fallo, timeout=120)` | dora_git.py:20 y tasa_fallo() tapan TimeoutExpired con el except generico: el mismo patron de f-7a219330 sin cerrar |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-8639c173` | medium | owner-decision | `tools/tests/run-tests.sh + verify-run.sh (matriz de entornos)` | La suite no corre nunca con CI=true, asi que una rama entera de comportamiento no se verifica en local |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
@@ -71,7 +72,6 @@ Abiertos: **83** · Cerrados: 172 · Total: 255
 | `f-6e236c11` | low | auto-fix | `scripts/agent-hooks/session-start.sh (sed del bloque de check-ring3)` | El banner de sesion aplana la indentacion del diagnostico del Anillo 3 y pierde la jerarquia del remedio |
 | `f-708ec207` | low | owner-decision | `tools/check-execution-map.sh (PALABRAS_AMBIGUAS / exencion por posicion)` | Dos fugas de posicion en el detector de evidencia del mapa, encontradas tras cerrarlo |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
-| `f-7a219330` | low | owner-decision | `tools/metrics/dora.py + .claude/commands/status.md` | gh run list con timeout de 60s esta ahora en el camino critico de /status |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-8491b341` | low | auto-fix | `scripts/install-harness.sh:107-108` | install-harness: la variable NUNCA es inerte — documenta una politica que ningun codigo evalua |
 | `f-86d257b3` | low | auto-fix | `scripts/agent-hooks/canon-enforce.sh:135 + tools/tests/test_canon_enforce.sh` | Ningun test fija que los .yaml esten en el alcance de CHECK 4: el mutante sobrevive |
@@ -269,3 +269,4 @@ Abiertos: **83** · Cerrados: 172 · Total: 255
 | `f-94384693` | fixed | Cerrado en los CUATRO sitios donde el fichero descartaba callado, no solo en el que denunciaba semgr |
 | `f-2b1e6145` | fixed | Decision del owner: las dos cosas. (1) _tronco() prueba ahora la referencia REMOTA antes que el nomb |
 | `f-b77dbbfb` | fixed | Cerrado con el test que faltaba: test_sin_desfase_el_aviso_calla monta una rama local AL DIA con su  |
+| `f-7a219330` | fixed | Decision del owner: 20s. Y el numero era solo la mitad del problema — un TimeoutExpired ES un Subpro |

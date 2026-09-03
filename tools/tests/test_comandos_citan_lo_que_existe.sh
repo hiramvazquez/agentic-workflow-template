@@ -73,3 +73,27 @@ test_el_filtro_de_entrega_del_status_casa() {
     echo "  silencio, que es peor que un error."
     return 1; }
 }
+
+# ── El techo de espera que /status promete es el que dora aplica ────
+# `/status` documenta su presupuesto, y el presupuesto declarado es parte de por
+# qué se usa: un comando que dices que tarda trece segundos y tarda un minuto
+# deja de pedirse. El timeout de `gh` vivía en el código y el número en la doc,
+# sin nada que los atara — y ya bajó de 60 a 20 por decisión del owner
+# (`f-7a219330`). Si vuelve a moverse uno solo de los dos, que falle aquí.
+test_el_techo_de_espera_coincide_con_lo_que_status_promete() {
+  local prometido real
+  prometido="$(grep -o '\*\*hasta [0-9]* s\*\*' "$PROJECT_ROOT/.claude/commands/status.md" \
+               | grep -o '[0-9]*' | head -1)"
+  [ -n "$prometido" ] || {
+    echo "  status.md ya no declara un techo de espera para dora"; return 1; }
+  real="$(cd "$PROJECT_ROOT" && env -u DORA_GH_TIMEOUT python3 -c "
+import runpy,sys
+sys.argv=['dora']
+m=runpy.run_path('tools/metrics/dora.py',run_name='_no_main_')
+print(m['TIMEOUT_GH'])" 2>/dev/null)"
+  [ -n "$real" ] || { echo "  no pude leer TIMEOUT_GH de dora.py"; return 1; }
+  [ "$prometido" = "$real" ] || {
+    echo "  /status promete hasta ${prometido}s y dora espera ${real}s."
+    echo "  Un presupuesto declarado que no se cumple deja de creerse."
+    return 1; }
+}

@@ -344,3 +344,28 @@ _case_sin_desfase_calla() {
   return 0
 }
 test_sin_desfase_el_aviso_calla() { _dora_sandbox _case_sin_desfase_calla; }
+
+# ── 20. Si `gh` no responde a tiempo, se dice ESO ────────────────────
+# Decisión del owner tras `f-7a219330`: el timeout baja de 60 s a 20 porque esta
+# llamada está ahora en el camino crítico de `/status`, que se documenta a ~13 s.
+#
+# Pero el número solo era la mitad. Un `TimeoutExpired` es un `SubprocessError`,
+# así que caía en el except genérico y salía como "`gh` falló al invocarse" —
+# una razón cierta de forma vaga y falsa en lo concreto: no falló al invocarse,
+# respondió tarde. Y este informe entero se apoya en que un `n/a` traiga la
+# razón VERDADERA; si no, es peor que el 0 al que sustituye.
+_case_gh_lento() {
+  mkdir -p bin
+  printf '#!/usr/bin/env bash\nsleep 5\n' > bin/gh; chmod +x bin/gh
+  local out rc
+  out="$(PATH="$PWD/bin:$PATH" DORA_GH_TIMEOUT=1 bash tools/metrics/dora.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || { echo "    un gh lento tumbó el informe entero (exit $rc)"; return 1; }
+  local l; l="$(printf '%s\n' "$out" | grep -i 'recuperaci')"
+  printf '%s' "$l" | grep -qi 'n/a' || { echo "    no salió n/a: $l"; return 1; }
+  printf '%s' "$l" | grep -qiE 'no respondió|tard' || {
+    echo "    dice n/a pero culpa a la invocación, no a la espera:"
+    echo "      $l"
+    echo "    'falló al invocarse' es falso: gh arrancó bien, respondió tarde."
+    return 1; }
+}
+test_un_gh_lento_se_declara_como_espera_agotada() { _dora_sandbox _case_gh_lento; }
