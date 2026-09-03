@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **70** · Cerrados: 165 · Total: 235
+Abiertos: **72** · Cerrados: 165 · Total: 237
 
 ## Abiertos
 
@@ -27,6 +27,7 @@ Abiertos: **70** · Cerrados: 165 · Total: 235
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
+| `f-61a3fb63` | medium | auto-fix | `tools/tests/run-tests.sh:19` | run-tests.sh:19 hace cd sin comprobarlo: si falla, la suite entera corre en el directorio equivocado |
 | `f-62d2ac5b` | medium | auto-fix | `tools/semgrep-scan.sh:82` | semgrep-scan.sh puede morir con TARGETS[@] unbound bajo bash 3.2 cuando semgrep esta operativo |
 | `f-67e07109` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh (guarda add+commit en la misma linea)` | reviewer-gate bloquea por el TEXTO del comando: un heredoc que contiene add+commit se lee como comando real |
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
@@ -35,6 +36,7 @@ Abiertos: **70** · Cerrados: 165 · Total: 235
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
 | `f-89ef31c4` | medium | owner-decision | `tools/lessons-rotate.sh (criterio de archivado) + docs/process/lessons_archive.md` | El rotador archiva lecciones alegando que su detector corre en el Anillo 3, y en ESTE repo el Anillo 3 no corre |
+| `f-8b74d177` | medium | owner-decision | `tools/check-skill-matrix-doc.sh + AGENTS.md §11` | check-skill-matrix-doc compara CONJUNTOS de refs, asi que mover una lectura de fila a otra es invisible |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
 | `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |

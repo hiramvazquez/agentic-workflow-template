@@ -38,6 +38,19 @@ unset GATES_SKIP_TESTS GATES_REQUIRE_SEMGREP GATES_REQUIRE_SOURCE_SETS \
       VERIFY_OVERRIDE VERIFY_OVERRIDE_REASON VERIFY_CMD VERIFY_CONF \
       MUTATION_SCORE_OVERRIDE 2>/dev/null || true
 
+# ── Las variables del PARALELO se leen y se DESEXPORTAN ─────────────
+# Misma razon que el bloque de arriba, y cazada en vivo: `RUN_TESTS_WORKER=1`
+# viaja en el entorno del worker, asi que CUALQUIER test que invoque a
+# run-tests.sh dentro de su sandbox heredaba el modo worker — el hijo emitia su
+# trailer y se saltaba el resumen, y el test media otra cosa sin decirlo. Se
+# capturan en variables internas (que este script no exporta) y se desexportan
+# antes de correr nada. Leer PRIMERO y desexportar DESPUES: al reves se perderia
+# el `VAR=x bash run-tests.sh` con el que el dispatcher invoca a sus workers.
+_RT_IS_WORKER="${RUN_TESTS_WORKER:-0}"
+_RT_ONLY_FILE="${RUN_TESTS_ONLY_FILE:-}"
+_RT_JOBS_ENV="${TESTS_JOBS:-auto}"
+unset RUN_TESTS_WORKER RUN_TESTS_ONLY_FILE TESTS_JOBS 2>/dev/null || true
+
 FILTER="${1:-}"
 PASS=0; FAIL=0; FAILED_NAMES=()
 
@@ -154,8 +167,215 @@ with_temp_repo() { # with_temp_repo <función>
 }
 export -f assert_eq assert_contains assert_exit assert_detector_limpio with_temp_repo
 
+# ════════════════════════════════════════════════════════════════════
+# PARALELO POR ARCHIVO
+# ════════════════════════════════════════════════════════════════════
+# La suite corre entera en `verify-run` (antes de cada commit) y en el
+# pre-push: medido el 2026-09-02, 786 tests en ~7 minutos, dos veces por
+# cambio. Es el coste dominante del bucle.
+#
+# La unidad es el ARCHIVO, no el test: los tests de un archivo comparten los
+# helpers que ese archivo define, y 60 de los 66 ya montan su propio sandbox
+# con `mktemp -d`, así que el paralelismo por archivo no cambia lo que cada
+# test ve.
+#
+# El dispatcher REINVOCA a este mismo script en modo worker en vez de duplicar
+# la maquinaria. Así el saneado del entorno, el watchdog por test y el formato
+# de salida son literalmente el mismo código en los dos caminos — una regla
+# implementada dos veces diverge, y aquí divergir significa que el paralelo
+# cuente distinto que el secuencial.
+#
+# ⚠️ EL INVARIANTE QUE MÁS IMPORTA: **un worker que no deja resultado cuenta
+# como FALLO.** Este script decide el marker de `verify-run`; si un archivo que
+# revienta, se cuelga o muere por señal pudiera desaparecer del recuento, una
+# suite ROJA se firmaría como verde. Por eso el trailer es obligatorio y su
+# ausencia es un rojo con nombre y apellido, no un hueco silencioso.
+# Lo fija test_runner_paralelo.sh::test_un_worker_sin_resultado_cuenta_como_fallo.
+#
+# Efecto secundario que resulto valioso: correr cada fichero en su PROPIO
+# proceso convierte al runner en detector de ACOPLAMIENTOS OCULTOS entre
+# ficheros de test. El camino secuencial sourcea todos los test_*.sh antes de
+# ejecutar nada, asi que un helper definido en A se cuela en B y B parece
+# autocontenido sin serlo. Al paralelizar salio uno real de 66:
+# test_lessons_rotacion.sh usaba `_doc` sin definirlo. Un fichero de tests
+# sostenido por el orden de sourceo es una casualidad, no un diseno.
+#
+# Escotilla: TESTS_JOBS=1 vuelve al camino secuencial sin editar nada.
+_rt_cores() {
+  local n
+  n="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 2)"
+  case "$n" in ''|*[!0-9]*) n=2 ;; esac
+  # Tope de 8: por encima, los tests que lanzan subprocesos y esperan señales
+  # compiten por slots de proceso, que es la presión bajo la que nació el
+  # flaky de WF-01. Más paralelismo del que la máquina sostiene no es más
+  # rápido, es más flaky.
+  [ "$n" -gt 8 ] && n=8
+  echo "$n"
+}
+JOBS="$_RT_JOBS_ENV"
+[ "$JOBS" = "auto" ] && JOBS="$(_rt_cores)"
+case "$JOBS" in ''|*[!0-9]*) JOBS=1 ;; esac
+
+# `-z "$FILTER"`: una corrida FILTRADA no entra al pool. El filtro puede casar
+# el NOMBRE de un test, no solo el del archivo, asi que saber que archivos
+# afecta exige sourcearlos todos — y el dispatcher acababa forkeando 67 workers
+# para correr uno. Medido en el review: 1,9s -> 12,8s. Peor: `canon-enforce.sh`
+# (CHECK 4) usa justamente ese camino en cada cierre de turno, y existe para NO
+# pagar la suite entera; paralelizar la suite le habia subido el coste al
+# mecanismo creado para no correrla. Una corrida dirigida no gana nada con el
+# paralelismo y solo paga el fork.
+if [ "$_RT_IS_WORKER" != "1" ] && [ "$JOBS" -gt 1 ] && [ -z "$FILTER" ]; then
+  _RT_OUT="$(mktemp -d)"
+  # El perfil de la corrida anterior solo sirve para ORDENAR. Si falta, está
+  # corrupto o es de otra máquina, el orden es alfabético y el resultado es el
+  # mismo: es una optimización, nunca una condición de corrección.
+  _RT_PERFIL_CACHE="$PROJECT_ROOT/.agents/state/metrics/tests-perfil.txt"
+  _RT_PERFIL=""
+  # ── GRUPO SERIE: los que miden procesos y señales corren SOLOS ─────
+  # No es una precaución teórica. Medido el 2026-09-02 con el pool a 8: tres
+  # corridas seguidas dieron 2 ROJAS, y los cuatro fallos fueron del mismo
+  # archivo (`test_agent_runner.sh`: timeouts que no matan descendientes,
+  # cancelación que no propaga 143). Esos tests miden CUÁNDO muere un proceso;
+  # con la máquina saturada, los plazos que comprueban dejan de cumplirse y el
+  # test acusa al harness de un fallo del entorno. Es la familia f-wf01, que ya
+  # estaba abierta como flaky en CI — el paralelismo la empeora, no la crea.
+  #
+  # Una suite roja 2 de cada 3 veces es PEOR que una lenta: se desactiva. Así
+  # que estos archivos se ejecutan uno a uno y con el resto ya terminado.
+  # Cuesta ~76s de los ~120s totales y es el precio de que el verde signifique
+  # algo. Cuando f-wf01 se cierre de verdad, esta lista se vacía y la suite baja
+  # sola a ~73s; hasta entonces, la lista ES la deuda, visible y con nombre.
+  _RT_SERIE="${TESTS_SERIAL_FILES:-test_agent_runner.sh test_capability_probe.sh test_verdict.sh}"
+  _RT_FILES=(); _RT_SERIE_FILES=()
+  for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
+    [ -f "$f" ] || continue
+    case " $_RT_SERIE " in
+      *" $(basename "$f") "*) _RT_SERIE_FILES+=("$f") ;;
+      *) _RT_FILES+=("$f") ;;
+    esac
+  done
+  _RT_N=${#_RT_FILES[@]}
+  if [ "$_RT_N" -gt 0 ] || [ ${#_RT_SERIE_FILES[@]} -gt 0 ]; then
+    # POOL con reposicion, no lotes. bash 3.2 (el de macOS) no tiene `wait -n`,
+    # asi que la primera version esperaba a la tanda entera: cada lote duraba lo
+    # que su miembro mas lento y la suite se quedaba en 162s teniendo un camino
+    # critico de 50s (`TESTS_PROFILE=1` lo enseña). Se repone el slot sondeando
+    # los PIDs vivos con `kill -0`, que es portable y cuesta un `sleep 0.05`.
+    #
+    # Los archivos se lanzan de MAS LARGO a MAS CORTO cuando hay un perfil de la
+    # corrida anterior: meter el de 50s al final obliga a esperarlo solo. Sin
+    # perfil (primera corrida) va en orden alfabetico y no pasa nada.
+    _RT_ORDEN=""
+    if [ -f "$_RT_PERFIL_CACHE" ]; then
+      _RT_ORDEN="$(sort -rn "$_RT_PERFIL_CACHE" 2>/dev/null | awk '{print $2}')"
+    fi
+    _RT_PENDIENTES=()
+    # El guard de duplicados va TAMBIEN aqui, no solo en el relleno de abajo: un
+    # perfil con un basename repetido —un edit a mano, una fusion accidental—
+    # metia el mismo indice dos veces, y eso son dos workers del MISMO fichero
+    # escribiendo al MISMO .out. El review lo reprodujo; el recuento salio bien
+    # por casualidad (la agregacion es por indice), pero un fichero de tests con
+    # efectos laterales corriendo dos veces no puede depender de la suerte.
+    for _rt_nombre in $_RT_ORDEN; do
+      _rt_i=0
+      while [ "$_rt_i" -lt "$_RT_N" ]; do
+        if [ "$(basename "${_RT_FILES[$_rt_i]}")" = "$_rt_nombre" ]; then
+          case " ${_RT_PENDIENTES[*]+${_RT_PENDIENTES[*]}} " in
+            *" $_rt_i "*) : ;;
+            *) _RT_PENDIENTES+=("$_rt_i") ;;
+          esac
+        fi
+        _rt_i=$((_rt_i+1))
+      done
+    done
+    _rt_i=0
+    while [ "$_rt_i" -lt "$_RT_N" ]; do
+      case " ${_RT_PENDIENTES[*]+${_RT_PENDIENTES[*]}} " in *" $_rt_i "*) : ;; *) _RT_PENDIENTES+=("$_rt_i") ;; esac
+      _rt_i=$((_rt_i+1))
+    done
+
+    _RT_VIVOS=""
+    for _rt_idx in ${_RT_PENDIENTES[@]+"${_RT_PENDIENTES[@]}"}; do
+      # Espera a que haya hueco.
+      while :; do
+        _rt_nuevos=""; _rt_n_vivos=0
+        for _rt_pid in $_RT_VIVOS; do
+          if kill -0 "$_rt_pid" 2>/dev/null; then
+            _rt_nuevos="$_rt_nuevos $_rt_pid"; _rt_n_vivos=$((_rt_n_vivos+1))
+          fi
+        done
+        _RT_VIVOS="$_rt_nuevos"
+        [ "$_rt_n_vivos" -lt "$JOBS" ] && break
+        sleep 0.05
+      done
+      RUN_TESTS_WORKER=1 RUN_TESTS_ONLY_FILE="${_RT_FILES[$_rt_idx]}" \
+        bash "$0" ${FILTER:+"$FILTER"} > "$_RT_OUT/$_rt_idx.out" 2>&1 &
+      _RT_VIVOS="$_RT_VIVOS $!"
+    done
+    wait
+    # Y ahora el grupo serie, uno a uno, con la máquina ya libre.
+    for _rt_sf in ${_RT_SERIE_FILES[@]+"${_RT_SERIE_FILES[@]}"}; do
+      _RT_FILES+=("$_rt_sf")
+      RUN_TESTS_WORKER=1 RUN_TESTS_ONLY_FILE="$_rt_sf" \
+        bash "$0" ${FILTER:+"$FILTER"} > "$_RT_OUT/$_RT_N.out" 2>&1
+      _RT_N=$((_RT_N+1))
+    done
+
+    # Se imprime en ORDEN DE ARCHIVO, no de terminación: una suite cuya salida
+    # cambia de orden entre corridas es imposible de diferenciar.
+    _rt_k=0
+    while [ "$_rt_k" -lt "$_RT_N" ]; do
+      _rt_f="${_RT_FILES[$_rt_k]}"; _rt_o="$_RT_OUT/$_rt_k.out"
+      grep -v '^__RT_' "$_rt_o" 2>/dev/null
+      _rt_res="$(grep '^__RT_RESULT__' "$_rt_o" 2>/dev/null | tail -1)"
+      if [ -z "$_rt_res" ]; then
+        # Sin trailer: el worker no llegó al final. Nunca es un archivo verde.
+        FAIL=$((FAIL+1))
+        FAILED_NAMES+=("$(basename "$_rt_f")::(el worker murió sin dejar resultado)")
+        echo ""
+        echo "━━━ $(basename "$_rt_f") ━━━"
+        echo "  ❌ el worker de este archivo terminó SIN resultado."
+        echo "     Se cuenta como fallo a propósito: un archivo que revienta no"
+        echo "     puede desaparecer del recuento y dejar la suite en verde."
+      else
+        _rt_p="${_rt_res#*pass=}"; _rt_p="${_rt_p%% *}"
+        _rt_fa="${_rt_res#*fail=}"; _rt_fa="${_rt_fa%% *}"
+        case "$_rt_p" in ''|*[!0-9]*) _rt_p=0 ;; esac
+        case "$_rt_fa" in ''|*[!0-9]*) _rt_fa=0 ;; esac
+        PASS=$((PASS+_rt_p)); FAIL=$((FAIL+_rt_fa))
+        _rt_s="${_rt_res#*secs=}"; _rt_s="${_rt_s%% *}"
+        case "$_rt_s" in ''|*[!0-9]*) _rt_s=0 ;; esac
+        _RT_PERFIL="$_RT_PERFIL$_rt_s $(basename "$_rt_f")
+"
+        while IFS= read -r _rt_line; do
+          [ -n "$_rt_line" ] && FAILED_NAMES+=("${_rt_line#__RT_FAILED__ }")
+        done < <(grep '^__RT_FAILED__' "$_rt_o" 2>/dev/null)
+      fi
+      _rt_k=$((_rt_k+1))
+    done
+  fi
+  rm -rf "$_RT_OUT"
+  # El perfil solo se imprime si lo piden: la salida normal de una suite verde
+  # no debe crecer. Sirve para saber DONDE esta el camino critico — con 8
+  # trabajos, la suite no puede bajar del fichero mas lento.
+  if [ -n "$_RT_PERFIL" ]; then
+    mkdir -p "$(dirname "$_RT_PERFIL_CACHE")" 2>/dev/null \
+      && printf '%s' "$_RT_PERFIL" > "$_RT_PERFIL_CACHE" 2>/dev/null || true
+  fi
+  if [ "${TESTS_PROFILE:-0}" = "1" ] && [ -n "$_RT_PERFIL" ]; then
+    echo ""
+    echo "━━━ perfil por archivo (segundos, los 12 mas lentos) ━━━"
+    printf '%s' "$_RT_PERFIL" | sort -rn | head -12 | awk '{printf "   %4ss  %s\n", $1, $2}'
+  fi
+  # Cae al bloque de resumen de abajo, que es el mismo para los dos caminos.
+  _RT_DISPATCHED=1
+fi
+
 # ── Descubrimiento y ejecución ──────────────────────────────────────
 for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
+  [ "${_RT_DISPATCHED:-0}" = "1" ] && break
+  # En modo worker, este proceso corre UN archivo y nada más.
+  if [ -n "$_RT_ONLY_FILE" ] && [ "$f" != "$_RT_ONLY_FILE" ]; then continue; fi
   [ -f "$f" ] || continue
   BASE="$(basename "$f")"
   # El filtro casa contra el ARCHIVO o contra el NOMBRE de un test. Si casa el
@@ -197,6 +417,18 @@ for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
     unset -f "$t"
   done
 done
+
+# ── Trailer del worker: maquinal, obligatorio y lo ultimo que hace ──
+# El padre lo exige; su ausencia es un fallo con nombre. El worker NO aplica el
+# guard del conjunto vacio: un archivo sin tests que casen el filtro es normal,
+# y quien decide si la SUITE entera esta vacia es el padre.
+if [ "$_RT_IS_WORKER" = "1" ]; then
+  printf '__RT_RESULT__ pass=%s fail=%s secs=%s\n' "$PASS" "$FAIL" "$SECONDS"
+  for _rt_n in ${FAILED_NAMES[@]+"${FAILED_NAMES[@]}"}; do
+    printf '__RT_FAILED__ %s\n' "$_rt_n"
+  done
+  exit 0
+fi
 
 echo ""
 echo "────────────────────────────────────────"

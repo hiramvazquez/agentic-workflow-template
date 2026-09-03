@@ -17,6 +17,14 @@
 # El riesgo del mecanismo es archivar de MÁS (perder la lección de verdad),
 # así que estos tests fijan sobre todo lo que NO debe archivarse.
 
+# Definido AQUI, no heredado. Lo usaban tres ficheros y solo dos lo definian:
+# este funcionaba porque el runner secuencial sourcea TODOS los test_*.sh antes
+# de ejecutar nada, asi que `_doc` se colaba desde otro archivo. Al correr los
+# ficheros en paralelo —cada uno en su propio proceso— el acoplamiento salio a
+# la luz con un `_doc: command not found`. Un fichero de tests tiene que ser
+# autocontenido; que el orden de sourceo lo sostenga es una casualidad.
+_doc() { printf '%s\n' "$1" > docs/process/lessons_learned.md; }
+
 _rot_sandbox() {
   local d; d="$(mktemp -d)"
   mkdir -p "$d/tools/tests" "$d/docs/process"
