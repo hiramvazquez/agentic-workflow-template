@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **72** · Cerrados: 165 · Total: 237
+Abiertos: **75** · Cerrados: 166 · Total: 241
 
 ## Abiertos
 
@@ -16,11 +16,13 @@ Abiertos: **72** · Cerrados: 165 · Total: 237
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
+| `f-970c3590` | high | owner-decision | `scripts/bootstrap.sh:35-39` | bootstrap.sh borra con rm -rf el codigo fuente real del adoptante: backend/ no lo trae el template, solo puede ser suyo |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
+| `f-29b0127a` | medium | auto-fix | `scripts/install-harness.sh (_verificar_clasificacion)` | install-harness: _verificar_clasificacion no expande SYNC_GLOBS, punto ciego dormido del mismo patron que ya fallo |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3793c17b` | medium | owner-decision | `.claude/settings.json:21 + .agents/ (convencion de rutas de estado)` | Un deny de Edit sobre .agents/state alcanza a las escrituras por Bash del sub-agente, y nada lo declara |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
@@ -41,6 +43,7 @@ Abiertos: **72** · Cerrados: 165 · Total: 237
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
 | `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |
 | `f-a2f82cec` | medium | owner-decision | `tools/check-drift.sh` | El chequeo de tamano de check-drift solo mira SRC_DIRS, asi que no vigila tools/ ni scripts/ |
+| `f-aca0acb0` | medium | owner-decision | `scripts/install-harness.sh (_enlazar_skills)` | install-harness: si .claude/skills preexiste como directorio real, no enlaza y no lo dice |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
 | `f-d13227b5` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh:22-27` | La trayectoria pierde el binario real tras un cd encadenado y no distingue coordinador de sub-agente: 98 de 257 eventos Bash dicen solo cd |
@@ -251,3 +254,4 @@ Abiertos: **72** · Cerrados: 165 · Total: 237
 | `f-4b971920` | fixed | Los tres workflows instalan ahora semgrep + gitleaks antes de la suite (harness-ci job suite, harnes |
 | `f-6cc1f3b4` | fixed | reviewer-gate.sh extrae REVIEWER_OVERRIDE/_REASON del PREFIJO VAR=val del segmento que es un git com |
 | `f-7a8d1fbe` | fixed | reviewer-gate.sh une las continuaciones de linea (_join_cont, un awk que pega la linea siguiente cua |
+| `f-a9e12041` | fixed | scripts/install-harness.sh copia la maquinaria leyendo el mismo inventario que upgrade.sh (SYNC_PATH |

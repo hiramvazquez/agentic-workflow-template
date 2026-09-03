@@ -73,14 +73,39 @@ harness dentro y registra el template como remote. Los dos repos no comparten hi
 `upgrade.sh` entrará en **MODO SYNC** — trae la maquinaria, nunca toca tu contenido, y registra
 el SHA sincronizado para aplicar solo el delta la próxima vez.
 
+> ⚠️ **`bootstrap.sh` SÍ puede borrar tu código — haz copia antes de correrlo.**
+> Su pregunta de plataformas hace `rm -rf` de las que NO listes, y el bucle
+> incluye `backend`, que el template **no trae**: ese elemento solo puede
+> alcanzar un directorio TUYO. Reproducido el 2026-09-03: un proyecto con
+> `backend/src/server.js` real, respondiendo "ios" al prompt, se queda sin
+> `backend/`. Lo mismo si tienes un `web/` o un `android/` propios y no los
+> listas. Está registrado como `high` en el ledger y no arreglado todavía: si
+> tus carpetas de plataforma tienen código, **lístalas todas** en el prompt, o
+> salta este paso y edita a mano `AGENTS.md` §2 y `tools/preset`.
+
 ```bash
-cd mi-proyecto-existente
-git clone --depth 1 <este-template> /tmp/awt && rm -rf /tmp/awt/.git
-cp -R /tmp/awt/. .                         # revisa el diff antes de commitear
+git clone --depth 1 <este-template> /tmp/awt
+bash /tmp/awt/scripts/install-harness.sh ~/ruta/a/mi-proyecto-existente
+cd ~/ruta/a/mi-proyecto-existente
 git remote add template <este-template>
-bash scripts/bootstrap.sh
+bash scripts/bootstrap.sh   # ⚠️ LEE EL AVISO DE ARRIBA: su prompt de plataformas hace rm -rf
 ```
 
+> **Por qué un instalador y no `cp -R`.** Esta guía decía `cp -R /tmp/awt/. .`
+> con la nota "revisa el diff antes de commitear". Medido el 2026-09-02 sobre un
+> proyecto de juguete con su propia identidad: ese comando **pisa tu README.md,
+> tu LICENSE, tu CODEOWNERS y tu .editorconfig** con los del template, te deja un
+> `ios/AGENTS.md` dentro de tu código y, en un proyecto backend-only, te crea
+> `ios/ android/ web/` de la nada. El `cp -R` no tocaba tu código fuente — el
+> daño era de identidad y configuración, pero un LICENSE sustituido en silencio
+> no es cosmético. Una nota que dice "revisa el diff" es prosa, no un mecanismo.
+>
+> `install-harness.sh` copia la maquinaria (leyendo el mismo inventario que usa
+> `upgrade.sh`, para que instalar y actualizar no diverjan), **respeta** lo que
+> ya exista de lo que es tuyo —y te dice cuáles respetó, para que no te quedes
+> con una versión vieja sin saberlo— y **nunca** toca tu identidad ni copia los
+> ejemplos `ios/ android/ web/` del template. Lo fija
+> `tools/tests/test_install_harness.sh`.
 > Si hiciste `rm -rf .git && git init` (lo que decía la versión anterior de esta guía), no has
 > roto nada: estás en el Caso B y el modo sync te cubre. Solo añade el remote `template`.
 
