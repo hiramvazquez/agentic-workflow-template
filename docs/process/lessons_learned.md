@@ -42,10 +42,6 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 
 ## Lecciones del harness
 
-> Estas seis salieron de construir el propio harness (PRD 0001 §18). Se dejan en el template
-> porque son **universales**: le pasan a cualquiera que monte gates para agentes. Bórralas si
-> montas otro sistema; consérvalas si usas este.
-
 ### [2026-08-05] Un gate anunciado pero no implementado (peor que ausente)
 - **Qué pasó:** `canon-enforce.sh` estaba enteramente comentado mientras el `SessionStart` lo
   anunciaba como guardrail activo. Nadie lo habría notado: un gate que nunca dispara y uno que
@@ -239,6 +235,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > relato completo (síntoma, causa raíz, racional) vive en `docs/process/lessons_archive.md`.
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
+- [2026-09-03] Un agregador que filtra en silencio borra el dato y deja un hueco idéntico al de "no medido" — `tools/tests/test_dora.sh`
 - [2026-08-31] Un `command -v` que ELIGE implementación duplica el código bajo prueba, y cada plataforma solo ejercita una mitad — `tools/tests/test_ring3.sh`
 - [2026-08-27] `grep -r` sobre UN archivo: BSD dice el nombre, GNU no — `tools/tests/test_source_sets_fallback.sh`
 - [2026-08-27] Un test que dependía de con qué se atraganta semgrep: verde en macOS, rojo en CI — `tools/tests/test_source_sets_fallback.sh`

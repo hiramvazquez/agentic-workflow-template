@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **79** · Cerrados: 168 · Total: 247
+Abiertos: **82** · Cerrados: 168 · Total: 250
 
 ## Abiertos
 
@@ -47,12 +47,14 @@ Abiertos: **79** · Cerrados: 168 · Total: 247
 | `f-b144fe5e` | medium | owner-decision | `tools/lib/scope.sh (_scope_fuentes_de_app)` | La lista de extensiones de _scope_fuentes_de_app deja fuera stacks reales: .vue .jsx .php .dart .scala .c/.cpp |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
+| `f-cb4f7155` | medium | owner-decision | `tools/metrics/dora.py` | Una fila del rollup mezcla 'esta ventana' con 'todo el historico' sin decirlo |
 | `f-d13227b5` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh:22-27` | La trayectoria pierde el binario real tras un cd encadenado y no distingue coordinador de sub-agente: 98 de 257 eventos Bash dicen solo cd |
 | `f-d179c95d` | medium | owner-decision | `gobierno del harness` | check-prd-tree.sh entra cableado al Anillo 3 como EXCEPCION DECLARADA al freeze de gates nuevos |
 | `f-d3015816` | medium | owner-decision | `.github/workflows/harness-ci.yml (cabecera) + tools/verify-run.sh (marker sin plataforma)` | La cobertura macOS pasa a depender de una afirmacion sobre la maquina de quien publica, y ningun artefacto la registra |
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-e012fcce` | medium | owner-decision | `lefthook.yml (pre-push) + scripts/agent-hooks/canon-enforce.sh (CHECK 4) + .claude/agents/reviewer.md` | Nada impide que algo mute el arbol mientras otra cosa lo verifica: tres incidentes en una sesion |
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
+| `f-ebb770a1` | medium | owner-decision | `.claude/commands/status.md + tools/metrics/dora.sh` | Las seis métricas de entrega existen pero nadie las ejecuta: /status no las llama |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
 | `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky en macOS: senales, procesos hijo y timeouts. ~2 de 3 corridas en rojo |
@@ -78,6 +80,7 @@ Abiertos: **79** · Cerrados: 168 · Total: 247
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
 | `f-97021ca1` | low | owner-decision | `tools/check-drift.sh` | El limite de tamano de §4 no se mide en los .sh del propio harness |
 | `f-9b078b03` | low | owner-decision | `tools/check-prd-tree.sh` | check-prd-tree no compara el bloque NO-TOUCH ni los PRDs Shipped: dos citas ya podridas quedan fuera de alcance |
+| `f-9e3a426d` | low | auto-fix | `tools/metrics/dora.py` | lead_time() ignora el tercer padre de un merge de pulpo, y es camino muerto sin test |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
 | `f-a6e7b6cd` | low | owner-decision | `tools/tests/test_execution_map.sh` | test_execution_map.sh pasa de 590 a 794 lineas: engordo un fichero que YA estaba al doble de su hard limit |
 | `f-a8cf6f5b` | low | owner-decision | `tools/check-execution-map.sh` | check-execution-map: 'No es lo unico que queda' dispara, y se ACEPTA a proposito |

@@ -45,10 +45,18 @@ Encima se apilan dos específicas de IA:
 - **Tasa de retrabajo**, que captura lo que el *change failure rate* no ve: los fallos
   pequeños que sí pasaron la revisión.
 
-**Nosotros.** No tenemos ninguna de las seis, ni serie temporal. Lo único cercano es un dato
-medido a mano una vez: **27% de las unidades de trabajo pasan la review a la primera** (29 de
-107, del campo `verdict` de `.agents/state/review-history.jsonl`). Está en el rango sano, pero
-no se mide de forma continua y nadie puede responder "¿esto va mejor que hace dos semanas?".
+**Nosotros.** Al escribirse este estudio no había ninguna de las seis ni serie temporal, y el
+único dato era uno medido a mano: 27% de aceptación. Desde el PRD 0009 fase 5 hay
+`tools/metrics/dora.sh`, que las lee de una vez y apenda una fila a
+`.agents/state/metrics/series.jsonl`; el resumen semanal se versiona en
+`docs/process/metrics-weekly.md`.
+
+Cuatro de las seis tienen evento en este repo. Las otras dos **salen `n/a` con su razón, nunca
+0**: sin merges no hay lead time, y el campo `area` del ledger es texto libre, así que no hay
+join para el retrabajo. Esa distinción es el punto entero — un 0 dice "medí y salió cero".
+
+Lo que ya se puede responder, y antes no: la **tasa de aceptación real es 25%** (35 de 139
+unidades verdes a la primera), borde inferior del rango sano 25–45%.
 
 ### `1` — Evals sobre la trayectoria, corriendo en CI
 

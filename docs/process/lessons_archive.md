@@ -11,6 +11,31 @@
 >
 > Generado/actualizado por `tools/lessons-rotate.sh --apply`.
 
+### [2026-09-03] Un agregador que filtra en silencio borra el dato y deja un hueco idéntico al de "no medido"
+
+- **Qué pasó:** `dora.sh` imprimía `tasa de fallo 0% (denominador: 41 findings)` en pantalla,
+  y esa métrica **no tenía columna** en `docs/process/metrics-weekly.md`, el fichero que se
+  commitea. Dos causas independientes, la misma forma: el rollup repetía a mano la lista de
+  nombres de columna, y agregaba solo valores numéricos mientras el productor guardaba la tasa
+  como la cadena que había parseado. Ninguna de las dos da error.
+- **Causa raíz:** el fichero versionado dice `n/a` por dos motivos que no distingue —"no hay
+  evento que medir" y "el agregador se lo comió"—. Es el **cero ambiguo del §14.3 con otro
+  disfraz**: aquí no es un gate que no corrió pareciendo verde, es un dato presente pareciendo
+  ausente. Y la deriva es de las caras porque nunca falla: renombrar una métrica la habría
+  escondido para siempre sin romper un solo test.
+- **Regla:** un agregador **deriva sus claves de los datos**, nunca las repite a mano al lado de
+  quien las nombra. Y si filtra por tipo, el productor garantiza el tipo — la conversión va donde
+  se produce el valor, no donde se consume. Si aun así hay que descartar algo, se dice: un
+  descarte silencioso no es un filtro, es una pérdida.
+- **Detector:** `tools/tests/test_dora.sh::test_las_columnas_del_rollup_salen_de_los_datos` +
+  `::test_todo_lo_medido_llega_al_rollup` (este segundo compara la serie contra la tabla y
+  exige que todo valor no nulo sea numérico).
+- **Área:** `tools/metrics/dora.py` — aplica a cualquier informe que agregue una serie.
+
+> Estas seis salieron de construir el propio harness (PRD 0001 §18). Se dejan en el template
+> porque son **universales**: le pasan a cualquiera que monte gates para agentes. Bórralas si
+> montas otro sistema; consérvalas si usas este.
+
 ### [2026-08-31] Un `command -v` que ELIGE implementación duplica el código bajo prueba, y cada plataforma solo ejercita una mitad
 - **Qué pasó:** `_con_limite` en `check-ring3.sh` prefería `timeout` cuando existía y caía a un perro guardián propio cuando no. El guardián escala TERM→KILL; GNU `timeout` sin `-k` manda TERM y se queda esperando al hijo. Como macOS no trae `timeout` y Linux sí, **la rama que se probaba en el pre-push nunca era la que corría en CI** — y la de CI era la mala. En el adoptante `iOSAppBaseline` eso dejó su Anillo 3 **rojo dos días**, con el fallo diagnosticado como *flaky* todo ese tiempo. El test que lo cazaba no había estado verde en su CI ni un solo día desde que se sincronizó.
 - **Causa raíz:** dos cosas que se refuerzan. (1) Un `command -v X` que elige entre **dos implementaciones vivas** duplica el código bajo prueba y reparte la cobertura entre plataformas **sin declararlo** — distinto de un `command -v` que degrada cuando la herramienta falta, que es el contrato sano de §14.3. (2) Un fallo que solo aparece en una plataforma **se parece a un flaky**, y «es flaky» es una explicación que no obliga a nadie a mirar; el sesgo se agrava cuando el repo tiene flakies reales registrados, porque el diagnóstico barato ya está escrito.

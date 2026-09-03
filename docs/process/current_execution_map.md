@@ -112,6 +112,46 @@
 
 ## Próximo paso
 
+> **2026-09-03 · Fase 5 ENTREGADA: las seis métricas como serie.**
+> `bash tools/metrics/dora.sh` las lee de una vez y apenda una fila a
+> `.agents/state/metrics/series.jsonl` (local y volátil, porque `.agents/state/` está en el
+> `.gitignore`); `--rollup` agrega por semana en `docs/process/metrics-weekly.md`, que **sí se
+> versiona** — la decisión del owner en OQ-2. Ese fichero es idempotente a propósito, sin fecha
+> de generación: un fichero commiteado que cambia en cada corrida llena el diff de ruido, y un
+> diff ruidoso se deja de leer.
+>
+> **Lo que hace útil este informe es lo que NO imprime.** Dos de las seis salen `n/a` **con su
+> razón**: sin merges no hay ventana de lead time, y el campo `area` del ledger es texto libre,
+> así que no hay join para el retrabajo. Un `0` diría "medí y salió cero" — que es la mentira
+> que este harness lleva todo el PRD persiguiendo. La tasa de fallo tampoco se recalcula: se
+> deriva de `escape-rate` y **arrastra su denominador**, porque un 0% sobre 41 clasificados de
+> 247 no es un 0%.
+>
+> Escribiéndolo me salieron dos huecos silenciosos propios, los dos en el agregador y ninguno
+> con error: el rollup repetía a mano los nombres de las columnas —renombrar una métrica la
+> habría escondido para siempre— y filtraba por tipo mientras el productor guardaba una tasa
+> medida como texto, así que esa métrica se caía de la tabla commiteada **igual que una que no
+> se pudo medir**. Lección viva con sus dos detectores.
+>
+> **DoD del PRD 0009 escrita**, que estaba pendiente de las OQ. Fases 4 y 5 cerradas contra
+> comandos; 3b degradada a regla, 6 aparcada y 7 bloqueada por OQ-1, que es del owner: cuánto
+> contexto de `AGENTS.md` es irrenunciable.
+>
+> **La ronda 1 de review salió RED, y el hallazgo valía el turno.** `recuperacion()` pareaba
+> "roja → primera verde posterior" sobre la lista MEZCLADA de workflows, así que el rojo de un
+> pipeline lo cerraba el verde de otro: con el `gh run list` real de este repo, un rojo de
+> `gate-0a-macos` quedaba "recuperado" por un verde de `harness-ci` casi 27 h después. El
+> número contaminado ya estaba commiteado en `metrics-weekly.md`. Se paréa por workflow y se
+> regeneró el fichero. El reviewer además lanzó `median`→`mean` y **sobrevivió** —esa lógica no
+> tenía ni un test—; el fixture nuevo tiene tres intervalos con mediana y media distintas a
+> propósito, porque uno simétrico no discrimina estadísticos. Sus dos notas no bloqueantes
+> (ventanas mezcladas en una misma fila, merge de pulpo) están en el ledger.
+>
+> **Lo que sigue sin resolverse:** hay que acordarse de ejecutar `dora.sh`. `/status` no lo
+> llama y eso queda registrado en el ledger como decisión del owner — es la misma
+> observabilidad *pull* que el estudio de paridad marca como nuestra brecha frente a la
+> industria, ahora con mejor instrumento pero el mismo disparador humano.
+
 > **2026-09-03 · PRD 0009 arrancado.** Las cinco Open Questions resueltas: tres cerradas
 > investigando el código, dos decididas por el owner. La de OQ-10 **cambió la fase 3b** —no hay
 > aislamiento de sub-agentes por configuración, solo un parámetro por invocación de la tool

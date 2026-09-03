@@ -227,11 +227,35 @@ sería una afirmación disfrazada. Los dos que ya se pueden fijar, del aislamien
 
 ## 11. Definition of Done
 
-Se escribirá al cerrar las OQ. Hoy no se puede: una DoD sobre fases cuyo diseño está abierto
-sería un checklist que no verifica nada.
+Ya se puede escribir: las cinco OQ están cerradas. Cada condición es un comando, no una
+afirmación.
+
+| # | Condición | Cómo se verifica | Estado |
+|---|---|---|---|
+| 1 | El mapa se vigila solo: tocar producto sin tocar el mapa se delata | `bash tools/check-execution-map.sh` con `tools/` sucio y el mapa viejo → exit 1 | ✅ fase 4 |
+| 2 | El aviso del mapa existe en LOCAL y nunca bloquea | job `execution-map` en `lefthook.yml`, `exit 0` incondicional | ✅ fase 4 |
+| 3 | Las seis métricas se leen de una vez | `bash tools/metrics/dora.sh` → exit 0 con las seis líneas | ✅ fase 5 |
+| 4 | **Ninguna métrica sin evento imprime un 0** | `test_lo_que_no_se_puede_medir_sale_na_con_razon` | ✅ fase 5 |
+| 5 | La serie es serie, no foto | `test_la_serie_es_append_only` | ✅ fase 5 |
+| 6 | El resumen semanal se versiona y no ensucia el diff | `docs/process/metrics-weekly.md` + `test_el_rollup_semanal_es_idempotente` | ✅ fase 5 |
+| 7 | Lo medido llega al fichero commiteado | `test_todo_lo_medido_llega_al_rollup` | ✅ fase 5 |
+| 8 | Sin `gh`, las otras cinco siguen saliendo | `test_sin_gh_declara_y_sigue` | ✅ fase 5 |
+
+**Fuera de la DoD, y por qué.** Las tres fases restantes no se cierran con un comando porque su
+OQ decidió que no se hacen así:
+
+- **3b** — OQ-10 demostró que no existe aislamiento de sub-agentes por configuración; solo un
+  parámetro por invocación. Baja de mecanismo a **regla**, y una regla no tiene DoD verificable.
+- **6** — OQ-11b (owner): **aparcada**. Sin credencial de IA en ningún workflow, `ci/ai-review.sh`
+  falla abierto y el juez nocturno daría un badge verde permanente — que es P2 violado por la
+  fase que lo predica.
+- **7** — bloqueada por OQ-1, que es **decisión del owner**: cuánto contexto de `AGENTS.md` es
+  irrenunciable. No se estima sin esa respuesta.
 
 ## 12. Change log
 
 | Fecha | Cambio | Quién |
 |---|---|---|
+| 2026-09-03 | Ronda 1 de la fase 5: RED. `recuperacion()` pareaba rojo→verde sobre la lista mezclada de workflows y publicaba recuperaciones que nunca ocurrieron; el número ya estaba en el fichero versionado. Se parea por workflow y se regeneró. Dos notas no bloqueantes al ledger. | reviewer |
+| 2026-09-03 | Fases 4 y 5 entregadas; DoD escrita con las cinco OQ cerradas. La fase 5 encontró dos huecos silenciosos propios: el rollup repetía a mano los nombres de las métricas (renombrar una la escondía), y guardaba la tasa de fallo como texto, así que la métrica MEDIDA se caía de la tabla commiteada igual que una no medida. | sesión de auditoría |
 | 2026-09-03 | Nace al partir el PRD 0008 original por el remedio de §13, tras dos design-reviews RED. Recoge sus fases con diseño ABIERTO y convierte en OQ bloqueante cada premisa que el código desmintió. | sesión de auditoría |
