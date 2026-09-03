@@ -111,3 +111,26 @@ _case_rollup_declara_descartes() {
     echo "    el fichero VERSIONADO no declara la fila descartada"; return 1; }
 }
 test_el_rollup_declara_lo_que_no_pudo_datar() { _dora_sandbox _case_rollup_declara_descartes; }
+
+# ── Observar no puede modificar ──────────────────────────────────────
+# `/status` se declara "solo lectura: no escribe ningún archivo", y `dora.sh`
+# apenda una fila a la serie en CADA corrida. Cablearlo tal cual habría repetido
+# el incidente que ese mismo comando documenta: alguien llamó a `session-start`
+# sin `--report`, borró los markers de skills leídas y dejó el siguiente `Edit`
+# bloqueado a mitad de sesión (`f-session-start-fx`).
+#
+# De ahí `--sin-serie`: el mismo informe, sin tocar nada. Y la serie es lo que
+# alimenta el rollup versionado, así que una fila escrita "de mirar" no es
+# inocua — falsea la media semanal de un fichero que se commitea.
+_case_sin_serie_no_escribe() {
+  bash tools/metrics/dora.sh --sin-serie >/dev/null 2>&1
+  [ -s .agents/state/metrics/series.jsonl ] && {
+    echo "    --sin-serie escribió en la serie:"
+    sed 's/^/      /' .agents/state/metrics/series.jsonl
+    return 1; }
+  # y sigue informando: un modo que calla no sirve para /status
+  bash tools/metrics/dora.sh --sin-serie 2>&1 | grep -qi 'frecuencia' || {
+    echo "    --sin-serie no imprimió el informe"; return 1; }
+  return 0
+}
+test_sin_serie_informa_sin_escribir() { _dora_sandbox _case_sin_serie_no_escribe; }

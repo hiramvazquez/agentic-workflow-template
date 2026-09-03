@@ -170,10 +170,11 @@
 > por detrás se avisa **con el número de commits**; el caso simétrico (local por delante) calla,
 > y esa asimetría es la razón de la preferencia.
 >
-> **Lo que sigue sin resolverse:** hay que acordarse de ejecutar `dora.sh`. `/status` no lo
-> llama y eso queda registrado en el ledger como decisión del owner — es la misma
-> observabilidad *pull* que el estudio de paridad marca como nuestra brecha frente a la
-> industria, ahora con mejor instrumento pero el mismo disparador humano.
+> **`/status` ya las llama** (`f-ebb770a1` cerrado): ejecuta `dora.sh --sin-serie` e imprime
+> una sección ENTREGA. El modo de solo lectura no es un lujo — el comando se declara sin
+> efectos, y la serie que dora apenda alimenta el rollup versionado, así que *mirar* habría
+> falseado la media semanal de un fichero commiteado. Sigue siendo observabilidad *pull*: hay
+> que pedir `/status`. Lo que ya no hay es que acordarse de una herramienta suelta.
 
 > **2026-09-03 · PRD 0009 arrancado.** Las cinco Open Questions resueltas: tres cerradas
 > investigando el código, dos decididas por el owner. La de OQ-10 **cambió la fase 3b** —no hay

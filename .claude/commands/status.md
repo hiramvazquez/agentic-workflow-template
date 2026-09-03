@@ -1,5 +1,5 @@
 ---
-description: Imprime EN PANTALLA el estado real del workflow — fase, gates, niveles mudos de la pirámide y findings abiertos — y termina con lo que falta, ordenado por coste. Solo lectura: no arregla nada, no escribe ningún archivo.
+description: Imprime EN PANTALLA el estado real del workflow — fase, gates, niveles mudos de la pirámide, findings abiertos y las seis métricas de entrega — y termina con lo que falta, ordenado por coste. Solo lectura: no arregla nada, no escribe ningún archivo.
 ---
 
 # /status — qué está cableado, qué está mudo, y qué toca ahora
@@ -35,7 +35,7 @@ voy?". Corto, priorizado y **prescriptivo** — termina en qué hacer, no en qu�
 3. **Cero cifras derivables escritas a mano** — la misma disciplina que
    `tools/check-execution-map.sh` impone sobre el mapa. Si el número se puede derivar, se deriva.
 
-## Qué ejecutar (todo solo-lectura, ~10 s en total)
+## Qué ejecutar (todo solo-lectura, ~13 s en total)
 
 ```bash
 bash scripts/agent-hooks/session-start.sh --report
@@ -44,7 +44,14 @@ bash tools/drift-ratchet.sh --check
 bash tools/check-layers.sh
 bash tools/check-execution-map.sh
 bash tools/findings/findings.sh list --status open --json
+bash tools/metrics/dora.sh --sin-serie
 ```
+
+`dora` es lo más lento de la lista (~3 s, casi todo esperando a `gh` por red) y el único que
+podría **escribir**: apunta una fila a la serie en cada corrida, y esa serie alimenta el rollup
+versionado. **`--sin-serie` no es opcional aquí** — sin él, mirar el estado falsearía la media
+semanal de un fichero que se commitea. Si no hay red, `dora` declara `n/a` en la métrica que
+dependía de `gh` y sigue con las otras; no aborta.
 
 Filtros para no ahogarte en su salida (la salida completa es para `harness-report`, no para ti):
 
@@ -59,6 +66,18 @@ Filtros para no ahogarte en su salida (la salida completa es para `harness-repor
   `awk '/^## Próximo paso/{f=1;next} /^## /{f=0} f' docs/process/current_execution_map.md | grep -E '^([0-9]+\.|-) ' | head -6`
   (acepta lista numerada Y viñetas: cada repo escribe su mapa a su manera, y un filtro
   atado a una sola convención devuelve **vacío en silencio** en el otro — medido, no supuesto)
+- **Entrega** → de `dora --sin-serie`, las seis líneas tal cual: `grep -E '^  [^ ]'`.
+  (Dos espacios exactos: son los que `Metrica.linea()` emite, y el mismo filtro recoge de paso
+  la nota de huecos y el aviso de desfase, que también van a la pantalla. La primera versión de
+  esta línea pedía cuatro y devolvía **cero** — el fallo silencioso que este mismo documento
+  avisa dos viñetas más arriba; ahora lo fija `test_el_filtro_de_entrega_del_status_casa`.)
+  Cópialas **literalmente**. Cuatro tienen evento en este repo y dos salen `n/a` con su razón
+  (sin merges no hay lead time; el campo `area` del ledger es texto libre y no hay join para
+  el retrabajo). **Un `n/a` NUNCA se convierte en `0`, ni se omite**: es la misma regla que el
+  `?` del punto 2 del contrato, y la razón por la que ese informe existe.
+  Si la tasa de aceptación queda fuera de **25–45%**, dilo en una línea: por debajo el harness
+  está frenando, por encima la industria lo lee como aceptación acrítica.
+
 - **Findings por severidad** — derivado, nunca contado a ojo:
 
 ```bash
@@ -106,6 +125,11 @@ MUDOS     <niveles de la pirámide sin cubrir, ordenados 0→9>
 FINDINGS  <N> abiertos — <h> high · <m> medium · <l> low
           <x> owner-decision (deciden ellos) · <y> auto-fix (los cierras tú)
           high: <id + título, máx 3; si hay más, "… y N más">
+
+ENTREGA   frecuencia <x/semana> · lead time <v|n/a> · fallo <v|n/a>
+          recuperación <v|n/a> · aceptación <x%> · retrabajo <v|n/a>
+          <si aceptación sale de 25-45%, una línea de por qué importa>
+          <si dora avisó de desfase con la remota, esa línea, literal>
 
 PRÓXIMO PASO (docs/process/current_execution_map.md)
   <titular 1, y el 2 si sigue vivo>

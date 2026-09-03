@@ -28,6 +28,9 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+_GIT = runpy.run_path(str(Path(__file__).with_name("dora_git.py")))
+_git, _tronco, _desfase_local = _GIT["git"], _GIT["tronco"], _GIT["desfase_local"]
+
 SERIE = Path(".agents/state/metrics/series.jsonl")
 ROLLUP = Path("docs/process/metrics-weekly.md")
 REVIEWS = Path(".agents/state/review-history.jsonl")
@@ -44,77 +47,6 @@ class Metrica:
     def linea(self) -> str:
         derecha = self.texto if self.razon is None else f"n/a — {self.razon}"
         return f"  {self.nombre:<26}{derecha}"
-
-
-def _git(*args) -> str:
-    try:
-        r = subprocess.run(("git",) + args, capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    return r.stdout.strip() if r.returncode == 0 else ""
-
-
-def _resuelve(ref: str) -> bool:
-    """¿Este nombre apunta a algo? La pregunta que faltaba."""
-    return bool(ref) and bool(_git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"))
-
-
-def _tronco() -> str:
-    """La rama que hace de tronco, DERIVADA y VERIFICADA. Cadena vacía si
-    ninguna candidata resuelve.
-
-    Estaba escrita a mano como `main`, y en un repo con `master` o `trunk` eso
-    producía "0 commits en main en 90 días": un `n/a` cuya razón declarada es
-    falsa —no es que no hubiera commits, es que se miró un sitio que no
-    existe—. Esta es una plantilla que se distribuye, así que le pasaba a
-    cualquier adoptante que no usara `main`.
-
-    Y la primera versión de este arreglo cortaba el prefijo de `origin/HEAD`
-    para devolver el nombre pelado, que **solo resuelve si existe la rama
-    LOCAL**. Borrarla es rutina, y entonces reaparecía exactamente el mismo
-    bug por otra puerta. Lo cazó el review con el repro completo. De ahí que
-    aquí no se devuelva ningún nombre sin comprobar antes que apunta a algo:
-    la lección es que un `n/a` es una AFIRMACIÓN, y una afirmación se verifica.
-    """
-    remoto = _git("symbolic-ref", "--short", "refs/remotes/origin/HEAD")
-    if remoto.startswith("origin/"):
-        corto = remoto[len("origin/"):]
-        # La REMOTA primero. El orden anterior probaba el nombre pelado "porque
-        # es lo que el usuario reconoce", y con una rama local por detrás medía
-        # la local sin decirlo: el review lo reprodujo dando 2 commits donde
-        # había 3 entregados. Y preferirla es lo correcto por definición —
-        # "entrega" es lo que llegó al tronco compartido, no lo que hay en tu
-        # clon; lo que aún no has empujado, precisamente, no se ha entregado.
-        for cand in (remoto, corto):
-            if _resuelve(cand):
-                return cand
-    for nombre in ("main", "master", "trunk"):
-        if _resuelve(nombre):
-            return nombre
-    actual = _git("rev-parse", "--abbrev-ref", "HEAD")
-    return actual if _resuelve(actual) else ""
-
-
-def _desfase_local(tronco: str) -> str:
-    """Aviso si se midió contra la referencia remota y la rama local del mismo
-    nombre va por detrás. El número es correcto —es el tronco compartido— pero
-    el lector necesita saber que su copia no contiene lo que se le está
-    contando.
-
-    El caso simétrico (la local por DELANTE) no es un aviso: son commits sin
-    empujar, y no empujado es no entregado. Esa asimetría es justamente la
-    razón de preferir la remota."""
-    if not tronco.startswith("origin/"):
-        return ""
-    local = tronco[len("origin/"):]
-    if not _resuelve(f"refs/heads/{local}"):
-        return ""
-    detras = _git("rev-list", "--count", f"refs/heads/{local}..{tronco}")
-    if not detras.isdigit() or detras == "0":
-        return ""
-    return (f"  ⚠️  tu rama local `{local}` va {detras} commit(s) por detrás de "
-            f"`{tronco}`.\n      Se midió contra la remota: esto es lo entregado, "
-            "no lo que tienes delante.")
 
 
 def _desde(dias: int) -> str:
@@ -341,12 +273,7 @@ def _recoger(dias: int) -> list[Metrica]:
             recuperacion(), aceptacion(), retrabajo()]
 
 
-def informar(dias: int) -> int:
-    metricas = _recoger(dias)
-    print(f"━━━ entrega · ventana {dias} días ━━━")
-    for m in metricas:
-        print(m.linea())
-
+def _apuntar_serie(metricas: list[Metrica], dias: int) -> None:
     fila = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
             "kind": "dora", "dias": dias,
             # Sin sort_keys: el ORDEN de esta dict es el orden de las columnas
@@ -360,6 +287,22 @@ def informar(dias: int) -> int:
     except OSError as e:
         print(f"⚠️  no pude apendar a {SERIE}: {e}", file=sys.stderr)
 
+
+def informar(dias: int, serie: bool = True) -> int:
+    """El informe. `serie=False` (`--sin-serie`) lo imprime SIN apuntar nada.
+
+    `/status` se declara de solo lectura, y una fila escrita "de mirar" no es
+    inocua: la serie alimenta el rollup VERSIONADO, así que falsearía la media
+    semanal de un fichero que se commitea. Observar no puede modificar — la
+    misma trampa por la que `session-start` necesitó su `--report`
+    (`f-session-start-fx`). Lo que NO cambia es lo que se imprime: un modo de
+    lectura que además recorta el informe no sirve para lo que se pidió.
+    """
+    metricas = _recoger(dias)
+    print(f"━━━ entrega · ventana {dias} días ━━━")
+    for m in metricas:
+        print(m.linea())
+
     aviso = _desfase_local(_tronco())
     if aviso:
         print("")
@@ -368,8 +311,14 @@ def informar(dias: int) -> int:
     huecos = [m for m in metricas if m.razon is not None]
     if huecos:
         print("")
-        print(f"  ℹ️  {len(huecos)} de 6 sin evento que medir en este repo. Un hueco")
-        print("      declarado es una lectura correcta; un 0 en su lugar, no.")
+        # Una sola línea, y autocontenida: el filtro de `/status` recoge las
+        # líneas con dos espacios de sangría, así que una nota partida en dos
+        # llegaba a pantalla cortada a mitad de frase.
+        print(f"  ℹ️  {len(huecos)} de 6 sin evento que medir aquí — un hueco declarado "
+              "es una lectura correcta; un 0 en su lugar, no.")
+
+    if serie:
+        _apuntar_serie(metricas, dias)
     return 0
 
 
@@ -384,7 +333,7 @@ def main(argv: list[str]) -> int:
         except (IndexError, ValueError):
             print("⚠️  --days necesita un entero positivo.", file=sys.stderr)
             return 3
-    return informar(dias)
+    return informar(dias, serie="--sin-serie" not in argv)
 
 
 if __name__ == "__main__":

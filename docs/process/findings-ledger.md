@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **83** · Cerrados: 171 · Total: 254
+Abiertos: **83** · Cerrados: 172 · Total: 255
 
 ## Abiertos
 
@@ -54,7 +54,6 @@ Abiertos: **83** · Cerrados: 171 · Total: 254
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-e012fcce` | medium | owner-decision | `lefthook.yml (pre-push) + scripts/agent-hooks/canon-enforce.sh (CHECK 4) + .claude/agents/reviewer.md` | Nada impide que algo mute el arbol mientras otra cosa lo verifica: tres incidentes en una sesion |
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
-| `f-ebb770a1` | medium | owner-decision | `.claude/commands/status.md + tools/metrics/dora.sh` | Las seis métricas de entrega existen pero nadie las ejecuta: /status no las llama |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
 | `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky en macOS: senales, procesos hijo y timeouts. ~2 de 3 corridas en rojo |
@@ -72,6 +71,7 @@ Abiertos: **83** · Cerrados: 171 · Total: 254
 | `f-6e236c11` | low | auto-fix | `scripts/agent-hooks/session-start.sh (sed del bloque de check-ring3)` | El banner de sesion aplana la indentacion del diagnostico del Anillo 3 y pierde la jerarquia del remedio |
 | `f-708ec207` | low | owner-decision | `tools/check-execution-map.sh (PALABRAS_AMBIGUAS / exencion por posicion)` | Dos fugas de posicion en el detector de evidencia del mapa, encontradas tras cerrarlo |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
+| `f-7a219330` | low | owner-decision | `tools/metrics/dora.py + .claude/commands/status.md` | gh run list con timeout de 60s esta ahora en el camino critico de /status |
 | `f-7e00dbd` | low | owner-decision | `tools/tests/test_semgrep_rules.sh` | El detector de invocaciones de semgrep no ve exec, xargs, subshell sin $ ni subprocess con shell=True |
 | `f-8491b341` | low | auto-fix | `scripts/install-harness.sh:107-108` | install-harness: la variable NUNCA es inerte — documenta una politica que ningun codigo evalua |
 | `f-86d257b3` | low | auto-fix | `scripts/agent-hooks/canon-enforce.sh:135 + tools/tests/test_canon_enforce.sh` | Ningun test fija que los .yaml esten en el alcance de CHECK 4: el mutante sobrevive |
@@ -265,6 +265,7 @@ Abiertos: **83** · Cerrados: 171 · Total: 254
 | `f-a9e12041` | fixed | scripts/install-harness.sh copia la maquinaria leyendo el mismo inventario que upgrade.sh (SYNC_PATH |
 | `f-970c3590` | fixed | PRD 0008 fase 2. bootstrap.sh ya NO borra: imprime el comando y deja la decision al adoptante (OQ-5, |
 | `f-2c889b68` | fixed | El bloque se reescribio en el mismo commit de la fase 2: 'while IFS= read -r -d' sobre 'git ls-files |
+| `f-ebb770a1` | fixed | Cableado. /status ejecuta ahora 'bash tools/metrics/dora.sh --sin-serie' e imprime una seccion ENTRE |
 | `f-94384693` | fixed | Cerrado en los CUATRO sitios donde el fichero descartaba callado, no solo en el que denunciaba semgr |
 | `f-2b1e6145` | fixed | Decision del owner: las dos cosas. (1) _tronco() prueba ahora la referencia REMOTA antes que el nomb |
 | `f-b77dbbfb` | fixed | Cerrado con el test que faltaba: test_sin_desfase_el_aviso_calla monta una rama local AL DIA con su  |

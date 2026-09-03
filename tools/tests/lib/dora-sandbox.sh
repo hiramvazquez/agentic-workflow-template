@@ -7,13 +7,20 @@
 # serie por otro. Duplicar estos helpers en los dos ficheros habría sido el
 # drift que este repo persigue en todo lo demás.
 
+_dora_copiar_modulos() { # <destino> — la lista vive UNA vez
+  # Los dos sandboxes copiaban su propia lista y una se quedó sin `dora_git.py`
+  # al partir el módulo: un fichero que falta aquí no da error, da un traceback
+  # dentro del sandbox y un test que falla por la razón equivocada.
+  local f
+  for f in dora.sh dora.py dora_git.py dora_rollup.py read-events.py; do
+    cp "$PROJECT_ROOT/tools/metrics/$f" "$1/tools/metrics/" 2>/dev/null
+  done
+}
+
 _dora_sandbox() { # <función>
   local d; d="$(mktemp -d)" A=add C=commit
   mkdir -p "$d/tools/metrics" "$d/.agents/state/metrics"
-  cp "$PROJECT_ROOT/tools/metrics/dora.sh" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/dora.py" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/dora_rollup.py" "$d/tools/metrics/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/metrics/read-events.py" "$d/tools/metrics/" 2>/dev/null
+  _dora_copiar_modulos "$d"
   (
     cd "$d" || exit 1
     git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
@@ -26,10 +33,7 @@ _dora_sandbox() { # <función>
 _dora_sandbox_vacio() { # <función> — repo recién inicializado, sin un solo commit
   local d; d="$(mktemp -d)"
   mkdir -p "$d/tools/metrics"
-  local f
-  for f in dora.sh dora.py dora_rollup.py read-events.py; do
-    cp "$PROJECT_ROOT/tools/metrics/$f" "$d/tools/metrics/" 2>/dev/null
-  done
+  _dora_copiar_modulos "$d"
   (
     cd "$d" || exit 1
     git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t

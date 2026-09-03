@@ -18,8 +18,8 @@
 - **Sub-agentes:** viven en `.claude/agents/*.md`. Invócalos con la tool `Agent` según su `description`. Catálogo en `.claude/agents/README.md`.
 - **Comandos** (`.claude/commands/*.md` — esta lista es la del directorio, sin detector que
   la vigile: si añades el sexto, añádelo aquí en el mismo commit):
-  - `/status` — el estado real en una pantalla: fase, gates, niveles mudos, findings, y qué
-    falta ordenado por coste. Solo lectura.
+  - `/status` — el estado real en una pantalla: fase, gates, niveles mudos, findings, las seis
+    métricas de entrega, y qué falta ordenado por coste. Solo lectura.
   - `/goal <objetivo>` — fija condiciones VERIFICABLES y delega el cierre en el `reviewer` (nivel 8).
   - `/historia <idea>` — convierte una idea suelta en una historia de backlog con criterios verificables.
   - `/reconciliar [área]` — caza el drift entre lo que la spec AFIRMA y lo que el código ES.
