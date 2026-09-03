@@ -75,26 +75,25 @@ el SHA sincronizado para aplicar solo el delta la próxima vez.
 
 > ⚠️ **`bootstrap.sh` lo corres TÚ, en tu terminal — no se lo pidas a un agente.**
 > Está en `permissions.deny`, así que un agente no puede invocarlo: el 2026-09-03 uno lo
-> ejecutó contra el repo del template y borró ficheros. Ese deny viaja contigo si el
-> instalador te dejó su `.claude/settings.json`, y es deliberado — este es un paso humano
-> de la adopción.
+> ejecutó contra el repo del template y borró ficheros. Ese deny viaja contigo si el instalador
+> te dejó su `.claude/settings.json`, y es deliberado — este es un paso humano de la adopción.
 >
-> ⚠️ **Y puede borrar tu código — haz copia antes de correrlo.**
-> Su pregunta de plataformas hace `rm -rf` de las que NO listes, y el bucle
-> incluye `backend`, que el template **no trae**: ese elemento solo puede
-> alcanzar un directorio TUYO. Reproducido el 2026-09-03: un proyecto con
-> `backend/src/server.js` real, respondiendo "ios" al prompt, se queda sin
-> `backend/`. Lo mismo si tienes un `web/` o un `android/` propios y no los
-> listas. Está registrado como `high` en el ledger y no arreglado todavía: si
-> tus carpetas de plataforma tienen código, **lístalas todas** en el prompt, o
-> salta este paso y edita a mano `AGENTS.md` §2 y `tools/preset`.
+> **Ya NO borra nada.** Antes hacía `rm -rf` de las plataformas que no listaras, y el bucle
+> incluía `backend`, que el template no trae — así que solo podía alcanzar directorios TUYOS.
+> Desde el PRD 0008 fase 2, **te propone el comando y no lo ejecuta**: tú decides. Si tus
+> carpetas de plataforma tienen código, no pasa nada por no listarlas.
+>
+> Y el reemplazo de `<PROJECT>` ahora solo toca lo que **tu git** considera del proyecto
+> (`git ls-files`), respetando tu `.gitignore`. Antes recorría el árbol entero, `node_modules/`
+> incluido — y en macOS no reemplazaba nada en absoluto, por una incompatibilidad de `grep -Z`
+> entre GNU y BSD que hacía que el bucle no iterara ni una vez.
 
 ```bash
 git clone --depth 1 <este-template> /tmp/awt
 bash /tmp/awt/scripts/install-harness.sh ~/ruta/a/mi-proyecto-existente
 cd ~/ruta/a/mi-proyecto-existente
 git remote add template <este-template>
-bash scripts/bootstrap.sh   # ⚠️ LEE EL AVISO DE ARRIBA: su prompt de plataformas hace rm -rf
+bash scripts/bootstrap.sh   # lo corres TÚ, no un agente (ver aviso arriba). Ya no borra: propone.
 ```
 
 > **Por qué un instalador y no `cp -R`.** Esta guía decía `cp -R /tmp/awt/. .`

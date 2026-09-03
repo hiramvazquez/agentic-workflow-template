@@ -130,7 +130,14 @@
 > test. Límite declarado: el matching de Bash es por prefijo, así que no cubre
 > `cd scripts && bash bootstrap.sh`; esa mitad la cierra la fase 2.
 >
-> **Siguiente:** fase 2 (bootstrap propone en vez de ejecutar) y fase 1 (lector del denominador).
+> **Fase 2 ENTREGADA:** `bootstrap.sh` ya no borra — propone el comando y deja la decisión al
+> adoptante (OQ-5). Precondición que aborta si no hay remote `template` (OQ-8). Reemplazo de
+> placeholders acotado a `git ls-files` (OQ-11). Cierra `f-970c3590`. Y al reescribir ese
+> bloque salió un bug preexistente peor: `grep -lZ` alimentando un `read -d ''` no itera en
+> BSD, así que bootstrap **nunca reemplazó los placeholders en macOS** anunciando que sí —
+> registrado, arreglado, y con detector nuevo para la clase.
+>
+> **Siguiente:** fase 1 (lector del denominador).
 
 
 - **DECISIÓN DEL OWNER 2026-08-24 — el freeze de gates nuevos (PRD 0005 §3) sigue VIGENTE y se

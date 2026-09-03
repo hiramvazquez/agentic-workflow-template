@@ -222,3 +222,62 @@ test_el_runner_sanea_el_entorno_del_anfitrion() {
   [ -z "$sucias" ] \
     || { echo "    el saneo no surtió efecto: llegaron del anfitrión:$sucias"; return 1; }
 }
+
+# ── `grep -Z` alimentando un `read -d ''` no funciona en BSD ────────
+# SEGUNDA trampa GNU/BSD en 24 horas, y de la misma forma exacta que la del
+# orden de `stat`: una opción que en GNU hace una cosa y en BSD otra, fallando
+# hacia el SILENCIO.
+#
+# En GNU, `grep -lZ` separa los nombres por NUL y el `read -d ''` los consume.
+# En BSD/macOS, `-Z` NO emite NUL — verificado con `od -c`: separa por `\n`. El
+# `read -d ''` espera un NUL que nunca llega, el bucle da CERO iteraciones, y el
+# script sigue como si hubiera trabajado.
+#
+# Lo que costó: `scripts/bootstrap.sh` combinaba las dos cosas, así que su
+# función principal —reemplazar `<PROJECT>` por el nombre del proyecto— NUNCA
+# funcionó en macOS. Imprimía "→ Reemplazando…" y no reemplazaba nada. Todo
+# adoptante de macOS se quedó con los placeholders puestos.
+#
+# La forma portable es `git ls-files -z` (que sí emite NUL en todas partes) o
+# `find -print0`, con el grep por fichero dentro del bucle.
+#
+# ⚠️ LÍMITE DECLARADO, y hay que leerlo antes de confiar en este detector: caza
+# el flag PEGADO a `grep` como texto. Se evade con indirección de variable —
+# `_F="-lZ"; grep $_F … | while read -d ''` es funcionalmente idéntico y pasa en
+# verde. Lo demostró el review con un mutante en vivo. Cubrirlo de verdad
+# exigiría seguir el valor de una variable a través del script, que con `grep`
+# de texto no se puede hacer sin falsos positivos — y un detector con más de
+# ~10% de FP se descarta entero (§14.2).
+#
+# Se deja así, con el hueco ESCRITO, porque la alternativa no es un detector
+# mejor: es uno que afirma una cobertura que no tiene, que es justo la lección
+# que f-74be77fe lleva registrada. Lo que este detector sí garantiza es que la
+# forma LITERAL —la que se escribe sin pensar, y la que causó el bug— no vuelve.
+test_grep_Z_no_alimenta_un_read_nul() {
+  # Se miran las líneas de CÓDIGO, no los comentarios. La primera versión se
+  # cazaba a sí misma vía `bootstrap.sh`: el comentario que explica por qué NO
+  # usar ese par contiene el par. Misma trampa que ya tuvo el detector del orden
+  # de `stat`, y aquí la exención mínima es "los comentarios son texto", no
+  # "este fichero está exento".
+  #
+  # `-print0` además, porque un detector de portabilidad que se rompe con un
+  # nombre de fichero raro es una broma (lo señaló shellcheck SC2038 sobre la
+  # primera versión de estas mismas líneas).
+  local hits="" f cuerpo
+  while IFS= read -r -d '' f; do
+    cuerpo="$(grep -vE '^[[:space:]]*#' "$f" 2>/dev/null || true)"
+    printf '%s' "$cuerpo" | grep -qE 'grep[^|]*-[a-zA-Z]*Z' || continue
+    printf '%s' "$cuerpo" | grep -qE "read -r -d ''|read -d ''" || continue
+    hits="$hits $f"
+  done < <(find "$PROJECT_ROOT/scripts" "$PROJECT_ROOT/tools" "$PROJECT_ROOT/ci" \
+             -name '*.sh' -not -name 'test_shell_hygiene.sh' -print0 2>/dev/null)
+  [ -z "$hits" ] && return 0
+  echo "    estos scripts usan \`grep … -Z\` Y un \`read -d ''\`:"
+  for f in $hits; do echo "      ${f##*/}"; done
+  echo "    En BSD/macOS \`grep -Z\` NO emite NUL (separa por \\n), así que el"
+  echo "    \`read -d ''\` espera un NUL que nunca llega y el bucle no itera NI"
+  echo "    UNA VEZ — en silencio, con el script anunciando que trabajó."
+  echo "    Portable: \`git ls-files -z\` o \`find -print0\`, con el grep DENTRO."
+  echo "    Le pasó a bootstrap.sh: nunca reemplazó los placeholders en macOS."
+  return 1
+}

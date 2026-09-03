@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **76** · Cerrados: 166 · Total: 242
+Abiertos: **75** · Cerrados: 168 · Total: 243
 
 ## Abiertos
 
@@ -16,7 +16,6 @@ Abiertos: **76** · Cerrados: 166 · Total: 242
 | `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
-| `f-970c3590` | high | owner-decision | `scripts/bootstrap.sh:35-39` | bootstrap.sh borra con rm -rf el codigo fuente real del adoptante: backend/ no lo trae el template, solo puede ser suyo |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
@@ -256,3 +255,5 @@ Abiertos: **76** · Cerrados: 166 · Total: 242
 | `f-6cc1f3b4` | fixed | reviewer-gate.sh extrae REVIEWER_OVERRIDE/_REASON del PREFIJO VAR=val del segmento que es un git com |
 | `f-7a8d1fbe` | fixed | reviewer-gate.sh une las continuaciones de linea (_join_cont, un awk que pega la linea siguiente cua |
 | `f-a9e12041` | fixed | scripts/install-harness.sh copia la maquinaria leyendo el mismo inventario que upgrade.sh (SYNC_PATH |
+| `f-970c3590` | fixed | PRD 0008 fase 2. bootstrap.sh ya NO borra: imprime el comando y deja la decision al adoptante (OQ-5, |
+| `f-2c889b68` | fixed | El bloque se reescribio en el mismo commit de la fase 2: 'while IFS= read -r -d' sobre 'git ls-files |
