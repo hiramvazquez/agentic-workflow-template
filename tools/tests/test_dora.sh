@@ -273,3 +273,74 @@ _case_fila_sin_nada() {
     echo "    la fila sin veredicto ni sha desaparece sin contador: $l"; return 1; }
 }
 test_las_filas_sin_veredicto_ni_sha_se_declaran() { _dora_sandbox _case_fila_sin_nada; }
+
+# ── 18. Se mide contra la REMOTA, y el desfase local se dice ────────
+# Decisión del owner tras el hallazgo de la ronda 2. El orden anterior probaba
+# el nombre pelado primero "porque es lo que el usuario reconoce", y con una
+# rama local por detrás de `origin/<rama>` medía la local sin decirlo: el
+# reviewer lo reprodujo dando "2 commits" donde había 3 entregados.
+#
+# Preferir la remota es además lo correcto por definición: "entrega" es lo que
+# llegó al tronco compartido, no lo que tienes en tu clon. Y el desfase se
+# declara porque el lector necesita saber que su copia va por detrás de lo que
+# se le está contando.
+_dora_tres_commits_con_remoto() { # deja origin/main 2 commits por delante de main
+  local A=add C=commit c1
+  git branch -m "$(git rev-parse --abbrev-ref HEAD)" main 2>/dev/null
+  c1="$(git rev-parse HEAD)"
+  echo a > x.txt; git "$A" x.txt; git "$C" -qm dos
+  echo b > y.txt; git "$A" y.txt; git "$C" -qm tres
+  git update-ref refs/remotes/origin/main HEAD
+  git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git checkout -q --detach          # para poder mover `main` sin tocar el árbol
+  git branch -f main "$c1"
+}
+
+_case_prefiere_la_remota() {
+  _dora_tres_commits_con_remoto
+  local l; l="$(_dora | grep -i 'frecuencia')"
+  printf '%s' "$l" | grep -q 'origin/main' || {
+    echo "    midió contra la rama local, no contra la remota: $l"; return 1; }
+  printf '%s' "$l" | grep -q '3 commits' || {
+    echo "    esperaba los 3 commits de origin/main; salió: $l"
+    echo "    Con la local (1 commit) el número es el de tu clon, no el entregado."
+    return 1; }
+}
+test_el_tronco_prefiere_la_referencia_remota() { _dora_sandbox _case_prefiere_la_remota; }
+
+_case_avisa_del_desfase() {
+  _dora_tres_commits_con_remoto
+  local out; out="$(_dora)"
+  printf '%s' "$out" | grep -qi 'por detrás' || {
+    echo "    no avisa de que la rama local va por detrás de la remota:"
+    printf '%s\n' "$out" | tail -4 | sed 's/^/      /'
+    return 1; }
+  printf '%s' "$out" | grep -qi 'por detrás' && printf '%s' "$out" | grep -q '2 commit' || {
+    echo "    avisa, pero sin decir CUÁNTOS commits de desfase"; return 1; }
+}
+test_avisa_cuando_la_rama_local_va_por_detras() { _dora_sandbox _case_avisa_del_desfase; }
+
+# ── 19. Con la local al día, el aviso CALLA ─────────────────────────
+# El review lanzó un mutante sobre el guard de silencio (`or` → `and` en
+# `if not detras.isdigit() or detras == "0"`) y SOBREVIVIÓ: mis cuatro mutantes
+# cubrían la lógica de negocio y ninguno el silencio. Lo reprodujo contra este
+# repo, sincronizado, sacando "va 0 commit(s) por detrás" — un aviso que asusta
+# sin motivo. Un detector que avisa cuando no pasa nada se aprende a ignorar,
+# y entonces no avisa cuando sí pasa.
+_case_sin_desfase_calla() {
+  local A=add C=commit
+  git branch -m "$(git rev-parse --abbrev-ref HEAD)" main 2>/dev/null
+  echo a > x.txt; git "$A" x.txt; git "$C" -qm dos
+  git update-ref refs/remotes/origin/main HEAD      # remota == local, al día
+  git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  local out; out="$(_dora)"
+  printf '%s' "$out" | grep -qi 'por detrás' && {
+    echo "    con la rama local AL DÍA sigue avisando de desfase:"
+    printf '%s\n' "$out" | grep -i 'detrás' | sed 's/^/      /'
+    return 1; }
+  # y sigue midiendo contra la remota, que es lo que se decidió
+  printf '%s' "$out" | grep -i 'frecuencia' | grep -q 'origin/main' || {
+    echo "    dejó de medir contra la remota"; return 1; }
+  return 0
+}
+test_sin_desfase_el_aviso_calla() { _dora_sandbox _case_sin_desfase_calla; }

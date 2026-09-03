@@ -162,6 +162,14 @@
 > ronda 1 con el repro completo, y esa rama de la función no tenía ni un test. Ahora ningún
 > candidato se devuelve sin comprobar que apunta a algo, y si ninguno resuelve se dice.
 >
+> **Y por decisión del owner, la referencia REMOTA va primero.** El orden anterior probaba el
+> nombre pelado "porque es lo que el usuario reconoce", y con una rama local por detrás medía
+> la local sin decirlo — el reviewer lo reprodujo dando 2 commits donde había 3 entregados.
+> Preferir la remota además es lo correcto por definición: entrega es lo que llegó al tronco
+> compartido, así que lo que sigue solo en tu clon queda fuera a propósito. Cuando la local va
+> por detrás se avisa **con el número de commits**; el caso simétrico (local por delante) calla,
+> y esa asimetría es la razón de la preferencia.
+>
 > **Lo que sigue sin resolverse:** hay que acordarse de ejecutar `dora.sh`. `/status` no lo
 > llama y eso queda registrado en el ledger como decisión del owner — es la misma
 > observabilidad *pull* que el estudio de paridad marca como nuestra brecha frente a la

@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **83** · Cerrados: 169 · Total: 252
+Abiertos: **83** · Cerrados: 171 · Total: 254
 
 ## Abiertos
 
@@ -22,7 +22,6 @@ Abiertos: **83** · Cerrados: 169 · Total: 252
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-29b0127a` | medium | auto-fix | `scripts/install-harness.sh (_verificar_clasificacion)` | install-harness: _verificar_clasificacion no expande SYNC_GLOBS, punto ciego dormido del mismo patron que ya fallo |
-| `f-2b1e6145` | medium | owner-decision | `tools/metrics/dora.py:79-86` | _tronco() puede medir contra una rama local desactualizada frente a origin/<rama>, sin declararlo |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3793c17b` | medium | owner-decision | `.claude/settings.json:21 + .agents/ (convencion de rutas de estado)` | Un deny de Edit sobre .agents/state alcanza a las escrituras por Bash del sub-agente, y nada lo declara |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
@@ -92,6 +91,7 @@ Abiertos: **83** · Cerrados: 169 · Total: 252
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
 | `f-cbdd8e70` | low | auto-fix | `tools/lib/detector-run.sh + tools/tests/test_detector_runs.sh` | Un fixture de test puede escribir en el log de metricas REAL si olvida DETECTOR_RUNS_LOG, y nada lo detecta |
 | `f-e10aa746` | low | owner-decision | `tools/check-finding-refs.sh (CITA vs resuelve)` | check-finding-refs perdona abreviaturas en source pero las exige exactas en los .md |
+| `f-f0f52107` | low | auto-fix | `tools/check-execution-map.sh` | check-execution-map marca prosa definicional como afirmacion de estado sin evidencia |
 
 ## Cerrados
 
@@ -266,3 +266,5 @@ Abiertos: **83** · Cerrados: 169 · Total: 252
 | `f-970c3590` | fixed | PRD 0008 fase 2. bootstrap.sh ya NO borra: imprime el comando y deja la decision al adoptante (OQ-5, |
 | `f-2c889b68` | fixed | El bloque se reescribio en el mismo commit de la fase 2: 'while IFS= read -r -d' sobre 'git ls-files |
 | `f-94384693` | fixed | Cerrado en los CUATRO sitios donde el fichero descartaba callado, no solo en el que denunciaba semgr |
+| `f-2b1e6145` | fixed | Decision del owner: las dos cosas. (1) _tronco() prueba ahora la referencia REMOTA antes que el nomb |
+| `f-b77dbbfb` | fixed | Cerrado con el test que faltaba: test_sin_desfase_el_aviso_calla monta una rama local AL DIA con su  |

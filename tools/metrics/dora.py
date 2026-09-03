@@ -79,9 +79,13 @@ def _tronco() -> str:
     remoto = _git("symbolic-ref", "--short", "refs/remotes/origin/HEAD")
     if remoto.startswith("origin/"):
         corto = remoto[len("origin/"):]
-        # El pelado primero (es lo que el usuario reconoce), pero solo si existe
-        # de verdad; si no, la referencia remota completa, que es inequívoca.
-        for cand in (corto, remoto):
+        # La REMOTA primero. El orden anterior probaba el nombre pelado "porque
+        # es lo que el usuario reconoce", y con una rama local por detrás medía
+        # la local sin decirlo: el review lo reprodujo dando 2 commits donde
+        # había 3 entregados. Y preferirla es lo correcto por definición —
+        # "entrega" es lo que llegó al tronco compartido, no lo que hay en tu
+        # clon; lo que aún no has empujado, precisamente, no se ha entregado.
+        for cand in (remoto, corto):
             if _resuelve(cand):
                 return cand
     for nombre in ("main", "master", "trunk"):
@@ -89,6 +93,28 @@ def _tronco() -> str:
             return nombre
     actual = _git("rev-parse", "--abbrev-ref", "HEAD")
     return actual if _resuelve(actual) else ""
+
+
+def _desfase_local(tronco: str) -> str:
+    """Aviso si se midió contra la referencia remota y la rama local del mismo
+    nombre va por detrás. El número es correcto —es el tronco compartido— pero
+    el lector necesita saber que su copia no contiene lo que se le está
+    contando.
+
+    El caso simétrico (la local por DELANTE) no es un aviso: son commits sin
+    empujar, y no empujado es no entregado. Esa asimetría es justamente la
+    razón de preferir la remota."""
+    if not tronco.startswith("origin/"):
+        return ""
+    local = tronco[len("origin/"):]
+    if not _resuelve(f"refs/heads/{local}"):
+        return ""
+    detras = _git("rev-list", "--count", f"refs/heads/{local}..{tronco}")
+    if not detras.isdigit() or detras == "0":
+        return ""
+    return (f"  ⚠️  tu rama local `{local}` va {detras} commit(s) por detrás de "
+            f"`{tronco}`.\n      Se midió contra la remota: esto es lo entregado, "
+            "no lo que tienes delante.")
 
 
 def _desde(dias: int) -> str:
@@ -333,6 +359,11 @@ def informar(dias: int) -> int:
             fh.write(json.dumps(fila, ensure_ascii=False) + "\n")
     except OSError as e:
         print(f"⚠️  no pude apendar a {SERIE}: {e}", file=sys.stderr)
+
+    aviso = _desfase_local(_tronco())
+    if aviso:
+        print("")
+        print(aviso)
 
     huecos = [m for m in metricas if m.razon is not None]
     if huecos:
