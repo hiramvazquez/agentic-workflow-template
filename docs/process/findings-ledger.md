@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **84** · Cerrados: 177 · Total: 261
+Abiertos: **83** · Cerrados: 178 · Total: 261
 
 ## Abiertos
 
@@ -15,7 +15,6 @@ Abiertos: **84** · Cerrados: 177 · Total: 261
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
-| `f-9b37c351` | high | auto-fix | `flujo de review · PRD 0011 (aislamiento)` | El aislamiento por worktree de la tool Agent no lleva el trabajo staged: el reviewer no ve nada que revisar |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
 | `f-12096526` | medium | auto-fix | `scripts/bootstrap.sh + docs/ADOPTION.md` | La adopcion por copia hereda el ledger ENTERO del template como si fuera deuda del proyecto |
@@ -275,3 +274,4 @@ Abiertos: **84** · Cerrados: 177 · Total: 261
 | `f-74c528ef` | fixed | Cerrados los dos sitios. (1) dora_git.py: git() devolvia cadena vacia tanto si git DIJO QUE NO -un r |
 | `f-8d0884f9` | fixed | Cerrado por la via del P3 del PRD 0010, decidida por el owner tras TRES revisiones con un hallazgo c |
 | `f-4e3aafc5` | fixed | Cerrado en el mismo commit: excluidos del pathspec los ficheros de datos generados, con test para el |
+| `f-9b37c351` | fixed | Cerrado con tools/review-aislado.sh. El hallazgo sigue siendo cierto sobre el mecanismo NATIVO -isol |
