@@ -10,32 +10,9 @@
 # solo ejercitaba el camino del Anillo 2. Los 60 tests pasaban con la regresión
 # dentro. Lección: **testea cada CAMINO de invocación, no cada función.**
 
-_rm_sandbox() {
-  local d; d="$(mktemp -d)"
-  mkdir -p "$d/tools" "$d/scripts/agent-hooks/lib" "$d/.agents/state/markers"
-  cp "$PROJECT_ROOT/tools/check-review-marker.sh" "$d/tools/"
-  cp -R "$PROJECT_ROOT/scripts/agent-hooks/." "$d/scripts/agent-hooks/"
-  cp "$PROJECT_ROOT/tools/check-layers.sh" "$d/tools/" 2>/dev/null
-  cp "$PROJECT_ROOT/tools/layers.conf" "$d/tools/" 2>/dev/null
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$d/tools/drift-ratchet.sh"
-  (
-    cd "$d" || exit 1
-    git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
-    echo seed > seed.txt; git add seed.txt; git commit -qm init 2>/dev/null
-    mkdir -p src; echo "let x = 1" > src/App.swift; git add src/App.swift
-    "$1"
-  )
-  local rc=$?; rm -rf "$d"; return $rc
-}
-
-# Camino Anillo 1 (lefthook): invoca el script DIRECTO.
-_anillo1() { WORKFLOW_PRESET="$1" bash tools/check-review-marker.sh --staged >/dev/null 2>&1; echo $?; }
-# Camino Anillo 2 (hook): pasa por reviewer-gate.
-_anillo2() {
-  echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
-    | WORKFLOW_PRESET="$1" bash scripts/agent-hooks/reviewer-gate.sh >/dev/null 2>&1
-  echo $?
-}
+_RMS_LIB="$PROJECT_ROOT/tools/tests/lib/review-marker-sandbox.sh"
+# shellcheck source=/dev/null
+. "$_RMS_LIB"
 
 # ── LA REGRESIÓN: los dos caminos deben coincidir ───────────────────
 # FALSO POSITIVO guard: en preset lite el marker AVISA, no bloquea — y debe

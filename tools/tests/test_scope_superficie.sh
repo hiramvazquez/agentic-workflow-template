@@ -102,3 +102,53 @@ test_un_invocador_informativo_no_cuenta_como_gate() {
     return 1; }
   return 0
 }
+
+# ── Lo que un gate CONSULTA es superficie, aunque nadie lo invoque ──
+# `carril.sh` no lo llama ningún anillo: lo consulta `check-review-marker.sh`
+# para decidir si exige review. El extractor de arriba mira `lefthook.yml` y
+# `run-gates.sh`, así que nunca lo vería — y en un proyecto adoptante, donde
+# `tools/` es andamio exento, stagear un clasificador que diga `ligero` para
+# todo dejaba pasar cualquier cosa sin review.
+#
+# El test se DERIVA de la consulta: si `check-review-marker.sh` deja de leer el
+# clasificador, deja de exigirlo. No hay lista a mano que se quede vieja.
+test_lo_que_el_gate_consulta_tambien_es_superficie() {
+  local sup consultado
+  sup="$(_sup_superficie)"
+  consultado="$(grep -oE 'tools/carril\.(sh|conf)' tools/check-review-marker.sh 2>/dev/null \
+                | sort -u)"
+  [ -n "$consultado" ] || return 0   # ya no lo consulta: nada que exigir
+  local malos="" c
+  while IFS= read -r c; do
+    [ -n "$c" ] || continue
+    printf '%s\n' "$c" | grep -qE "$sup" || malos="${malos}  $c"$'\n'
+  done <<< "$consultado"
+  [ -z "$malos" ] || {
+    echo "    check-review-marker CONSULTA esto para decidir si exige review,"
+    echo "    y no exige review para cambiarlo:"
+    printf '%s' "$malos"
+    echo "    Añádelos a scope_siempre_producto() en tools/lib/scope.sh."
+    return 1; }
+}
+
+# ── Las copias de respaldo dicen LO MISMO que la fuente ─────────────
+# `check-review-marker.sh` y `check-verify-marker.sh` llevan una copia literal
+# de la ERE para el caso de que `tools/lib/scope.sh` aún no haya llegado por
+# sync. Es deliberado, y por eso mismo puede divergir: al añadir `tools/carril.sh`
+# a la superficie hubo que tocar las tres, y encontrarlas fue un `grep` a mano.
+# Una regla implementada en tres sitios diverge en cuanto una se olvida — y la
+# que se olvide será la que decida en el repo que va con retraso, que es
+# exactamente donde menos se mira.
+test_las_copias_de_respaldo_no_divergen() {
+  local n
+  n="$(grep -ho '\^(tools/(check|verify.*scripts/agent-hooks/)' \
+        tools/check-review-marker.sh tools/check-verify-marker.sh tools/lib/scope.sh \
+        2>/dev/null | sort -u | grep -c .)"
+  [ "${n:-0}" = "1" ] || {
+    echo "    la superficie de enforcement está escrita de $n formas distintas:"
+    grep -n '\^(tools/(check|verify.*scripts/agent-hooks/)' \
+      tools/check-review-marker.sh tools/check-verify-marker.sh tools/lib/scope.sh \
+      2>/dev/null | cut -c1-120 | sed 's/^/      /'
+    echo "    La fuente es tools/lib/scope.sh; las otras dos son respaldo y la copian literal."
+    return 1; }
+}

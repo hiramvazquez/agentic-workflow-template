@@ -36,7 +36,7 @@ if [ -f tools/lib/scope.sh ]; then
   SIEMPRE_PRODUCTO="$(scope_siempre_producto)"
 else
   NON_PRODUCT='^(docs/|ci/|tools/|scripts/|\.agents/|\.claude/|README)'
-  SIEMPRE_PRODUCTO='^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
+  SIEMPRE_PRODUCTO='^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/carril\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
 fi
 
 fail() { echo "$1" >&2; exit 1; }

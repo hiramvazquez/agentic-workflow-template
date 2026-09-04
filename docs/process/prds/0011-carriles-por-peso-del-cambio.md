@@ -94,7 +94,7 @@ un solo fichero es estructural, el cambio entero es estructural.
 
 | Carril | Qué lo activa | Qué corre |
 |---|---|---|
-| **ligero** | Nada que se ejecute: `docs/**`, `*.md`, fixtures de test | Gates rápidos (secretos, marcadores de conflicto, exec-bits) |
+| **ligero** | Nada que se ejecute: `docs/**`, prosa en `*.md` | Gates rápidos (secretos, marcadores de conflicto, exec-bits) · **ni tests ni review** |
 | **normal** | Código que se ejecuta y no es maquinaria de gates | Gates rápidos + los tests del área tocada + **una** review |
 | **estructural** | La maquinaria que decide qué se verifica: `lefthook.yml`, `.claude/settings.json`, `scripts/agent-hooks/**`, `ci/**`, `AGENTS.md`, `tools/verify.conf`, `tools/carril.*` | Todo lo anterior + suite completa + review |
 
@@ -102,6 +102,14 @@ un solo fichero es estructural, el cambio entero es estructural.
 equivocado; un cambio en la maquinaria puede hacer que **ningún** detector corra. El
 segundo caso no lo caza ningún test del propio detector, así que es el único que
 justifica pagar la suite entera.
+
+**Dos correcciones a esta tabla, hechas en la fase 3 y reproducidas antes de tocarlas.**
+Los **fixtures** salieron de `ligero`: `ligero` significa "nada que se ejecute", y un
+fixture es la entrada que un test interpreta — con `ligero` no corría ninguno, así que
+cambiar el dato con el que se afirma algo quedaba sin verificar. Caen en `normal`, donde
+la derivación por referencia encuentra los tests que los nombran. Y `.claude/agents/*`
+pasó a **estructural**: el glob `ligero|*.md` casaba `.claude/agents/reviewer.md`, es
+decir, clasificaba como prosa el prompt del propio revisor.
 
 ## 7. Flujo de la solución
 
@@ -148,9 +156,21 @@ baja de dos minutos a segundos, esto no sirvió.
 
 ## 13. Open Questions
 
-- [ ] **OQ-1.** ¿El carril ligero necesita marker de tests? Hoy `check-verify-marker`
-      ya exime los cambios que no tocan producto; hay que comprobar si esa exención
-      coincide con el carril ligero o si son dos criterios que van a divergir.
+- [x] **OQ-1 — RESUELTA (fase 3).** No coinciden, y no deben fundirse. "¿es producto?"
+      es una pregunta de RUTAS (qué pertenece al adoptante); "¿cuánto puede romper?"
+      es el carril. Se solapan mucho pero cada una exime cosas que la otra no: el
+      criterio de rutas exime `backlog/` y `.agents/`, que el carril llama `normal`;
+      el carril exime prosa dentro del árbol de producto, que el criterio de rutas
+      llama producto. Por eso el carril se añade como exención EXTRA sobre el criterio
+      existente y nunca como sustituto: sustituirlo endurecería el gate en media
+      docena de sitios a la vez, y un gate con falsos positivos se acaba apagando
+      (§14.2). Y la exención por carril nunca alcanza las llaves del reino
+      (`scope_siempre_producto`): la superficie que gobierna un gate no se exime.
+
+- [ ] **OQ-2.** ¿El carril `normal` mantiene una review por commit, o pasa a review a
+      demanda / al cerrar la unidad? La review es ~70% del coste por unidad y `normal`
+      cubre la mayoría de los commits, así que es donde queda el tiempo. Pendiente de
+      decisión del owner; la fase 3 entrega lo que este PRD aprobó (ligero=0, normal=1).
 
 ## 15. Definition of Done
 
@@ -162,3 +182,4 @@ medidos antes y después.
 | Fecha | Cambio | Quién |
 |---|---|---|
 | 2026-09-04 | Nace de la auditoría de lentitud: el coste por cambio era plano y la mitad del trabajo lo generaba el propio trabajo | sesión de estabilización |
+| 2026-09-04 | Fases 1-3 entregadas. La fase 3 destapó dos misclasificaciones de la fase 1: `ligero\|*.md` se tragaba `.claude/agents/*` (el prompt del propio revisor) y los fixtures estaban en `ligero` pese a que un test los ejecuta. Corregidas: la primera a `estructural`, los segundos a `normal` | sesión de estabilización |

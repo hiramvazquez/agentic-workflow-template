@@ -61,15 +61,17 @@
 
 ## Próximo paso
 
-**Cerrar `f-8b74d177`, o dejar de prometer lo que no da.** `check-skill-matrix-doc.sh` compara
-el CONJUNTO global de referencias entre el conf y su vista humana, no los pares
-`path → referencias`: mover una lectura de una fila a otra sale limpio. Mientras siga así, la
-frase "exactamente el conf" de §11 anuncia una garantía que el detector no ofrece — y una
-defensa anunciada que no existe es el único pecado que este harness no comete.
+**PRD 0011 fase 4: mover lo pesado fuera del camino crítico.** Las fases 1-3 están
+entregadas — el carril se deriva, `verify-run` ejecuta en proporción, y el carril ligero ya
+no exige review. Lo que queda del coste por unidad es la revisión (~70%) y tres cosas que
+corren en cada commit sin necesitarlo: el juez de trayectoria (cola de 12), las métricas, y
+la familia flaky de macOS, que sola cuesta la mitad de la suite
+(`f-wf01-ci-macos-intermitente`). Van a demanda, pre-push o release; no se borran (P3).
 
-Después, por coste: las columnas del rollup mezclan ventanas de tiempo distintas en la misma
-fila (`f-cb4f7155`) y la familia flaky de macOS cuesta la mitad del tiempo de la suite
-(`f-wf01-ci-macos-intermitente`).
+Después, por coste: `f-8b74d177` —`check-skill-matrix-doc.sh` compara el CONJUNTO global de
+referencias entre el conf y su vista humana, no los pares `path → referencias`, así que la
+frase "exactamente el conf" de §11 promete una garantía que el detector no da— y las columnas
+del rollup, que mezclan ventanas de tiempo distintas en la misma fila (`f-cb4f7155`).
 
 ## Lo que ya NO es el próximo paso (estaba aquí y confundía)
 

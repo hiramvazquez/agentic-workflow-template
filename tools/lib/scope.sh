@@ -167,8 +167,17 @@ _NON_PRODUCT_HARNESS='^(docs/|backlog/|enterprise/|\.github/|\.claude/|\.claude-
 # este repo persigue. Lo que sí se sostiene: los tests de `test_scope_kind.sh`
 # fijan las cinco vías conocidas, y **un gate con nombre fuera de la convención
 # hay que añadirlo aquí, con su test, el día que se escribe.**
+#
+# SEXTA vía, 2026-09-04: `tools/carril.sh` no sigue la convención de nombres y
+# NINGÚN anillo lo invoca directamente — lo CONSULTA `check-review-marker.sh`
+# para decidir si exige review (PRD 0011 fase 3). Un script que decide si un
+# gate aplica es superficie de enforcement aunque nadie lo llame desde
+# `lefthook.yml`: en un proyecto adoptante, donde `tools/` es andamio exento,
+# stagear un `carril.sh` que devuelva `ligero` para todo dejaba pasar cualquier
+# cosa sin review. Lo que un gate CONSULTA cuenta igual que lo que un anillo
+# INVOCA, y eso no lo comprueba nadie todavía (registrado en el ledger).
 scope_siempre_producto() { # → ERE de FORMAS que exigen review, gobierne quien gobierne
-  printf '%s' '^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
+  printf '%s' '^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/carril\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
 }
 
 scope_non_product() {

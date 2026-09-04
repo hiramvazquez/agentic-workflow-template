@@ -46,7 +46,7 @@ if [ -f tools/lib/scope.sh ]; then
   SIEMPRE_PRODUCTO="$(scope_siempre_producto)"
 else
   NON_PRODUCT='^(docs/|ci/|\.github/|tools/|scripts/|backlog/|enterprise/|\.claude/|\.claude-plugin/|\.codex/|\.cursor/|\.agents/|README|LICENSE|CODEOWNERS|\.gitignore|\.editorconfig|\.gitattributes|lefthook|\.gitleaks|\.semgrepignore|muter\.conf|AGENTS\.md|CLAUDE\.md|GEMINI\.md|(ios|android|web|backend)/AGENTS\.md$)'
-  SIEMPRE_PRODUCTO='^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
+  SIEMPRE_PRODUCTO='^(tools/(check|verify|secret|mutation|drift|semgrep|architecture|probe|gate|lesson)-[^/]*|tools/tests/run-tests\.sh$|tools/carril\.sh$|tools/[^/]*\.conf$|tools/preset$|tools/lib/|tools/semgrep/|lefthook|\.gitleaks|\.semgrepignore$|ci/|\.github/workflows/|\.claude/settings\.json$|\.claude/agents/|\.codex/|\.cursor/|scripts/agent-hooks/)'
 fi
 
 fail() { echo "$1"; exit 1; }
@@ -66,6 +66,58 @@ CRITICAL="$(printf '%s\n' "$CHANGED" | grep -vE "$NON_PRODUCT" || true)"
 _LLAVES="$(printf '%s\n' "$CHANGED" | grep -E "$SIEMPRE_PRODUCTO" || true)"
 CRITICAL="$(printf '%s\n%s\n' "$CRITICAL" "$_LLAVES" | grep -v '^$' | sort -u || true)"
 [ -z "$CRITICAL" ] && { echo "✅ review-marker: el cambio no toca código de producto (solo docs/tooling)."; exit 0; }
+
+# ── PRD 0011 fase 3: el carril ligero no exige review ───────────────
+# "Producto" es una pregunta de RUTAS; "cuánto puede romper esto" es otra. Un
+# .md dentro del árbol de producto contesta que sí a la primera y que nada a la
+# segunda, y pagaba una revisión entera. Pagar eso por prosa es el peaje que
+# hace que la gente acabe apagando el gate (§14.2).
+#
+# Tres condiciones, y las tres importan:
+#   · Solo en modo staged. En `--range` el análisis abarca commits enteros y el
+#     clasificador lee el ÍNDICE: preguntaría por otra cosa.
+#   · Nunca si el cambio toca las llaves del reino ($_LLAVES). `carril.conf` ya
+#     clasifica esa superficie como estructural, pero esa fila es UN dato en UN
+#     fichero — y el glob `ligero|*.md` ya se tragó una vez el prompt del propio
+#     revisor. Un gate cuyo suelo depende de que un conf esté bien no tiene suelo.
+#   · Solo si el clasificador SALE 0 y dice `ligero`. Ausente, roto, sin
+#     trackear o dudoso → se exige review, como antes de que el carril
+#     existiera. No saber cuánto pesa un cambio nunca puede traducirse en pedir
+#     menos garantías.
+#
+# Y el clasificador se ejecuta desde el ÍNDICE, no desde el disco. Esto no es
+# celo: leído del árbol de trabajo abría un bypass completo, reproducido por la
+# review de esta misma fase — editas `carril.conf` añadiendo `ligero|src/*`, NO
+# lo stageas, y código de producto staged pasa sin review con exit 0. El diff
+# resultante no tiene una sola línea de `carril.conf`: sin override, sin entrada
+# en override_log, sin rastro. Es la MISMA clase que `tools/lib/scope.sh`
+# documenta haber sufrido con `project.conf`, y su comentario ya dejó escrito el
+# principio general: **lo que decide sobre un diff se lee de la misma fuente que
+# ese diff.** Si el clasificador no está trackeado, no hay exención.
+_carril_del_indice() { # → CARRIL_SUMMARY del clasificador TRACKEADO, o nada
+  # No hace falta comprobar antes que estén trackeados: `git show ":ruta"` lee
+  # el índice y falla solo si no lo están. Lo comprobaba, y el mutante que
+  # quitaba esa línea no mataba ningún test — una defensa que ningún test puede
+  # matar es peso muerto, no una capa.
+  local d out rc
+  d="$(mktemp -d 2>/dev/null)" || return 1
+  mkdir -p "$d/tools" || { rm -rf "$d"; return 1; }
+  # `carril.sh` resuelve su conf junto a sí mismo, así que los dos van al mismo
+  # directorio y la copia del índice usa la conf del índice.
+  git show ":tools/carril.sh"   > "$d/tools/carril.sh"   2>/dev/null &&
+  git show ":tools/carril.conf" > "$d/tools/carril.conf" 2>/dev/null || { rm -rf "$d"; return 1; }
+  out="$(bash "$d/tools/carril.sh" 2>/dev/null)"; rc=$?
+  rm -rf "$d"
+  [ "$rc" -eq 0 ] || return 1
+  printf '%s\n' "$out"
+}
+if [ "$MODE" != "--range" ] && [ -z "$_LLAVES" ]; then
+  _CARRIL="$(_carril_del_indice | sed -n 's/^CARRIL_SUMMARY carril=\([a-z]*\).*/\1/p' | head -1)"
+  if [ "$_CARRIL" = "ligero" ]; then
+    echo "✅ review-marker: carril ligero — nada de lo tocado se ejecuta, no se exige review (PRD 0011 §5b)."
+    exit 0
+  fi
+fi
 
 # ── Commit de MERGE: el contenido YA pasó sus gates en su rama ──────
 # Cazado en vivo en el PRIMER merge del primer proyecto: el owner mergeaba

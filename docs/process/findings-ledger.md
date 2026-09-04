@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **84** · Cerrados: 178 · Total: 262
+Abiertos: **85** · Cerrados: 178 · Total: 263
 
 ## Abiertos
 
@@ -33,6 +33,7 @@ Abiertos: **84** · Cerrados: 178 · Total: 262
 | `f-62d2ac5b` | medium | auto-fix | `tools/semgrep-scan.sh:82` | semgrep-scan.sh puede morir con TARGETS[@] unbound bajo bash 3.2 cuando semgrep esta operativo |
 | `f-67e07109` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh (guarda add+commit en la misma linea)` | reviewer-gate bloquea por el TEXTO del comando: un heredoc que contiene add+commit se lee como comando real |
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
+| `f-7171089c` | medium | owner-decision | `tools/lib/scope.sh + tools/tests/test_scope_superficie.sh` | Lo que un gate CONSULTA no cuenta como superficie de enforcement |
 | `f-7256d194` | medium | auto-fix | `tools/tests/test_e2e_*.sh` | _e2e_repo duplicado en cuatro archivos: cada fix del sandbox se aplica x4 a mano |
 | `f-7498dab2` | medium | owner-decision | `tools/check-execution-map.sh (_es_comando / EVIDENCIA)` | La evidencia del mapa se INFIERE de los backticks, y cinco heuristicas seguidas han tenido fuga |
 | `f-76d2a144` | medium | owner-decision | `tools/lib/scope.sh + tools/*-ratchet.json` | Los trinquetes *-ratchet.json no casan ninguna forma de la superficie: su unica defensa es un Anillo 0 de un solo cliente |

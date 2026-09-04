@@ -229,3 +229,31 @@ _case_exit3_en_modo_tests_dice_todos() {
 test_en_modo_tests_el_exit3_pide_la_suite_entera() {
   _c_sandbox _case_exit3_en_modo_tests_dice_todos
 }
+
+# ── La definición de un agente NO es prosa ──────────────────────────
+# `ligero|*.md` casaba `.claude/agents/reviewer.md`: el glob no distingue la
+# prosa del PROMPT DEL PROPIO REVISOR. Reproducido con el clasificador real
+# antes de arreglarlo: salía `ligero` → `NINGUNO`. Editar las instrucciones de
+# quien revisa es tocar la maquinaria que decide qué se verifica (§6 del PRD
+# 0011), igual que `.claude/settings.json`, que ya era estructural.
+_case_definicion_de_agente_es_estructural() {
+  _stage .claude/agents/reviewer.md
+  _c | grep -q 'carril=estructural' || {
+    echo "    el prompt del revisor salió como prosa: $(_c)"; return 1; }
+}
+test_la_definicion_de_un_agente_es_estructural() {
+  _c_sandbox _case_definicion_de_agente_es_estructural
+}
+
+# ── Un fixture SÍ se ejecuta: lo consume un test ────────────────────
+# Estaba en `ligero` — la tabla del PRD lo listaba así— pero `ligero` significa
+# "nada que se ejecute", y un fixture es exactamente la entrada que un test
+# interpreta. Con `ligero` no corría NINGÚN test: cambiar el dato con el que se
+# afirma algo quedaba sin verificar. Cae a `normal`, donde la derivación por
+# referencia encuentra justo los tests que lo NOMBRAN.
+_case_fixture_no_es_ligero() {
+  _stage tools/tests/fixtures/algo.json
+  _c | grep -q 'carril=normal' || {
+    echo "    un fixture no salió normal: $(_c)"; return 1; }
+}
+test_un_fixture_no_es_carril_ligero() { _c_sandbox _case_fixture_no_es_ligero; }
