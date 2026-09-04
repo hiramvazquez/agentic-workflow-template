@@ -65,7 +65,13 @@ Filtros para no ahogarte en su salida (la salida completa es para `harness-repor
 - **Drift y capas** → sus líneas de contrato: `drift-ratchet` imprime `errors=N/techo`
   (ya corre `check-drift` por dentro: no lo llames aparte), `check-layers` imprime
   `LAYERS_SUMMARY errors=N`.
-- **Mapa** → `EXECUTION_MAP_SUMMARY stale=<0|1>`; y el próximo paso, solo sus titulares:
+- **Mapa** → `EXECUTION_MAP_SUMMARY stale=<0|1> atrasado=<0|1>`. Son cosas distintas:
+  `stale=1` es que el mapa MIENTE (cifra derivable, afirmación sin evidencia) y bloquea;
+  `atrasado=1` es que hay commits de producto —o una historia que pasó a `done`—
+  posteriores al mapa, y solo AVISA: un
+  commit de producto no puede exigir editar un documento que no guarda historia.
+  Si sale `atrasado=1`, dilo en una línea; no lo trates como un fallo.
+  Y el próximo paso, solo sus titulares:
   `awk '/^## Próximo paso/{f=1;next} /^## /{f=0} f' docs/process/current_execution_map.md | grep -E '^([0-9]+\.|-) ' | head -6`
   (acepta lista numerada Y viñetas: cada repo escribe su mapa a su manera, y un filtro
   atado a una sola convención devuelve **vacío en silencio** en el otro — medido, no supuesto)

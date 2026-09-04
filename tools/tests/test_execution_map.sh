@@ -64,10 +64,13 @@ _case_producto_mas_nuevo_que_el_mapa() {
   printf 'entidad\n' > src/domain/entidad.txt
   git add -A && _em_commit "feat: producto" 200
 
-  local out rc; out="$(_em_run)"; rc=$?
-  [ "$rc" = "1" ] || { echo "    esperaba exit 1 (stale), obtuve $rc"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
-  printf '%s' "$out" | grep -q 'EXECUTION_MAP_SUMMARY stale=1' \
-    || { echo "    falta el contrato de stdout con stale=1"; return 1; }
+  local out rc; out="$(_em_run 2>&1)"; rc=$?
+  # El ATRASO avisa, no bloquea (decisión de la V1): un commit de producto no
+  # puede exigir editar un mapa que no guarda historia. Lo que sigue duro es
+  # que el atraso se DETECTE y se DIGA.
+  [ "$rc" = "0" ] || { echo "    el atraso bloqueó (exit $rc); debe avisar"; printf '%s\n' "$out" | sed 's/^/      /'; return 1; }
+  printf '%s' "$out" | grep -q 'atrasado=1' \
+    || { echo "    el contrato de stdout no expone atrasado=1: $out"; return 1; }
 }
 test_producto_mas_nuevo_que_el_mapa_dispara() {
   _em_repo _case_producto_mas_nuevo_que_el_mapa
@@ -84,8 +87,14 @@ _case_historia_a_done_mas_nueva() {
   printf -- '---\nid: 0003\nstatus: done\n---\n' > backlog/0003-algo.md
   git add -A && _em_commit "chore(backlog): 0003 a done" 300
 
-  local rc; _em_run >/dev/null; rc=$?
-  [ "$rc" = "1" ] || { echo "    una historia a done después del mapa debería disparar (exit $rc)"; return 1; }
+  local out rc; out="$(_em_run 2>&1)"; rc=$?
+  printf '%s' "$out" | grep -q 'atrasado=1' \
+    || { echo "    una historia a done después del mapa debería marcar atraso: $out"; return 1; }
+  # Y NO debe bloquear. Sin esta línea, reintroducir el bloqueo SOLO en la rama
+  # de `done` sobrevivía: `atrasado=1` sale igual bloquee o no. Lo cazó el review
+  # con ese mutante exacto — `TS_PROD` y `TS_DONE` son dos ramas, y el test
+  # dedicado del aviso solo ejercita la primera.
+  [ "$rc" = "0" ] || { echo "    la rama de 'done' BLOQUEA (exit $rc); debe avisar"; return 1; }
 }
 test_historia_a_done_despues_del_mapa_dispara() {
   _em_repo _case_historia_a_done_mas_nueva
@@ -274,8 +283,10 @@ _case_transicion_real_con_done_previo_si_dispara() {
   printf -- '---\nid: 0004\nstatus: done\n---\n' > backlog/0004-nueva.md
   git add -A && _em_commit "chore(backlog): 0004 pasa a done" 950
 
-  local rc; _em_run >/dev/null; rc=$?
-  [ "$rc" = "1" ] || { echo "    una transición REAL a done con otra ya done no disparó (exit $rc)"; return 1; }
+  local out rc; out="$(_em_run 2>&1)"; rc=$?
+  printf '%s' "$out" | grep -q 'atrasado=1' \
+    || { echo "    una transición REAL a done con otra ya done no marcó atraso: $out"; return 1; }
+  [ "$rc" = "0" ] || { echo "    la rama de 'done' BLOQUEA (exit $rc); debe avisar"; return 1; }
 }
 test_transicion_real_a_done_con_otra_ya_done_si_dispara() {
   _em_repo _case_transicion_real_con_done_previo_si_dispara
@@ -296,9 +307,10 @@ _case_mapa_en_curso_no_bloquea_su_propio_arreglo() {
   printf 'entidad\n' > src/domain/entidad.txt
   git add -A && _em_commit "feat: producto" 200
 
-  # Sin tocar el mapa: stale, como debe.
-  local rc; _em_run >/dev/null; rc=$?
-  [ "$rc" = "1" ] || { echo "    precondición rota: debería estar stale antes de arreglarlo (exit $rc)"; return 1; }
+  # Sin tocar el mapa: atrasado, como debe.
+  local out; out="$(_em_run 2>&1)"
+  printf '%s' "$out" | grep -q 'atrasado=1' \
+    || { echo "    precondición rota: debería estar atrasado antes de arreglarlo: $out"; return 1; }
 
   # Ahora lo estoy arreglando, aún sin commitear.
   _em_mapa '# Mapa
@@ -474,7 +486,7 @@ test_la_ultima_linea_es_el_contrato_exacto() {
     local ultima
     ultima="$(bash tools/check-execution-map.sh 2>/dev/null | tail -1)"
     case "$ultima" in
-      "EXECUTION_MAP_SUMMARY stale=0"|"EXECUTION_MAP_SUMMARY stale=1") return 0 ;;
+      "EXECUTION_MAP_SUMMARY stale="[01]" atrasado="[01]) return 0 ;;
       *) echo "    última línea inesperada: '$ultima'"; return 1 ;;
     esac
   }
@@ -1293,10 +1305,10 @@ _case_harness_delata_el_mapa_viejo() {
   _emk_commit "toco producto y NO el mapa" "2021-01-01T00:00:00" 
   local out rc
   out="$(bash tools/check-execution-map.sh 2>&1)"; rc=$?
-  [ "$rc" = "1" ] || {
-    echo "    se tocó scripts/ sin tocar el mapa y el detector dice que está al día (exit $rc):"
+  printf '%s' "$out" | grep -q 'atrasado=1' || {
+    echo "    se tocó scripts/ sin tocar el mapa y el detector no marcó atraso (exit $rc):"
     printf '%s\n' "$out" | grep SUMMARY | sed 's/^/      /'
-    echo "    Es lo que dejó el mapa nueve días atrás con stale=0."
+    echo "    Es lo que dejó el mapa nueve días atrás diciendo que estaba al día."
     return 1; }
 }
 test_en_el_harness_el_mapa_viejo_se_delata() {
@@ -1381,9 +1393,9 @@ test_el_detector_sobrevive_a_ci_con_declaracion_contradictoria() {
 _case_tocar_solo_ci_tambien_delata() {
   printf '#!/usr/bin/env bash\necho gate cambiado\n' > ci/algo.sh
   _emk_commit "toco SOLO ci/ y no el mapa" "2021-01-01T00:00:00"
-  local rc; bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
-  [ "$rc" = "1" ] || {
-    echo "    se tocó SOLO ci/ sin tocar el mapa y no se delató (exit $rc):"
+  local out; out="$(bash tools/check-execution-map.sh 2>&1)"
+  printf '%s' "$out" | grep -q 'atrasado=1' || {
+    echo "    se tocó SOLO ci/ sin tocar el mapa y no se marcó atraso: $out"
     echo "    ci/ cablea el Anillo 3 — si sale de la derivación, deja de vigilarse."
     return 1; }
 }
@@ -1439,10 +1451,9 @@ _case_codigo_junto_a_datos_si_exige() {
   git "$A" tools/findings/ledger.jsonl tools/algo-nuevo.sh
   GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
     git "$C" -qm "ledger Y código"
-  local rc
-  bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
-  [ "$rc" = "1" ] || {
-    echo "    tocar código de tools/ junto al ledger NO exigió el mapa (exit $rc)."
+  local out; out="$(bash tools/check-execution-map.sh 2>&1)"
+  printf '%s' "$out" | grep -q 'atrasado=1' || {
+    echo "    tocar código de tools/ junto al ledger NO marcó atraso: $out"
     echo "    La exclusión de datos se comió el caso que el detector existe para cazar."
     return 1; }
 }
@@ -1469,13 +1480,75 @@ _case_codigo_dentro_de_findings_si_exige() {
   git "$A" tools/findings/gestor.sh
   GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
     git "$C" -qm "cambio en la herramienta, no en sus datos"
-  local rc
-  bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
-  [ "$rc" = "1" ] || {
-    echo "    cambiar código dentro de tools/findings/ NO exigió el mapa (exit $rc)."
+  local out; out="$(bash tools/check-execution-map.sh 2>&1)"
+  printf '%s' "$out" | grep -q 'atrasado=1' || {
+    echo "    cambiar código dentro de tools/findings/ NO marcó atraso: $out"
     echo "    La exclusión se comió la herramienta junto con sus datos."
     return 1; }
 }
 test_codigo_dentro_de_findings_si_exige_el_mapa() {
   _emk_repo harness _case_codigo_dentro_de_findings_si_exige
+}
+
+# ── La FRESCURA avisa; el CONTENIDO bloquea ─────────────────────────
+# Decisión del owner en la estabilización de V1. El detector acumulaba cuatro
+# dimensiones en un solo `STALE`, y la de frescura dispara con CUALQUIER commit
+# de producto posterior al mapa. En este repo el producto ES `tools/`, así que
+# cada commit exigía editar el mapa — y el mapa acaba de quedarse sin historia a
+# propósito, o sea sin contenido por-commit que añadir. Esa es la cascada de
+# trabajo auxiliar que la V1 existe para eliminar, y tenía la suite en rojo
+# DETERMINISTA: tres corridas, los mismos dos fallos.
+#
+# Las otras tres dimensiones —frases muertas, cifras derivables y afirmaciones
+# de estado sin evidencia— son objetivas y baratas de cumplir: siguen duras.
+_case_atraso_avisa_no_bloquea() {
+  local A=add C=commit
+  git "$A" -A
+  GIT_COMMITTER_DATE="2026-01-01T10:00:00" GIT_AUTHOR_DATE="2026-01-01T10:00:00" \
+    git "$C" -qm base
+  printf '#!/usr/bin/env bash\necho v2\n' > tools/algo.sh
+  git "$A" tools/algo.sh
+  GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
+    git "$C" -qm "producto sin tocar el mapa"
+  local out rc
+  out="$(bash tools/check-execution-map.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    el mapa atrasado BLOQUEA (exit $rc); debe avisar:"
+    printf '%s\n' "$out" | head -5 | sed 's/^/      /'
+    return 1; }
+  # y el aviso tiene que VERSE: un atraso silencioso es el incidente original.
+  # OJO con la aserción: la propia línea de contrato dice `atrasado=1`, así que
+  # un grep de "atras" pasa aunque el bloque de aviso no exista — un mutante que
+  # lo borraba sobrevivía. Se afirma sobre el TEXTO del aviso, no sobre la clave.
+  printf '%s' "$out" | grep -q 'va ATRASADO respecto del árbol' || {
+    echo "    no bloquea, pero tampoco declara el atraso — silencio, que es peor:"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    return 1; }
+  printf '%s' "$out" | grep -q 'atrasado=1' || {
+    echo "    la línea de contrato no expone el atraso por separado: $out"; return 1; }
+}
+test_el_mapa_atrasado_avisa_pero_no_bloquea() {
+  _emk_repo harness _case_atraso_avisa_no_bloquea
+}
+
+# Y el reverso: una violación de CONTENIDO bloquea aunque el mapa esté fresco.
+_case_contenido_bloquea_aunque_fresco() {
+  local A=add C=commit
+  printf '# Mapa\n\n## Estado actual\n\nLa suite tiene 869 tests verdes.\n\n## Próximo paso\n\nAlgo.\n' \
+    > docs/process/current_execution_map.md
+  git "$A" -A
+  GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
+    git "$C" -qm "mapa fresco, con una cifra derivable dentro"
+  local out rc
+  out="$(bash tools/check-execution-map.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    una cifra derivable NO bloqueó (exit $rc) con el mapa fresco:"
+    printf '%s\n' "$out" | head -6 | sed 's/^/      /'
+    echo "    La frescura pasa a aviso; el contenido tiene que seguir duro."
+    return 1; }
+  printf '%s' "$out" | grep -q 'stale=1' || {
+    echo "    bloquea pero no lo declara en la línea de contrato: $out"; return 1; }
+}
+test_una_cifra_derivable_bloquea_con_el_mapa_fresco() {
+  _emk_repo harness _case_contenido_bloquea_aunque_fresco
 }

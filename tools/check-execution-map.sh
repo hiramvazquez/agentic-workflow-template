@@ -50,7 +50,11 @@
 #      shas, "11 mutantes", nombres *_250_lineas): si esa tasa sube, cae la
 #      excepción, no el test.
 #
-# Contrato de stdout:  EXECUTION_MAP_SUMMARY stale=<0|1>
+# Contrato de stdout:  EXECUTION_MAP_SUMMARY stale=<0|1> atrasado=<0|1>
+#   stale    = el mapa MIENTE (frase muerta, cifra derivable, afirmación sin
+#              evidencia). Objetivo, barato de cumplir → BLOQUEA.
+#   atrasado = hay commits de producto posteriores al mapa. Juicio, no hecho:
+#              podría no haber nada que actualizar → AVISA.
 # Exit: 0 al día · 1 stale · 3 no pude mirar (sin git, sin el doc)
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
@@ -207,15 +211,27 @@ if [ -d "$BACKLOG_DIR" ]; then
 fi
 
 # ── ¿Hay algo más nuevo que el mapa? ────────────────────────────────
+# ATRASADO va aparte de STALE, y AVISA en vez de bloquear. La razón la fijó la
+# estabilización de V1: esta dimensión dispara con CUALQUIER commit de producto
+# posterior al mapa, y en un repo donde el producto ES `tools/` eso obliga a
+# editar el mapa en cada commit — sobre un documento que se quedó sin historia a
+# propósito, o sea sin nada por-commit que añadirle. Es la cascada de trabajo
+# auxiliar que la V1 existe para eliminar, y tenía la suite en rojo determinista.
+#
+# Las otras tres dimensiones (frases muertas, cifras derivables, afirmaciones de
+# estado sin evidencia) son objetivas y baratas de cumplir: siguen en STALE y
+# siguen bloqueando. La diferencia es que aquellas dicen que el mapa MIENTE, y
+# esta solo dice que PODRÍA estar desactualizado — juicio, no hecho.
 STALE=0
+ATRASADO=0
 DETALLE=""
 if [ "$EN_CURSO" = "0" ]; then
   if [ -n "$TS_PROD" ] && [ "$TS_PROD" -gt "$TS_MAP" ] 2>/dev/null; then
-    STALE=1
+    ATRASADO=1
     DETALLE="${DETALLE}   · código de producto ($(git log -1 --format='%h %s' -- "${_EXISTENTES[@]}" 2>/dev/null))"$'\n'
   fi
   if [ -n "$TS_DONE" ] && [ "$TS_DONE" -gt "$TS_MAP" ] 2>/dev/null; then
-    STALE=1
+    ATRASADO=1
     DETALLE="${DETALLE}   · una historia pasó a done ($(git log -1 --format='%h %s' "$SHA_DONE" 2>/dev/null))"$'\n'
   fi
 fi
@@ -462,7 +478,21 @@ while IFS= read -r _n; do
   SIN_EVIDENCIA="${SIN_EVIDENCIA}     línea ${_n}: $(sed -n "${_n}p" "$MAP")"$'\n'
 done <<< "$(grep -inE "$STATE_ERE" "$MAP" 2>/dev/null | cut -d: -f1)"
 [ -n "$SIN_EVIDENCIA" ] && STALE=1
-echo "EXECUTION_MAP_SUMMARY stale=$STALE"
+echo "EXECUTION_MAP_SUMMARY stale=$STALE atrasado=$ATRASADO"
+
+# El atraso se DICE siempre, bloquee o no. Un atraso silencioso es el incidente
+# que motivó esta dimensión: el mapa nueve días detrás mientras el detector
+# declaraba que todo estaba al día.
+if [ "$ATRASADO" = "1" ]; then
+  {
+    echo "⚠️  execution-map: el mapa va ATRASADO respecto del árbol."
+    printf '%s' "$DETALLE"
+    echo "   No bloquea: que un commit de producto exija tocar el mapa sería"
+    echo "   pedirle historia a un documento que no la guarda. Pero si lo que"
+    echo "   cambió es la FASE o el próximo paso, actualízalo ahora."
+  } >&2
+fi
+
 [ "$STALE" = "0" ] && exit 0
 
 {
