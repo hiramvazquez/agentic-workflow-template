@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **84** · Cerrados: 176 · Total: 260
+Abiertos: **83** · Cerrados: 177 · Total: 260
 
 ## Abiertos
 
@@ -39,7 +39,6 @@ Abiertos: **84** · Cerrados: 176 · Total: 260
 | `f-86b1f53e` | medium | auto-fix | `tools/lib/scope.sh` | Un project_kind invalido se ignora en silencio y vuelve a la heuristica |
 | `f-89ef31c4` | medium | owner-decision | `tools/lessons-rotate.sh (criterio de archivado) + docs/process/lessons_archive.md` | El rotador archiva lecciones alegando que su detector corre en el Anillo 3, y en ESTE repo el Anillo 3 no corre |
 | `f-8b74d177` | medium | owner-decision | `tools/check-skill-matrix-doc.sh + AGENTS.md §11` | check-skill-matrix-doc compara CONJUNTOS de refs, asi que mover una lectura de fila a otra es invisible |
-| `f-8d0884f9` | medium | owner-decision | `tools/check-exec-bits.sh:82` | check-exec-bits hace 'git add' del fichero ENTERO para arreglar un bit de modo |
 | `f-98ab9c19` | medium | owner-decision | `tools/drift-ratchet.json` | El _note de drift-ratchet.json cambio sin autor identificable durante la sesion |
 | `f-9b5d63f1` | medium | auto-fix | `scripts/agent-hooks/post-compact.sh:46` | post-compact.sh nunca reinyecta la fase: su grep no casa la negrita del mapa |
 | `f-a192a98a` | medium | auto-fix | `tools/check-source-sets.sh` | Espacios alrededor del punto evaden los DOS motores del detector KMP |
@@ -273,4 +272,5 @@ Abiertos: **84** · Cerrados: 176 · Total: 260
 | `f-b77dbbfb` | fixed | Cerrado con el test que faltaba: test_sin_desfase_el_aviso_calla monta una rama local AL DIA con su  |
 | `f-7a219330` | fixed | Decision del owner: 20s. Y el numero era solo la mitad del problema — un TimeoutExpired ES un Subpro |
 | `f-74c528ef` | fixed | Cerrados los dos sitios. (1) dora_git.py: git() devolvia cadena vacia tanto si git DIJO QUE NO -un r |
+| `f-8d0884f9` | fixed | Cerrado por la via del P3 del PRD 0010, decidida por el owner tras TRES revisiones con un hallazgo c |
 | `f-4e3aafc5` | fixed | Cerrado en el mismo commit: excluidos del pathspec los ficheros de datos generados, con test para el |

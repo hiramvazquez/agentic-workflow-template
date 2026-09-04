@@ -63,6 +63,12 @@ while IFS= read -r f; do
   [ -f "$f" ] || continue
   TARGETS=$((TARGETS+1))
   case "$f" in */lib/*) continue ;; esac   # se sourcean, no se ejecutan
+  # Un symlink NO es un script al que le falta su bit: el bit vive en el
+  # target, y ese target, si está trackeado, ya es candidato por su cuenta.
+  # Excluirlos AQUÍ y no en la reparación evita el problema de raíz: marcar
+  # un symlink como 100755 lo deja como un "ejecutable" cuyo contenido es una
+  # ruta. Lo cazó el review sobre el arreglo anterior.
+  if [ -L "$f" ]; then continue; fi
   [ -x "$f" ] || BAD="${BAD}${f}"$'\n'
 done < <(_candidates)
 
@@ -73,21 +79,78 @@ command -v detector_targets >/dev/null 2>&1 && detector_targets "$TARGETS"
 echo "EXECBITS_SUMMARY missing=${N:-0}"
 [ "${N:-0}" -eq 0 ] && exit 0
 
-# ── --fix: repara, re-stagea, y AVISA (nunca en silencio) ───────────
-# Solo toca archivos que YA estaban staged: no amplía el commit del humano,
-# solo corrige el modo de lo que él mismo eligió incluir.
+# ── --fix: repara EL MODO, y AVISA (nunca en silencio) ──────────────
+# Solo toca archivos que YA estaban staged, y de ellos solo el bit de modo.
+#
+# Antes hacía `git add -- "$f"`, que stagea el CONTENIDO ENTERO del árbol: si lo
+# que hay en disco difiere de lo staged, se colaba en el índice sin que nadie lo
+# hubiera añadido. Pasó el 2026-09-03 — un sub-agente mutó un fichero durante una
+# verificación, eso le quitó el bit +x, y este gate reparó Y re-stageó con el
+# mutante dentro. El sha del diff staged se movió sin un solo `git add`, y todo el
+# sistema de evidencia del harness se apoya en que ese sha sea lo que el autor
+# puso ahí. `update-index --chmod` cambia el modo en el índice sin tocar el blob.
 if [ "$MODE" = "--fix" ]; then
+  # NUNCA escribe en el índice. Repara el bit en DISCO y, si el modo staged
+  # sigue mal, FALLA con la instrucción exacta.
+  #
+  # La versión anterior hacía `git add` tras el `chmod`, y se eligió así por un
+  # motivo medido: sin auto-stagear, el gate bloqueó dos commits seguidos por lo
+  # mismo. Se invierte esa decisión a la vista de lo que costó — `git add`
+  # stagea el CONTENIDO entero, así que este gate llegó a meter en el índice un
+  # mutante que nadie había añadido y a mover el `sha256(diff staged)` solo. Y
+  # los tres intentos de corregir el modo del índice sin tocar el contenido
+  # produjeron un hallazgo cada uno: `--chmod` refresca el blob igual que `add`,
+  # `--cacheinfo` con el modo a mano corrompe un symlink, y el guard del symlink
+  # mira el disco mientras el blob sale del índice, que pueden divergir en TIPO.
+  #
+  # La conclusión es la del P3 del PRD 0010: un gate corrector modifica solo lo
+  # que declara, o se limita a avisar. Aquí declara el bit del disco. El índice
+  # lo toca el humano, porque decidir qué contenido entra es suyo.
+  REPARADOS=""; NO_TOCADOS=""
   while IFS= read -r f; do
     [ -z "$f" ] && continue
-    chmod +x "$f" 2>/dev/null && git add -- "$f" 2>/dev/null
+    if chmod +x "$f" 2>/dev/null; then
+      REPARADOS="${REPARADOS}${f}"$'\n'
+    else
+      NO_TOCADOS="${NO_TOCADOS}${f}"$'\n'
+    fi
   done < <(printf '%s' "$BAD")
+  N_REP="$(printf '%s' "$REPARADOS" | grep -c . || true)"
+
+  # ¿Queda algún modo mal EN EL ÍNDICE? Solo se mira; no se corrige.
+  PENDIENTES=""
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    _modo="$(git ls-files -s -- "$f" 2>/dev/null | head -1 | awk '{print $1}')"
+    [ "$_modo" = "100644" ] && PENDIENTES="${PENDIENTES}${f}"$'\n'
+  done < <(printf '%s' "$BAD")
+
   {
-    echo "🔧 exec-bits: reparado el bit +x de ${N} script(s) y re-staged:"
-    printf '%s' "$BAD" | sed 's/^/   · /'
-    echo "   NO es cosmético: significa que estos archivos llegaron por FUERA de"
-    echo "   git (puente, cp, descarga) y ese canal pierde permisos. Si el aviso"
-    echo "   se repite en cada commit, arregla el CANAL, no los archivos."
+    if [ "${N_REP:-0}" -gt 0 ]; then
+      echo "🔧 exec-bits: puesto el bit +x en disco a ${N_REP} script(s):"
+      printf '%s' "$REPARADOS" | sed 's/^/   · /'
+      echo "   NO es cosmético: significa que llegaron por FUERA de git (puente,"
+      echo "   cp, descarga) y ese canal pierde permisos. Si el aviso se repite en"
+      echo "   cada commit, arregla el CANAL, no los archivos."
+    fi
+    if [ -n "$NO_TOCADOS" ]; then
+      echo "⚠️  exec-bits: el chmod FALLÓ en estos (¿permisos?). A mano:"
+      printf '%s' "$NO_TOCADOS" | sed 's/^/   · /'
+    fi
   } >&2
+
+  if [ -n "$PENDIENTES" ]; then
+    {
+      echo "❌ exec-bits: el modo en el ÍNDICE sigue sin el bit de ejecución."
+      printf '%s' "$PENDIENTES" | sed 's/^/   · /'
+      echo "   El bit ya está puesto en disco; falta llevarlo al índice, y eso lo"
+      echo "   haces TÚ: stagear decide qué contenido entra en el commit, y esa"
+      echo "   decisión no es de un gate (PRD 0010 P3)."
+      echo "   Remedio:"
+      echo "     git add -u"
+    } >&2
+    exit 1
+  fi
   exit 0
 fi
 
