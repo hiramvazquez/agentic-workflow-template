@@ -166,10 +166,27 @@ if [ -x "$_CARRIL_SH" ] || [ -f "$_CARRIL_SH" ]; then
   _carril_rc=$?
   [ "$_carril_rc" -ne 0 ] && QUE_CORRER="TODOS"
   # Y lo que no sea exactamente uno de los dos vocabularios o una lista de
-  # nombres de test plausibles, tampoco se acepta.
+  # nombres de test, tampoco se acepta. Se exige el prefijo `test_` línea a
+  # línea, y no solo ausencia de puntuación: un clasificador que saliera 0
+  # imprimiendo una palabra cualquiera pasaba el filtro anterior, caía en la
+  # rama de tests dirigidos, no casaba nada — y `run-tests` sale 0 cuando un
+  # filtro no casa. Verde con CERO tests corridos, el mismo agujero que el
+  # clasificador roto por otra puerta.
   case "$QUE_CORRER" in
     NINGUNO|TODOS) : ;;
-    *[!a-zA-Z0-9_$'\n'-]*) QUE_CORRER="TODOS" ;;
+    *)
+      _tests_ok=1
+      while IFS= read -r _l; do
+        [ -z "$_l" ] && continue
+        case "$_l" in
+          test_*[!a-zA-Z0-9_-]*|test_) _tests_ok=0 ;;
+          test_*) : ;;
+          *) _tests_ok=0 ;;
+        esac
+        [ "$_tests_ok" = "0" ] && break
+      done <<< "$QUE_CORRER"
+      [ "$_tests_ok" = "0" ] && QUE_CORRER="TODOS"
+      ;;
   esac
   CARRIL_NOMBRE="$(bash "$_CARRIL_SH" 2>/dev/null | sed -n 's/.*carril=\([a-z]*\).*/\1/p')"
   [ -z "$QUE_CORRER" ] && QUE_CORRER="TODOS"
