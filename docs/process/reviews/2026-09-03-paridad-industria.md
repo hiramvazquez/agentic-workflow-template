@@ -24,10 +24,20 @@ una sección cuando un agente se equivoque de forma repetida, y **quitar una cua
 convención cambie**. El error que nombran explícitamente es tratarlo como documentación —
 explicaciones largas, filosofía de arquitectura, racional de diseño, historia del proyecto.
 
-**Nosotros.** El 2026-09-03 bajó de 334 a 262 líneas moviendo el racional a
-`docs/process/agents-rationale.md`. El criterio aplicado —regla con detector en una línea que
-lo nombra; regla sin detector entera; racional fuera— es sólido y coincide con la guía. Pero
-262 sigue siendo ~8× lo recomendado, y ese exceso se paga en cada turno de cada agente.
+**Nosotros.** El criterio aplicado —regla con detector en una línea que lo nombra; regla sin
+detector entera; racional fuera— es sólido y coincide con la guía. Dos pasadas lo aplicaron
+hasta agotarlo: la segunda sacó la matriz de skills y la pirámide de nueve niveles, que además
+estaban DUPLICADAS en sus referencias.
+
+**Y ahí se ve el techo del método.** Lo que queda son en su mayoría reglas que **no tienen
+detector mecánico** —TDD y mutantes dirigidos (§5), las seis de seguridad (§6), la disciplina
+de scope (§8)— y el propio criterio las protege: leerlas es lo único que las cumple. Recortar
+más no es un problema de redacción.
+
+La consecuencia reordena el trabajo: **para adelgazar `AGENTS.md` no se edita `AGENTS.md`, se
+mecanizan sus reglas.** Cada detector nuevo convierte párrafos en una línea que lo nombra. El
+mutation score dormido (§5) es el ejemplo más caro: despertarlo libera la sección más grande
+del fichero.
 
 ### `3` — Métricas de entrega, no de actividad
 

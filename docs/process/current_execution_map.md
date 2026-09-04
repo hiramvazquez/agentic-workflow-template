@@ -112,6 +112,37 @@
 
 ## Próximo paso
 
+> **2026-09-03 · Fase 7 entregada, y el objetivo corregido.** `AGENTS.md` aplicó su propio
+> criterio hasta agotarlo —regla con detector en una línea que lo nombra; regla sin detector
+> entera— y salieron dos cosas que además estaban DUPLICADAS en sus referencias: la matriz de
+> skills (a `agents-rationale.md` §11) y la pirámide de nueve niveles (ya vivía en
+> `verification-loop.md`).
+>
+> **No llega a las ~120 que yo estimé, y la aritmética explica por qué:** 87 de las líneas que
+> quedan son reglas **sin detector mecánico** —TDD y mutantes dirigidos, las seis de seguridad,
+> la disciplina de scope— que el criterio protege porque leerlas es lo único que las cumple.
+> La estimación se hizo antes de medir esa fracción.
+>
+> **Y eso reordena el trabajo: para adelgazar `AGENTS.md` no se edita `AGENTS.md`, se mecanizan
+> sus reglas.** Cada detector nuevo convierte párrafos en una línea que lo nombra. El mutation
+> score dormido es el ejemplo más caro: §5 es la sección más grande y hoy solo se cumple
+> leyéndola.
+>
+> Mover la matriz costó tres cosas que el trabajo destapó: el detector tuvo que seguirla (su
+> `SKILL_MATRIX_DOC` ya estaba parametrizado), tres tests montaban el fixture en la ruta vieja
+> —y no fallaban claro, daban exit 3 que se leía como pasado—, y ahí apareció lo peor: el
+> detector **avisaba citando §14.3 y una línea después imprimía su resumen en ceros**, que es
+> su misma salida de éxito. Eso hizo pasar en vacío al test que cree mirar el repo real.
+>
+> **La ronda 1 salió RED por lo que más importaba: perdí una REGLA.** §14.3 tenía dos
+> corolarios y solo sobrevivió uno; el que se cayó —*un bug del hook nunca debe trabar al
+> dev*— es el principio de diseño del Anillo 2, y `semgrep-scan.sh` y `run-hook.sh` lo citan
+> por nombre desde ahí. Restaurado. Y la mudanza dejó instrucciones ACTIVAS apuntando al
+> fichero viejo —el propio conf mandaba editar una tabla que ya no está ahí—: nueve
+> corregidas, con un test que ata las tres fuentes operativas al mismo destino. Los registros
+> históricos (PRDs, reviews, archivo de lecciones) se dejan como están: son lo que era cierto
+> entonces.
+
 > **2026-09-03 · Fase 5 ENTREGADA: las seis métricas como serie.**
 > `bash tools/metrics/dora.sh` las lee de una vez y apenda una fila a
 > `.agents/state/metrics/series.jsonl` (local y volátil, porque `.agents/state/` está en el

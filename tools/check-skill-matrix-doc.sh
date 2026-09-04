@@ -3,7 +3,10 @@
 # check-skill-matrix-doc.sh — la tabla §11 y el conf no pueden divergir
 # ════════════════════════════════════════════════════════════════════
 # `tools/skill-matrix.conf` es la fuente única: la lee `skill-reminder` en
-# runtime y es lo que de verdad BLOQUEA. `AGENTS.md §11` es su vista humana.
+# runtime y es lo que de verdad BLOQUEA. Su vista humana vive en
+# `docs/process/agents-rationale.md` §11 (salió de AGENTS.md en la fase 7 del
+# PRD 0009: ese fichero entra en el contexto de cada turno y la tabla no hace
+# falta tenerla delante — al bloquear, `skill-reminder` nombra lo que falta).
 # Durante meses la cabecera del conf afirmaba que `test_skill_matrix.sh` cazaba
 # la divergencia entre ambos. No era cierto: ese test comprueba que las refs
 # EXISTAN y sean registrables, nunca compara tabla contra conf. O sea que el
@@ -34,11 +37,22 @@
 # de ruta — nunca por subcadena suelta, que casaría `SKILL.md` con cualquiera.
 #
 # Contrato de stdout:  MATRIX_DOC_SUMMARY solo_en_doc=<N> solo_en_conf=<M>
+#                  o:  MATRIX_DOC_SUMMARY estado=no-pude-mirar   (exit 3)
+# La segunda forma existe porque la primera, con ceros, se lee EXACTAMENTE igual
+# que una comparación limpia. Este script avisaba citando §14.3 y una línea
+# después imprimía `solo_en_doc=0 solo_en_conf=0` — y eso hizo pasar en vacío a
+# un test que creía estar comprobando el repo real.
 # Exit: 0 coherentes · 1 divergen · 3 no pude mirar (falta un archivo)
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 1
 
-DOC="${SKILL_MATRIX_DOC:-AGENTS.md}"
+# La vista humana de la matriz se movió a `agents-rationale.md` §11: `AGENTS.md`
+# entra en el contexto de cada turno y la tabla no hace falta tenerla delante —
+# cuando importa, `skill-reminder` bloquea nombrando las refs que faltan. El
+# detector sigue a la tabla; si se queda apuntando al fichero viejo, compara
+# contra una tabla que ya no existe y delata un drift que no hay
+# (`test_el_detector_de_la_matriz_apunta_donde_vive_la_tabla`).
+DOC="${SKILL_MATRIX_DOC:-docs/process/agents-rationale.md}"
 CONF="${SKILL_MATRIX_CONF:-tools/skill-matrix.conf}"
 
 if [ ! -f "$DOC" ] || [ ! -f "$CONF" ]; then
@@ -46,7 +60,7 @@ if [ ! -f "$DOC" ] || [ ! -f "$CONF" ]; then
     echo "⚠️  skill-matrix-doc: falta $( [ -f "$DOC" ] || printf '%s ' "$DOC"; [ -f "$CONF" ] || printf '%s' "$CONF") — no puedo comparar."
     echo "   Un gate que no pudo mirar NO es un gate que no encontró nada (§14.3)."
   } >&2
-  echo "MATRIX_DOC_SUMMARY solo_en_doc=0 solo_en_conf=0"
+  echo "MATRIX_DOC_SUMMARY estado=no-pude-mirar"
   exit 3
 fi
 
@@ -125,7 +139,7 @@ fi
     echo "   El CONF bloquea por esto y la tabla no lo menciona (el agente se"
     echo "   choca con un gate que su documentación no anuncia):"
     printf '%s' "$SOLO_CONF" | sed 's/^/     · /'
-    echo "   Añádelo a la tabla de §11 en este mismo commit."
+    echo "   Añádelo a la tabla de §11 ($DOC) en este mismo commit."
   fi
   echo ""
   echo "   Recuerda cuál manda: el conf es la fuente única (lo ejecuta"

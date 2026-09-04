@@ -27,7 +27,7 @@
 | Paso | Acción |
 |---|---|
 | 2.0 | **Handshake pre-código** (sub-agentes): resumen ≤8 puntos + archivos a tocar (= PRD §5) + los que NO va a tocar + OQ bloqueantes. Si algo no cuadra → **para y pregunta**. |
-| 2.1 | Antes de tocar un file, lee la skill que aplique (matriz `AGENTS.md` §11) + `tdd-workflow.md` |
+| 2.1 | Antes de tocar un file, lee la skill que aplique (regla en `AGENTS.md` §11; matriz en `agents-rationale.md`) + `tdd-workflow.md` |
 | 2.2 | 🔴 **RED** — escribe el test del comportamiento/riesgo actual y míralo FALLAR por la razón correcta |
 | 2.3 | 🟢 **GREEN** — implementación MÍNIMA que lo pasa (scope = el test, nada de más) |
 | 2.4 | ♻️ **REFACTOR** — limpia en verde + cubre cada rama observable, recuperación y límite aplicable. Respeta capas (`architecture/SKILL.md`) |

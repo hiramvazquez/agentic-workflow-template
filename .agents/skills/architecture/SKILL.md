@@ -14,7 +14,7 @@ paths:
 ---
 
 <!-- `paths:` = activación AUTOMÁTICA por glob, nativa de Claude Code. Es la
-     versión declarativa de la matriz de AGENTS.md §11: cuando el agente trabaja
+     versión declarativa de la matriz (§11, tabla en `agents-rationale.md`): cuando el agente trabaja
      sobre un archivo que casa, la skill se carga sola, sin coste de re-lectura
      forzada. El hook `skill-reminder` sigue siendo el gate DURO (bloquea si no
      la leíste); esto es el camino feliz que hace que casi nunca se dispare. -->

@@ -105,7 +105,7 @@ tools/drift-ratchet.json · tools/mutation-ratchet.json
 | **5** | **Las seis métricas como serie.** | OQ-2, OQ-12 |
 | **3b** | **Aislamiento por worktree** para sub-agentes con capacidad destructiva. | OQ-10 |
 | **6** | **Juez nocturno.** | OQ-2, OQ-11b |
-| **7** | **Segunda pasada de `AGENTS.md`** (262 → ~120). | OQ-1 |
+| **7** | **Segunda pasada de `AGENTS.md`.** Entregada: el criterio se aplicó hasta agotarlo. El objetivo de ~120 era inalcanzable sin violarlo — ver DoD. | OQ-1 (cerrada) |
 
 ## 6. Modelo de datos — lo que hay que definir
 
@@ -249,8 +249,16 @@ OQ decidió que no se hacen así:
 - **6** — OQ-11b (owner): **aparcada**. Sin credencial de IA en ningún workflow, `ci/ai-review.sh`
   falla abierto y el juez nocturno daría un badge verde permanente — que es P2 violado por la
   fase que lo predica.
-- **7** — bloqueada por OQ-1, que es **decisión del owner**: cuánto contexto de `AGENTS.md` es
-  irrenunciable. No se estima sin esa respuesta.
+- **7** — **entregada, y con el objetivo corregido.** El owner eligió aplicar el criterio del
+  propio fichero (regla con detector → una línea; sin detector → entera) hasta donde llegara.
+  Llega a **228**, no a ~120: **87 líneas son reglas sin detector** que el criterio protege, y
+  el resto ya está en su mínima expresión. La estimación de ~120 se hizo antes de medir qué
+  fracción del fichero carece de detector, y era mía: la corrijo aquí.
+
+  **Lo que sí desbloquea el camino:** para adelgazar `AGENTS.md` no se edita `AGENTS.md`, se
+  **mecanizan sus reglas**. Cada detector nuevo convierte párrafos en una línea que lo nombra.
+  El mutation score dormido es el ejemplo más caro — §5 es la sección más grande del fichero y
+  hoy solo se cumple leyéndola.
 
 ## 12. Change log
 

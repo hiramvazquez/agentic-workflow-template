@@ -57,7 +57,7 @@ Claves de esta fase:
   proyecto**: un módulo de referencia, cómo navegar a una pantalla nueva, cómo inyectar una
   dependencia, un puerto de repositorio con su fake. Si el proyecto ya tiene código, extrae
   los ejemplos del código real (verifícalos contra el repo, no contra tu memoria).
-- `tools/skill-matrix.conf` con las carpetas REALES + la tabla de AGENTS.md §11 en el mismo
+- `tools/skill-matrix.conf` con las carpetas REALES + la tabla de `agents-rationale.md` §11 en el mismo
   cambio. `tools/layers.conf` con sus capas.
 
 **Checkpoint:** `session-start.sh --report` muestra menos niveles MUDOS que en Fase 0 —

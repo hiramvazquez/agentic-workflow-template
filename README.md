@@ -198,7 +198,8 @@ tools/
   check-finding-refs.sh      ← un id de finding citado en la doc resuelve contra el ledger
   check-execution-map.sh     ← el mapa canónico no declara cifras que un comando recalcula
                                (una cifra derivable en doc vivo es una mentira futura garantizada)
-  check-skill-matrix-doc.sh  ← la tabla de AGENTS.md §11 y skill-matrix.conf no divergen
+  check-skill-matrix-doc.sh  ← la tabla de agents-rationale.md §11 y skill-matrix.conf
+                               no divergen
   check-version-claims.sh    ← declarar una herramienta incapaz por versión exige citar el
                                repositorio: `brew` sirve el último RELEASE, no lo que soporta
                                el proyecto (nos costó dar el nivel 4 por imposible durante semanas)

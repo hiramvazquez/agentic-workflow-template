@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **82** · Cerrados: 174 · Total: 256
+Abiertos: **83** · Cerrados: 174 · Total: 257
 
 ## Abiertos
 
@@ -90,6 +90,7 @@ Abiertos: **82** · Cerrados: 174 · Total: 256
 | `f-c7a05f92` | low | owner-decision | `.agents/state/markers/override_log.txt + scripts/agent-hooks/ (worktrees)` | Un override auditado dentro de un worktree se registra donde nadie lo lee |
 | `f-cbdd8e70` | low | auto-fix | `tools/lib/detector-run.sh + tools/tests/test_detector_runs.sh` | Un fixture de test puede escribir en el log de metricas REAL si olvida DETECTOR_RUNS_LOG, y nada lo detecta |
 | `f-e10aa746` | low | owner-decision | `tools/check-finding-refs.sh (CITA vs resuelve)` | check-finding-refs perdona abreviaturas en source pero las exige exactas en los .md |
+| `f-e5292b94` | low | auto-fix | `tools/tests/test_skill_matrix.sh:184` | test_skill_matrix.sh: un $? dentro del mensaje de error informa del test, no del comando |
 | `f-f0f52107` | low | auto-fix | `tools/check-execution-map.sh` | check-execution-map marca prosa definicional como afirmacion de estado sin evidencia |
 
 ## Cerrados

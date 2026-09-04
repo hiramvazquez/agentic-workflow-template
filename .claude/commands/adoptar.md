@@ -36,7 +36,8 @@ qué orden vive en `docs/ADOPTION.md` §4 — síguelo; no inventes otro orden.
       un módulo de referencia (View+ViewModel+Logic o equivalente), cómo se navega a una
       pantalla nueva, cómo se inyecta una dependencia, cómo se define un puerto de
       repositorio con su fake. Ejemplos REALES del repo si ya hay código; canónicos si no.
-   5. `tools/skill-matrix.conf` (globs de TUS carpetas — y la tabla humana de AGENTS.md §11
+   5. `tools/skill-matrix.conf` (globs de TUS carpetas — y su tabla humana, en
+      `docs/process/agents-rationale.md` §11,
       en el mismo cambio) · `tools/layers.conf` · `.gitignore` (bloque de tu plataforma)
    6. `scripts/agent-hooks/canon-enforce.sh` §CHECK 5 y `tools/semgrep/rules/` SOLO si el
       owner ya tiene anti-patrones claros — no inventes reglas ruidosas (ley del 10%, §14)

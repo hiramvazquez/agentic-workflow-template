@@ -100,7 +100,28 @@ AFIRMA cobertura es tan peligrosa como un comentario que la afirma.
 
 ---
 
-## §11 — Por qué el tooling no está en la matriz
+## §11 — La matriz, y por qué el tooling no está en ella
+
+> **Aquí vive la vista humana de la matriz de skills.** Estaba en `AGENTS.md §11`,
+> pero ese fichero entra en el contexto de CADA turno y esta tabla no hace falta
+> tenerla delante: cuando de verdad importa —al editar un archivo que la exige— el
+> hook `skill-reminder` bloquea **nombrando una por una las referencias que te
+> faltan**. Tenerla inline era pagar el peso en todos los turnos para ahorrar una
+> lectura en unos pocos.
+>
+> La **fuente única** sigue siendo `tools/skill-matrix.conf`, que es lo que el hook
+> ejecuta. Esta tabla es su vista humana y `tools/check-skill-matrix-doc.sh` compara
+> las dos: si cambias el conf, actualiza la tabla en el mismo commit.
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift`, `**/*Screen*.swift` | `architecture/SKILL.md` + `architecture/platforms/ios.md` |
+| `**/*ViewModel*.swift`, `**/*Logic*.swift`, `**/*UseCase*.swift` | `architecture/SKILL.md` + `domain/SKILL.md` + `process/references/tdd-workflow.md` + `platforms/swift-estado-del-arte.md` |
+| `**/Domain/**` | `.agents/skills/domain/SKILL.md` + `process/references/tdd-workflow.md` |
+| `**/Data/**`, `<migraciones-db>/**` | `domain/SKILL.md` (puertos) + `security/SKILL.md` |
+| `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |
+
+### Por qué el tooling no está
 
 Tocar `tools/**`, `ci/**` o `scripts/agent-hooks/**` **no** está en la tabla, y
 no es un olvido: `skill-reminder` excluye esas rutas a propósito. Editar la doc

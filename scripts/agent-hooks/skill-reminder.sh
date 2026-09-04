@@ -45,7 +45,7 @@ esac
 # de las skills, .claude/rules/, .cursor/rules/) y "Nada se duplica" era
 # mentira: cambiar una carpeta exigía tocar cinco archivos, y el primero en
 # divergir era justo este — el que bloquea. Ahora este hook LEE el conf en
-# runtime; AGENTS.md §11 es la vista humana del mismo conf.
+# runtime; `docs/process/agents-rationale.md` §11 es la vista humana del mismo conf.
 declare -a required=()
 MATRIX="$PROJECT_ROOT/tools/skill-matrix.conf"
 if [ -f "$MATRIX" ]; then
