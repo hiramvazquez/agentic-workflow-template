@@ -326,3 +326,19 @@ test_el_revisor_consulta_su_propia_profundidad() {
     echo "    en vez de algo que deriva — que es justo lo que §6b del PRD 0011 quita."
     return 1; }
 }
+
+# ── Sin nada staged, --review no pide review ────────────────────────
+# Esta rama entró con la fase 4 SIN test y su mutante sobrevivía; lo cazó la
+# ronda 2. No es peligrosa —equivocarse aquí pediría review de MÁS, nunca de
+# menos— pero una rama sin test es una rama sin test, y el sitio donde esa
+# excusa se acepta una vez es donde se acepta siempre.
+_case_review_sin_nada_staged() {
+  local out rc
+  out="$(bash tools/carril.sh --review 2>/dev/null)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    sin nada staged, --review salió $rc (esperaba 0: clasificar 'nada' es clasificar)"
+    return 1; }
+  printf '%s' "$out" | grep -q 'profundidad=ninguna' || {
+    echo "    sin nada staged, --review no dijo ninguna: $out"; return 1; }
+}
+test_sin_nada_staged_no_se_pide_review() { _c_sandbox _case_review_sin_nada_staged; }
