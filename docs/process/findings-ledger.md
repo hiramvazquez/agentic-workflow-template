@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **85** · Cerrados: 175 · Total: 260
+Abiertos: **84** · Cerrados: 176 · Total: 260
 
 ## Abiertos
 
@@ -13,7 +13,6 @@ Abiertos: **85** · Cerrados: 175 · Total: 260
 | `f-1ae68da7` | high | owner-decision | `tools/upgrade.sh + lefthook.yml` | lefthook.yml esta congelado para adoptantes por copia: ninguna mejora del Anillo 1 les llega |
 | `f-1caf51c6` | high | owner-decision | `tools/check-ring3.sh:169 (rama timeout) + tools/tests/test_ring3.sh` | check-ring3: _con_limite bifurca por plataforma y la rama de CI no escala a KILL, asi que el limite no limita en Linux |
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
-| `f-5a4e0204` | high | auto-fix | `tools/verify-run.sh:97` | verify-run firma un arbol que nadie compilo si el archivo nuevo esta sin trackear |
 | `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
@@ -193,6 +192,7 @@ Abiertos: **85** · Cerrados: 175 · Total: 260
 | `f-9b77444e` | fixed | Cerrado por la mitad 1 del arreglo, en este mismo cambio: scope.sh lee la declaracion del INDICE (gi |
 | `f-f387276` | fixed | Cerrado en este mismo cambio: lefthook.yml envuelve check-source-sets con el mismo wrapper de exit 3 |
 | `f-9024b380` | fixed | Cerrado con la otra mitad del arreglo. scope.sh exporta scope_siempre_producto() con las tres rutas  |
+| `f-5a4e0204` | fixed | Cerrado con test y mutantes. verify-run exigia que no hubiera modificaciones sin stagear en ficheros |
 | `f-1b033530` | fixed | Cerrado cambiando la FORMA del arreglo, no alargando la lista. La lista se quedo corta cuatro veces  |
 | `f-80e8df8c` | fixed | Arreglado en este diff: la superficie incluye .gitleaks (sin ancla, cubre .gitleaks.toml), .semgrepi |
 | `f-28006397` | fixed | Cerrado construyendo el detector que proponia, en vez de alargando la lista otra vez. tools/tests/te |

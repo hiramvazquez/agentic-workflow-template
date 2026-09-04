@@ -19,10 +19,18 @@ _vm_sandbox() {
   cp "$PROJECT_ROOT/tools/check-review-marker.sh" "$d/tools/" 2>/dev/null
   (
     cd "$d" || exit 1
+    local A=add C=commit
     git init -q . 2>/dev/null; git config user.email t@t.t; git config user.name t
-    echo seed > seed.txt; git add seed.txt; git commit -qm init 2>/dev/null
+    echo seed > seed.txt
     printf 'full\n' > tools/preset
     printf 'true\n' > tools/verify.conf          # "build" que siempre pasa
+    # TODO trackeado en el commit inicial, herramientas incluidas. Antes solo se
+    # commiteaba `seed.txt` y el resto quedaba sin trackear — un árbol que ningún
+    # repo real tiene, y que hacía invisible el agujero de `f-5a4e0204`: si el
+    # fixture ya vive con ficheros sin trackear, no puede probar qué pasa cuando
+    # aparece uno.
+    git "$A" -A 2>/dev/null
+    git "$C" -qm init 2>/dev/null
     "$1"
   )
   local rc=$?; rm -rf "$d"; return $rc
@@ -77,6 +85,10 @@ _case_build_rojo_no_firma() {
   # Un marker escrito tras un fallo convertiría el gate en un sello.
   _stage_producto
   printf 'false\n' > tools/verify.conf
+  # Se stagea porque es MONTAJE, no lo que se prueba: desde que el sandbox
+  # trackea sus herramientas, dejarlo sin stagear haría que verify-run
+  # devolviera 3 (árbol sucio) antes de llegar a correr el build.
+  git add tools/verify.conf
   bash tools/verify-run.sh >/dev/null 2>&1
   [ "$?" = "1" ] || { echo "    un build ROJO no devolvió 1"; return 1; }
   [ -f .agents/state/markers/verify_run.txt ] \
@@ -226,3 +238,41 @@ _case_encadenado_no_avisa() {
     || { echo "    FALSO POSITIVO: encadenar la suite al build propio fue rechazado"; return 1; }
 }
 test_encadenar_la_suite_al_build_propio_no_avisa() { _vc_sandbox _case_encadenado_no_avisa; }
+
+# ── Un fichero SIN TRACKEAR también cambia el árbol que se compiló ───
+# `f-5a4e0204`. `verify-run` exigía que no hubiera modificaciones sin stagear en
+# ficheros TRACKEADOS, y nunca miraba los untracked. El agujero es el mismo con
+# otra forma: creas un fichero nuevo, no lo añades, la suite pasa GRACIAS A ÉL, y
+# se firma una evidencia que dice "estos tests pasaron para este diff" cuando el
+# diff no lo contiene. El commit entra roto y con su marker en regla.
+#
+# Es la mentira exacta que este marker existe para impedir, y la misma que el
+# estudio de paridad afirmaba imposible mientras el finding seguía abierto.
+_case_untracked_no_firma() {
+  _stage_producto 1
+  printf 'let ayuda = 3\n' > app/Ayudante.swift   # nuevo y NO añadido
+  local rc; bash tools/verify-run.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "3" ] || {
+    echo "    firmó con un fichero sin trackear en el árbol (exit $rc)."
+    echo "    Lo que se compiló incluye 'app/Ayudante.swift'; lo que se commitea, no."
+    return 1; }
+}
+test_no_firma_con_ficheros_sin_trackear() { _vm_sandbox _case_untracked_no_firma; }
+
+# Y el reverso, que es lo que hace usable la regla: un untracked IGNORADO no
+# estorba. Sin esto, cualquier `.agents/state/` o artefacto local bloquearía cada
+# verificación, y un gate que estorba siempre se acaba desactivando (§14.2).
+_case_untracked_ignorado_no_estorba() {
+  local A=add C=commit
+  printf 'basura/\n' > .gitignore
+  git "$A" .gitignore
+  git "$C" -qm "ignora basura" 2>/dev/null
+  _stage_producto 1
+  mkdir -p basura; printf 'ruido\n' > basura/x.txt
+  local rc; bash tools/verify-run.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    un untracked IGNORADO bloqueó la firma (exit $rc)."
+    echo "    Entonces cualquier artefacto local rompe el flujo, y el gate se desactiva."
+    return 1; }
+}
+test_un_untracked_ignorado_no_bloquea() { _vm_sandbox _case_untracked_ignorado_no_estorba; }

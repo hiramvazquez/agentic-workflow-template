@@ -94,10 +94,19 @@ fi
 # impedir. El flujo correcto es el mismo que ya exige §13 para el review:
 #   stagea → verifica → commitea (en comandos separados).
 if [ "$MODE" != "--ci" ]; then
+  # Los ficheros SIN TRACKEAR cuentan igual, y ese era el agujero de
+  # `f-5a4e0204`: solo se miraban las modificaciones de ficheros ya trackeados.
+  # Un fichero nuevo sin `git add` está EN el árbol que se compila y NO en el
+  # diff que se firma — la suite puede pasar gracias a él y el commit entrar
+  # roto con su marker en regla. `--exclude-standard` deja fuera lo ignorado,
+  # porque bloquear por un artefacto local convertiría esto en un estorbo, y un
+  # gate que estorba se acaba desactivando (§14.2).
   SUCIO="$(git diff --name-only 2>/dev/null || true)"
+  UNTRACKED="$(git ls-files --others --exclude-standard 2>/dev/null || true)"
+  [ -n "$UNTRACKED" ] && SUCIO="$(printf '%s\n%s' "$SUCIO" "$UNTRACKED" | grep -v '^$' || true)"
   if [ -n "$SUCIO" ]; then
     {
-      echo "❌ verify-run: hay cambios SIN STAGEAR en archivos trackeados:"
+      echo "❌ verify-run: hay cambios en el árbol que NO están en lo staged:"
       printf '%s\n' "$SUCIO" | sed 's/^/     /'
       echo ""
       echo "   El build corre sobre el árbol de trabajo, así que lo que se"
