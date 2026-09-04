@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **85** · Cerrados: 178 · Total: 263
+Abiertos: **86** · Cerrados: 178 · Total: 264
 
 ## Abiertos
 
@@ -56,6 +56,7 @@ Abiertos: **85** · Cerrados: 178 · Total: 263
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-e012fcce` | medium | owner-decision | `lefthook.yml (pre-push) + scripts/agent-hooks/canon-enforce.sh (CHECK 4) + .claude/agents/reviewer.md` | Nada impide que algo mute el arbol mientras otra cosa lo verifica: tres incidentes en una sesion |
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
+| `f-ec811739` | medium | auto-fix | `tools/review-aislado.sh + .claude/agents/reviewer.md` | El marker de verify-run no llega al worktree aislado, asi que la review enfocada nunca puede leerlo |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
 | `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky en macOS: senales, procesos hijo y timeouts. ~2 de 3 corridas en rojo |
