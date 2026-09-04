@@ -18,6 +18,10 @@
 #   NINGUNO          nada se ejecuta (carril ligero)
 #   TODOS            la suite entera (estructural, o normal sin tests derivables)
 #   <nombres>        un test por línea (normal, derivados por REFERENCIA)
+# Con `--review`:    REVIEW_DEPTH profundidad=<ninguna|enfocada|profunda> carril=<...>
+#   Cuánta review pide este cambio (PRD 0011 §6b). La profundidad vive aquí y no
+#   en el prompt del revisor porque un prompt no se puede testear y esto sí, y
+#   porque el revisor debe DERIVARLA, no recordarla ni fiarse de quien le invoca.
 #
 # Se derivan buscando los tests que NOMBRAN el fichero tocado, no por convención
 # de nombres: la convención no se cumple —`check-drift.sh` lo ejercitan
@@ -36,12 +40,17 @@ CONF="${CARRIL_CONF:-$_RAIZ/carril.conf}"
 # CONCATENA en vez de reemplazar— recibiera basura de dos líneas, la tomara como
 # nombres de test, no casara ninguno, y firmara en verde con CERO tests corridos.
 _MODO_TESTS=0
-[ "${1:-}" = "--tests" ] && _MODO_TESTS=1
+_MODO_REVIEW=0
+[ "${1:-}" = "--tests" ]  && _MODO_TESTS=1
+[ "${1:-}" = "--review" ] && _MODO_REVIEW=1
 _no_pude() { # <mensaje>
   echo "⚠️  carril: $1 (§14.3)." >&2
-  # En modo --tests el fallo pide la suite ENTERA: no saber qué correr nunca
-  # puede traducirse en correr menos.
-  [ "$_MODO_TESTS" = "1" ] && { echo "TODOS"; exit 3; }
+  # Cada modo contesta en SU vocabulario, y siempre hacia el lado seguro: no
+  # saber cuánto pesa un cambio nunca puede traducirse en pedir menos. Imprimir
+  # el resumen aquí es justo lo que hizo que un consumidor tomara una salida de
+  # fallo por datos buenos en la fase 2.
+  [ "$_MODO_TESTS" = "1" ]  && { echo "TODOS"; exit 3; }
+  [ "$_MODO_REVIEW" = "1" ] && { echo "REVIEW_DEPTH profundidad=profunda carril=desconocido"; exit 3; }
   echo "CARRIL_SUMMARY carril=desconocido archivos=0"
   exit 3
 }
@@ -56,7 +65,8 @@ MODO="${1:-}"
 ARCHIVOS="$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)"
 N="$(printf '%s' "$ARCHIVOS" | grep -c . || true)"
 if [ "${N:-0}" -eq 0 ]; then
-  [ "$MODO" = "--tests" ] && { echo "NINGUNO"; exit 0; }
+  [ "$MODO" = "--tests" ]  && { echo "NINGUNO"; exit 0; }
+  [ "$MODO" = "--review" ] && { echo "REVIEW_DEPTH profundidad=ninguna carril=ninguno"; exit 0; }
   echo "CARRIL_SUMMARY carril=ninguno archivos=0"
   exit 0
 fi
@@ -86,6 +96,24 @@ while IFS= read -r f; do
   # fichero que nadie previó puede ejecutar.
   _casa_carril ligero "$f" || CARRIL=normal
 done <<< "$ARCHIVOS"
+
+# ── --review: cuánta review pide esto (PRD 0011 §6b) ────────────────
+# `ninguna` porque nada de lo tocado se ejecuta — el gate ya lo exime, y esto
+# es la misma decisión dicha para quien pregunte. `enfocada` es el diff, sus
+# tests y buscar un mutante que sobreviva: NO re-correr la suite, que
+# `verify-run` ya corrió contra este mismo sha y su marker lo demuestra.
+# `profunda` es el carril donde un fallo puede hacer que NINGÚN detector corra,
+# y es el único que justifica una pasada de veinte minutos.
+if [ "$MODO" = "--review" ]; then
+  case "$CARRIL" in
+    ligero) echo "REVIEW_DEPTH profundidad=ninguna carril=ligero" ;;
+    normal) echo "REVIEW_DEPTH profundidad=enfocada carril=normal" ;;
+    # Cualquier otra cosa —estructural, o un carril que alguien añada mañana y
+    # nadie mapee aquí— pide la profunda. El default cae del lado caro.
+    *)      echo "REVIEW_DEPTH profundidad=profunda carril=$CARRIL" ;;
+  esac
+  exit 0
+fi
 
 if [ "$MODO" != "--tests" ]; then
   echo "CARRIL_SUMMARY carril=$CARRIL archivos=$N"

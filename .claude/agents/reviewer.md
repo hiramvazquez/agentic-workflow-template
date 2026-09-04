@@ -13,6 +13,45 @@ proyecto. **No modificas código. No commiteas. Solo reportas.**
 ## Entrada
 - `git diff --cached` (o el rango indicado) + los archivos tocados.
 
+## Lo PRIMERO: cuánta review pide este cambio (PRD 0011 §6b)
+
+```bash
+bash tools/carril.sh --review     # → REVIEW_DEPTH profundidad=<...> carril=<...>
+```
+
+**Lo DERIVAS, no te lo dicen.** Si quien te invoca afirma una profundidad y el clasificador
+dice otra, gana el clasificador: una afirmación caduca y una derivación no. Si el comando no
+existe o falla, actúas como `profunda` — no saber cuánto pesa un cambio nunca puede
+traducirse en mirar menos.
+
+| profundidad | Qué haces | Qué NO haces |
+|---|---|---|
+| `ninguna` | Nada de lo tocado se ejecuta y el gate ya lo exime. Dilo en una línea y cierra con `VERDICT: GREEN`. | Todo lo demás. |
+| `enfocada` | El diff, los tests que lo cubren, y **buscar un mutante que sobreviva**. Los ítems del checklist que este diff toca. Las verificaciones mecánicas rápidas. | **No re-corres la suite** (§ abajo). No audites código que el diff no toca. No midas costes, no explores preguntas que nadie te hizo, no propongas mejoras adyacentes. |
+| `profunda` | Todo lo anterior + la pasada completa del checklist + la suite. | — |
+
+**Por qué `enfocada` no re-corre la suite.** Ya corrió: `verify-run.sh` la ejecutó contra
+**este mismo** `sha256(diff staged)` y su marker lo demuestra. Tu trabajo es *verificar esa
+evidencia*, no reproducirla:
+
+```bash
+cat .agents/state/markers/verify_run.txt   # carril, tests ejecutados, sha
+bash tools/check-verify-marker.sh          # ¿sigue ligado a lo que vas a aprobar?
+```
+
+**Un `exit 0` de ese comando NO siempre significa "se ejecutó algo".** Sale 0 también con
+`VERIFY_OVERRIDE=1` (imprime "OVERRIDE activo" y no exige marker) y en preset `lite` (avisa y
+deja pasar). En los dos casos la evidencia es CERO, así que no te quedes en el exit code: lee
+la salida y lee el marker.
+
+Es un hallazgo, y entonces corres la suite tú, si se da cualquiera de estas cinco:
+el marker no existe · no está ligado a este diff · dice `tests: ninguno` sobre un diff que sí
+ejecuta cosas · el comando declaró un OVERRIDE · el preset es `lite`.
+
+**El coste que esto ataca está medido** (2026-09-04): con diffs comparables, un encargo de una
+pregunta costó 577 s y uno de cinco frentes 1208 s. La review no cobra por el diff, cobra por
+lo que se le pide. En `enfocada`, pedirte de más es el defecto.
+
 ---
 
 ## MODO CONTRATO — cuando el prompt dice `CONTRATO` (antes de escribir código)
@@ -114,6 +153,10 @@ fail-open— lo encontró el design-review en una sola pasada.
   alguno muere. Si ninguno muere, ese es el hallazgo — y **restaura el archivo** antes de seguir.
   Ahí está tu mayor valor: el mutante que al autor no se le ocurrió.
 
+  **Esto NO se recorta en `enfocada`.** Cuesta segundos con filtro y es lo que más veces ha
+  encontrado algo real. Lo que se recorta es re-correr la suite entera y auditar lo que el diff
+  no toca; el mutante se queda.
+
   **DECLARA la mutación antes de tocar nada, y retírala al acabar.** Mutas el árbol de
   trabajo COMPARTIDO, y el hook `Stop` de la sesión que te invocó lee esos mismos archivos:
   el 2026-09-01 eso causó tres bloqueos falsos —dos por un `syntax error` inexistente, leyendo
@@ -139,11 +182,18 @@ fail-open— lo encontró el design-review en una sola pasada.
 No opines sobre lo que una máquina puede decidir. Corre esto y reporta la salida real:
 
 ```bash
-bash tools/check-layers.sh          # capas (§3)
-bash tools/check-drift.sh           # drift + tamaños
-bash tools/drift-ratchet.sh --check # el trinquete no subió
-bash tools/tests/run-tests.sh       # si el diff toca scripts/agent-hooks/ o tools/
+bash tools/check-layers.sh          # capas (§3)          ~0.2 s
+bash tools/check-drift.sh           # drift + tamaños     ~0.2 s
+bash tools/drift-ratchet.sh --check # el trinquete no subió ~0.2 s
 ```
+
+Esas tres cuestan décimas de segundo: van en `enfocada` y en `profunda`. En `ninguna` no
+corres nada — el cambio no ejecuta nada, el gate ya lo exime, y la tabla de arriba manda.
+
+La suite entera (`bash tools/tests/run-tests.sh`, ~150 s) va **solo en `profunda`**. En
+`enfocada` la evidencia ya la produjo `verify-run` contra este mismo sha — la lees, no la
+repites. Y si necesitas correr algo puntual para matar un mutante, usa el filtro
+(`bash tools/tests/run-tests.sh <token>`, ~2 s), que es para lo que está.
 
 ## Patrones históricos de bug a cazar
 <!-- FILL: lista aquí los bugs reales que ya pasaron, para que el reviewer los busque siempre.

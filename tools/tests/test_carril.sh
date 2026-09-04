@@ -257,3 +257,72 @@ _case_fixture_no_es_ligero() {
     echo "    un fixture no salió normal: $(_c)"; return 1; }
 }
 test_un_fixture_no_es_carril_ligero() { _c_sandbox _case_fixture_no_es_ligero; }
+
+# ── --review: cuánta review pide este cambio ────────────────────────
+# PRD 0011 §6b. La profundidad vive AQUÍ y no en el prompt del revisor por la
+# misma razón que todo lo demás: un prompt no se puede testear y una fila de
+# conf sí. El revisor la CONSULTA; no la declara ni la recuerda.
+_case_review_ligero_ninguna() {
+  _stage docs/algo.md
+  _c --review | grep -q 'profundidad=ninguna' || {
+    echo "    ligero no pidió review ninguna: $(_c --review)"; return 1; }
+}
+test_el_carril_ligero_no_pide_review() { _c_sandbox _case_review_ligero_ninguna; }
+
+_case_review_normal_enfocada() {
+  _stage tools/check-algo.sh
+  _c --review | grep -q 'profundidad=enfocada' || {
+    echo "    normal no pidió review enfocada: $(_c --review)"; return 1; }
+}
+test_el_carril_normal_pide_review_enfocada() { _c_sandbox _case_review_normal_enfocada; }
+
+_case_review_estructural_profunda() {
+  _stage lefthook.yml
+  _c --review | grep -q 'profundidad=profunda' || {
+    echo "    estructural no pidió review profunda: $(_c --review)"; return 1; }
+}
+test_el_carril_estructural_pide_review_profunda() {
+  _c_sandbox _case_review_estructural_profunda
+}
+
+# ── Y no poder mirar pide la PROFUNDA ───────────────────────────────
+# El mismo default seguro que `--tests`, en el otro sentido: si el clasificador
+# no sabe qué pesa el cambio, no puede pedir menos garantías de las que había
+# antes de existir. Salida de fallo en el vocabulario de `--review`, no en el
+# del resumen — imprimir `CARRIL_SUMMARY` aquí es exactamente lo que hizo que un
+# consumidor tomara basura por datos buenos en la fase 2.
+_case_review_sin_conf_pide_la_profunda() {
+  local R=rm; $R -f tools/carril.conf
+  _stage tools/check-algo.sh
+  local out rc
+  out="$(bash tools/carril.sh --review 2>/dev/null)"; rc=$?
+  # El EXIT CODE, no solo el texto. Solo miraba stdout, y el mutante que cambia
+  # `exit 3` por `exit 0` sobrevivía — lo cazó el review. §14.3 dice que "no pude
+  # mirar" es 3 y no 0, y un 0 aquí convertiría un detector que no miró en un
+  # detector que pasó, que es exactamente lo que ese contrato prohíbe.
+  [ "$rc" = "3" ] || {
+    echo "    sin conf, --review salió $rc; §14.3 exige 3 (no pude mirar)"; return 1; }
+  printf '%s' "$out" | grep -q 'profundidad=profunda' || {
+    echo "    sin conf, --review no pidió la profunda: $out"; return 1; }
+  printf '%s' "$out" | grep -q 'CARRIL_SUMMARY' && {
+    echo "    sin conf, --review habló el vocabulario del RESUMEN: $out"; return 1; }
+  return 0
+}
+test_sin_poder_clasificar_se_pide_la_review_profunda() {
+  _c_sandbox _case_review_sin_conf_pide_la_profunda
+}
+
+# ── Y el revisor tiene que CONSULTARLA, no recordarla ───────────────
+# `--review` no vale nada si el prompt del revisor no lo ejecuta: la
+# profundidad viviría otra vez en la cabeza del modelo, que es de donde este
+# PRD la está sacando. El test se DERIVA — si `carril.sh` deja de ofrecer
+# `--review`, deja de exigirlo, y no queda una lista a mano que se quede vieja.
+# No corre en sandbox a propósito: mira los ficheros REALES del repo.
+test_el_revisor_consulta_su_propia_profundidad() {
+  bash tools/carril.sh --review >/dev/null 2>&1 || return 0   # no lo ofrece: nada que exigir
+  grep -q 'carril\.sh --review' .claude/agents/reviewer.md || {
+    echo "    carril.sh ofrece --review y .claude/agents/reviewer.md no lo ejecuta."
+    echo "    Sin esa línea la profundidad vuelve a ser algo que el modelo recuerda"
+    echo "    en vez de algo que deriva — que es justo lo que §6b del PRD 0011 quita."
+    return 1; }
+}
