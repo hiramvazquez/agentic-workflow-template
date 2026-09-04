@@ -160,8 +160,18 @@ fi
 # Solo los directorios que existen, o `git log` avisa de pathspec inexistente.
 _EXISTENTES=()
 for _d in $PROD_DIRS; do [ -d "$_d" ] && _EXISTENTES+=("$_d"); done
+# Los ficheros de DATOS que escribe una herramienta no son "tocar producto".
+# Registrar un hallazgo en el ledger no es un cambio de fase, y el mapa se
+# mantiene sin historia a propósito: obligar a anotarlo ahí empuja de vuelta lo
+# que se acaba de sacar. Pasó de verdad — un commit de una sola fila de ledger
+# bloqueó un push. El CÓDIGO de `tools/` sigue exigiendo el mapa; lo fija
+# `test_tocar_codigo_junto_al_ledger_si_exige_el_mapa`.
+_EM_EXCLUIR=(
+  ':(exclude)tools/findings/*.jsonl'   # lo escribe findings.sh
+  ':(exclude)tools/*-ratchet.json'     # los escriben sus propios scripts (§9)
+)
 TS_PROD=""
-[ "${#_EXISTENTES[@]}" -gt 0 ] && TS_PROD="$(_ultimo_ts "${_EXISTENTES[@]}")"
+[ "${#_EXISTENTES[@]}" -gt 0 ] && TS_PROD="$(_ultimo_ts "${_EXISTENTES[@]}" "${_EM_EXCLUIR[@]}")"
 
 # ── Última TRANSICIÓN de una historia a `status: done` ──────────────
 # ⚠️ NO es "el commit más reciente cuyo árbol tenga alguna historia en done":

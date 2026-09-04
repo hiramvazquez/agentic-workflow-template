@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **85** · Cerrados: 174 · Total: 259
+Abiertos: **85** · Cerrados: 175 · Total: 260
 
 ## Abiertos
 
@@ -273,3 +273,4 @@ Abiertos: **85** · Cerrados: 174 · Total: 259
 | `f-b77dbbfb` | fixed | Cerrado con el test que faltaba: test_sin_desfase_el_aviso_calla monta una rama local AL DIA con su  |
 | `f-7a219330` | fixed | Decision del owner: 20s. Y el numero era solo la mitad del problema — un TimeoutExpired ES un Subpro |
 | `f-74c528ef` | fixed | Cerrados los dos sitios. (1) dora_git.py: git() devolvia cadena vacia tanto si git DIJO QUE NO -un r |
+| `f-4e3aafc5` | fixed | Cerrado en el mismo commit: excluidos del pathspec los ficheros de datos generados, con test para el |

@@ -1390,3 +1390,92 @@ _case_tocar_solo_ci_tambien_delata() {
 test_tocar_solo_ci_tambien_delata_el_mapa() {
   _emk_repo harness _case_tocar_solo_ci_tambien_delata
 }
+
+# ── Los DATOS generados de tools/ no son "tocar producto" ───────────
+# Falso positivo del propio detector, encontrado al usarlo: un commit que solo
+# añade una fila al ledger (`tools/findings/ledger.jsonl`, que escribe
+# `findings.sh`) contaba como tocar producto y exigía actualizar el mapa. Pero
+# registrar un hallazgo NO es un cambio de fase, y el mapa acaba de quedarse sin
+# historia a propósito: obligar a anotarlo ahí es empujar de vuelta lo que se
+# acaba de sacar. Bloqueó un `git push` de verdad.
+#
+# Los ficheros de datos que escribe una herramienta —el ledger y los
+# trinquetes— se excluyen. El CÓDIGO de `tools/` sigue exigiendo el mapa.
+_case_solo_datos_generados() {
+  local A=add C=commit
+  mkdir -p tools/findings
+  printf '{"id":"f-x","title":"algo"}\n' > tools/findings/ledger.jsonl
+  git "$A" -A
+  GIT_COMMITTER_DATE="2026-01-01T10:00:00" GIT_AUTHOR_DATE="2026-01-01T10:00:00" \
+    git "$C" -qm base
+  # el mapa se queda como está y solo cambia el ledger, DESPUÉS
+  printf '{"id":"f-x","title":"algo"}\n{"id":"f-y","title":"otro"}\n' > tools/findings/ledger.jsonl
+  git "$A" tools/findings/ledger.jsonl
+  GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
+    git "$C" -qm "solo una fila de ledger"
+  local out rc
+  out="$(bash tools/check-execution-map.sh 2>&1)"; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    una fila de ledger marcó el mapa como stale (exit $rc):"
+    printf '%s\n' "$out" | head -4 | sed 's/^/      /'
+    echo "    Registrar un hallazgo no es un cambio de fase."
+    return 1; }
+}
+test_una_fila_de_ledger_no_exige_tocar_el_mapa() {
+  _emk_repo harness _case_solo_datos_generados
+}
+
+# Y el reverso, para que la exclusión no se coma el caso real: tocar CÓDIGO de
+# tools/ en el mismo commit sí sigue exigiendo el mapa.
+_case_codigo_junto_a_datos_si_exige() {
+  local A=add C=commit
+  mkdir -p tools/findings
+  printf '{"id":"f-x"}\n' > tools/findings/ledger.jsonl
+  git "$A" -A
+  GIT_COMMITTER_DATE="2026-01-01T10:00:00" GIT_AUTHOR_DATE="2026-01-01T10:00:00" \
+    git "$C" -qm base
+  printf '{"id":"f-x"}\n{"id":"f-y"}\n' > tools/findings/ledger.jsonl
+  printf '#!/usr/bin/env bash\necho cambiado\n' > tools/algo-nuevo.sh
+  git "$A" tools/findings/ledger.jsonl tools/algo-nuevo.sh
+  GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
+    git "$C" -qm "ledger Y código"
+  local rc
+  bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    tocar código de tools/ junto al ledger NO exigió el mapa (exit $rc)."
+    echo "    La exclusión de datos se comió el caso que el detector existe para cazar."
+    return 1; }
+}
+test_tocar_codigo_junto_al_ledger_si_exige_el_mapa() {
+  _emk_repo harness _case_codigo_junto_a_datos_si_exige
+}
+
+# ── Y el código DENTRO de tools/findings/ tampoco está excluido ─────
+# El guard de arriba no bastaba: lleva un fichero en la RAÍZ de `tools/`, que
+# por sí solo mantiene el test verde aunque la exclusión se coma
+# `tools/findings/` entero. El review lo demostró con un mutante que le
+# sobrevivía. Este caso toca EXCLUSIVAMENTE código dentro de esa carpeta, que
+# es donde vive `findings.sh` — la herramienta, no sus datos.
+_case_codigo_dentro_de_findings_si_exige() {
+  local A=add C=commit
+  mkdir -p tools/findings
+  printf '{"id":"f-x"}\n' > tools/findings/ledger.jsonl
+  printf '#!/usr/bin/env bash\necho v1\n' > tools/findings/gestor.sh
+  git "$A" -A
+  GIT_COMMITTER_DATE="2026-01-01T10:00:00" GIT_AUTHOR_DATE="2026-01-01T10:00:00" \
+    git "$C" -qm base
+  # SOLO código dentro de tools/findings/. Ni la raíz de tools/, ni el ledger.
+  printf '#!/usr/bin/env bash\necho v2\n' > tools/findings/gestor.sh
+  git "$A" tools/findings/gestor.sh
+  GIT_COMMITTER_DATE="2026-01-02T10:00:00" GIT_AUTHOR_DATE="2026-01-02T10:00:00" \
+    git "$C" -qm "cambio en la herramienta, no en sus datos"
+  local rc
+  bash tools/check-execution-map.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    cambiar código dentro de tools/findings/ NO exigió el mapa (exit $rc)."
+    echo "    La exclusión se comió la herramienta junto con sus datos."
+    return 1; }
+}
+test_codigo_dentro_de_findings_si_exige_el_mapa() {
+  _emk_repo harness _case_codigo_dentro_de_findings_si_exige
+}
