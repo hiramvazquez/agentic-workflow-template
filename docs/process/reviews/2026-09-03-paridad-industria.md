@@ -1,8 +1,17 @@
 # Paridad con la práctica de la industria — 3 de septiembre de 2026
 
 > Estudio de qué se hace hoy con agentes de código y dónde queda este harness. Alimenta el
-> PRD 0008. Las cifras del harness son medidas en este repositorio; las de la industria vienen
-> de las fuentes del final, consultadas ese día.
+> PRD 0008.
+>
+> **Cómo leer las cifras.** Las del harness son **snapshots fechados**, medidos en este
+> repositorio el día que dice cada una, con su denominador y el comando que las reproduce. No
+> son estado actual: para eso está `bash tools/metrics/dora.sh --sin-serie`. Una cifra de este
+> informe citada como "hoy" es un error de lectura.
+>
+> **Y qué peso tiene cada fuente.** Las del final son **artículos y guías de terceros**, no
+> evidencia primaria: sirven para saber qué se recomienda y qué umbrales se manejan, no para
+> dar nada por demostrado. Lo único primario aquí son las notas de versión de Claude Code
+> (§5) y las mediciones de este repo, que traen su comando.
 >
 > Se clasifica cada práctica con el contrato de exit codes del propio harness (§14.3), porque
 > es la vara con la que mide todo lo demás: `0` lo tenemos y lo demuestra · `1` lo tenemos y
@@ -56,7 +65,9 @@ Encima se apilan dos específicas de IA:
   pequeños que sí pasaron la revisión.
 
 **Nosotros.** Al escribirse este estudio no había ninguna de las seis ni serie temporal, y el
-único dato era uno medido a mano: 27% de aceptación. Desde el PRD 0009 fase 5 hay
+único dato era uno medido a mano: **snapshot del 2026-09-03, 27%** (29 de 107 unidades
+del campo `verdict` de `review-history.jsonl`, contadas a mano una vez). Se conserva por
+contraste con la medición continua de abajo, no como estado. Desde el PRD 0009 fase 5 hay
 `tools/metrics/dora.sh`, que las lee de una vez y apenda una fila a
 `.agents/state/metrics/series.jsonl`; el resumen semanal se versiona en
 `docs/process/metrics-weekly.md`.
@@ -65,8 +76,10 @@ Cuatro de las seis tienen evento en este repo. Las otras dos **salen `n/a` con s
 0**: sin merges no hay lead time, y el campo `area` del ledger es texto libre, así que no hay
 join para el retrabajo. Esa distinción es el punto entero — un 0 dice "medí y salió cero".
 
-Lo que ya se puede responder, y antes no: la **tasa de aceptación real es 25%** (35 de 139
-unidades verdes a la primera), borde inferior del rango sano 25–45%.
+Lo que ya se puede responder, y antes no: la tasa de aceptación. **Snapshot del 2026-09-03:
+25%** (35 de 139 unidades con `staged_sha` en `review-history.jsonl`, primer veredicto por
+unidad), borde inferior del rango sano 25–45% que proponen las fuentes. Reproducible con
+`bash tools/metrics/dora.sh --sin-serie`; el valor de hoy lo da ese comando, no esta línea.
 
 ### `1` — Evals sobre la trayectoria, corriendo en CI
 
@@ -116,8 +129,10 @@ Los restauró y lo declaró — pero nada mecánico se lo impidió.
 Tres cosas poco comunes que este harness sí tiene:
 
 1. **La evidencia se ata al contenido exacto del diff.** Los markers de review y de tests
-   firman `sha256(diff staged)`. No se puede firmar un árbol que nadie compiló ni reutilizar
-   una aprobación de otro cambio.
+   firman `sha256(diff staged)`, así que una aprobación no se reutiliza en otro cambio.
+   **Con una grieta conocida y abierta:** `f-5a4e0204` documenta que `verify-run` puede firmar
+   un árbol que nadie compiló si el archivo nuevo está sin trackear. La propiedad es la
+   irreutilización de la firma, no la garantía de compilación.
 2. **"No pude mirar" es un estado propio.** El contrato de exit codes distingue `0` limpio de
    `1` hay un problema de `3` el detector no pudo mirar. La mayoría de las cadenas de CI
    colapsan el tercero contra el primero, que es como un scanner roto se vuelve luz verde
@@ -129,8 +144,11 @@ Tres cosas poco comunes que este harness sí tiene:
 ## La conclusión, en una línea
 
 Donde vamos por detrás es siempre lo mismo: **nuestra observabilidad es *pull* y la de la
-industria es *push***. Te enteras si ejecutas un comando, y todo lo que se obtiene es una
-foto, nunca una serie.
+industria es *push***. Te enteras si ejecutas un comando.
+
+**Corregido después de la fase 5 del PRD 0009:** la parte de "y siempre es una foto, nunca una
+serie" **dejó de ser cierta** — `tools/metrics/dora.sh` apenda a una serie y su resumen semanal
+se versiona. Lo que sigue siendo *pull* es el disparador: alguien tiene que pedir `/status`.
 
 ---
 

@@ -256,3 +256,181 @@ test_las_fuentes_operativas_nombran_el_mismo_doc() {
   done
   return 0
 }
+
+# ── Mover una lectura entre filas: lo que se ve y lo que NO ─────────
+# Mejora de `f-8b74d177`, con su límite declarado. El detector comparaba solo la
+# UNIÓN de referencias, así que cualquier baile entre filas salía limpio. Ahora
+# compara las COMBINACIONES: mover una lectura de una fila a otra cambia dos
+# combinaciones y se ve.
+#
+# LO QUE SIGUE SIN VERSE, y por eso `f-8b74d177` NO se cierra: permutar dos
+# conjuntos ENTEROS entre filas deja la colección de combinaciones idéntica.
+# Cazarlo exigiría parear `glob → refs` uno a uno, y eso no se puede: los globs
+# de la tabla agrupan a propósito y uno de ellos es un marcador (`<migraciones-db>`)
+# que no corresponde a ningún glob literal del conf. Forzar el pareo metería
+# falsos positivos sobre un placeholder deliberado — la ley del 10% (§14.2).
+_case_una_ref_cambiada_de_fila() {
+  _smd_conf '*View*.swift|.agents/skills/architecture/SKILL.md,.agents/skills/domain/SKILL.md
+*/Domain/*|.agents/skills/domain/SKILL.md'
+  # La UNIÓN es idéntica al conf; lo que cambia es de qué fila cuelga `domain`.
+  _smd_doc '## 11. Matriz
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift` | `architecture/SKILL.md` |
+| `**/Domain/**` | `domain/SKILL.md` + `architecture/SKILL.md` |
+'
+  local out rc
+  out="$(SKILL_MATRIX_DOC="$_SMD_DOC" bash tools/check-skill-matrix-doc.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    una ref cambiada de fila dio exit $rc:"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    echo "    La unión no cambia — por eso se comparan las combinaciones."
+    return 1; }
+  printf '%s' "$out" | grep -q 'COMBINACIONES' || {
+    echo "    lo detectó, pero no por la vía de las combinaciones: $out"; return 1; }
+}
+test_una_ref_cambiada_de_fila_se_detecta() {
+  _smd_sandbox _case_una_ref_cambiada_de_fila
+}
+
+# ── El límite, declarado como test para que no se olvide ────────────
+# Un hueco conocido y escrito vale más que uno supuesto: si algún día alguien
+# implementa el pareo real, este test falla y le recuerda actualizar
+# `f-8b74d177` y la redacción de §11 en vez de dejarlas prometiendo de menos.
+_case_permutar_conjuntos_enteros_no_se_ve() {
+  _smd_conf '*View*.swift|.agents/skills/architecture/SKILL.md
+*/Domain/*|.agents/skills/domain/SKILL.md'
+  _smd_doc '## 11. Matriz
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift` | `domain/SKILL.md` |
+| `**/Domain/**` | `architecture/SKILL.md` |
+'
+  local rc
+  SKILL_MATRIX_DOC="$_SMD_DOC" bash tools/check-skill-matrix-doc.sh >/dev/null 2>&1; rc=$?
+  [ "$rc" = "0" ] || {
+    echo "    el detector YA caza permutar conjuntos enteros (exit $rc)."
+    echo "    Es una buena noticia: actualiza f-8b74d177, la cabecera del"
+    echo "    detector y §11, que hoy declaran este hueco como abierto."
+    return 1; }
+}
+test_permutar_conjuntos_enteros_sigue_siendo_ciego() {
+  _smd_sandbox _case_permutar_conjuntos_enteros_no_se_ve
+}
+
+# ── Un conjunto del conf que la tabla no anuncia es un muro invisible ─
+# Hoy pasa de verdad: el conf tiene siete combinaciones de referencias y la
+# tabla cinco. Las dos que faltan son las de TypeScript y Kotlin, así que un
+# adoptante en esos stacks se choca con un gate que su documentación no menciona
+# — que es exactamente lo que este detector existe para impedir.
+_case_conjunto_del_conf_sin_fila() {
+  _smd_conf '*View*.swift|.agents/skills/architecture/SKILL.md,.agents/skills/domain/SKILL.md
+*.tsx|.agents/skills/architecture/SKILL.md'
+  # La tabla solo anuncia la combinación grande; la de `*.tsx` no existe.
+  _smd_doc '## 11. Matriz
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift` | `architecture/SKILL.md` + `domain/SKILL.md` |
+'
+  local out rc
+  out="$(SKILL_MATRIX_DOC="$_SMD_DOC" bash tools/check-skill-matrix-doc.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    un conjunto del conf sin fila en la tabla dio exit $rc:"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    return 1; }
+}
+test_un_conjunto_del_conf_sin_fila_se_detecta() {
+  _smd_sandbox _case_conjunto_del_conf_sin_fila
+}
+
+# ── Una ref ambigua no se resuelve a la primera que casa ────────────
+# Falso negativo del propio comparador de combinaciones. `_casa` empareja por
+# SUFIJO, así que una fila que abrevie a `SKILL.md` a secas casa con
+# `architecture/SKILL.md` Y con `domain/SKILL.md`; el bucle cogía la primera y
+# el detector daba exit 0 sobre una tabla que no dice a cuál se refiere.
+# La abreviatura es plausible —la tabla ya abrevia a propósito— y el modo de
+# fallo es el peor: verde sobre una ambigüedad real.
+_case_ref_ambigua() {
+  _smd_conf '*View*.swift|.agents/skills/architecture/SKILL.md
+*/Domain/*|.agents/skills/domain/SKILL.md'
+  _smd_doc '## 11. Matriz
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift` | `SKILL.md` |
+| `**/Domain/**` | `domain/SKILL.md` |
+'
+  local out rc
+  out="$(SKILL_MATRIX_DOC="$_SMD_DOC" bash tools/check-skill-matrix-doc.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    una ref ambigua (\`SKILL.md\` a secas) dio exit $rc:"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    echo "    Casa por sufijo con DOS refs del conf; resolver a la primera es"
+    echo "    verde sobre una ambigüedad real."
+    return 1; }
+  printf '%s' "$out" | grep -qi 'ambigu' || {
+    echo "    falla, pero sin decir que el problema es la ambigüedad: $out"
+    return 1; }
+}
+test_una_ref_ambigua_no_se_resuelve_a_la_primera() { _smd_sandbox _case_ref_ambigua; }
+
+# ── La tabla sobra una combinación: la rama que no se probaba ───────
+# El review lanzó dos mutantes que SOBREVIVIERON, y los dos caían en la misma
+# rama muerta. El test de "una ref cambiada de fila" dispara SOLO_DOC y
+# SOLO_CONF a la vez, y afirmaba con `grep -q 'COMBINACIONES'` — mayúscula que
+# solo aparece en el mensaje de SOLO_CONF. Así que pasaba por la otra puerta
+# aunque SOLO_DOC estuviera muerta. Este caso la aísla: al conf no le falta
+# nada, es la tabla la que anuncia de más.
+_case_solo_la_tabla_sobra() {
+  # Las DOS refs existen en el conf: la unión cuadra y el chequeo anterior no
+  # dice nada. Lo que sobra es la COMBINACIÓN — el conf nunca las pide juntas.
+  _smd_conf '*View*.swift|.agents/skills/architecture/SKILL.md
+*/Domain/*|.agents/skills/domain/SKILL.md'
+  _smd_doc '## 11. Matriz
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift` | `architecture/SKILL.md` |
+| `**/Domain/**` | `domain/SKILL.md` |
+| `**/Otro/**` | `architecture/SKILL.md` + `domain/SKILL.md` |
+'
+  local out rc
+  out="$(SKILL_MATRIX_DOC="$_SMD_DOC" bash tools/check-skill-matrix-doc.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    la tabla anuncia una combinación que el conf no pide y dio exit $rc"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    return 1; }
+  printf '%s' "$out" | grep -q 'defensa fingida' || {
+    echo "    falla, pero no por la rama de la tabla: $out"; return 1; }
+}
+test_una_combinacion_que_sobra_en_la_tabla_se_detecta() {
+  _smd_sandbox _case_solo_la_tabla_sobra
+}
+
+# ── `_casa` empareja por SUFIJO, no por subcadena ───────────────────
+# El otro mutante superviviente: cambiar `*/"$1"` por `*"$1"*`. Con subcadena,
+# `ios.md` casaría con `platforms/mi-ios.md` y `SKILL.md` con `NO-SKILL.md` —
+# emparejamientos falsos que hacen coincidir tablas que no coinciden. La
+# cabecera del propio detector ya advierte de este patrón; faltaba el test.
+_case_subcadena_no_es_sufijo() {
+  _smd_conf '*View*.swift|.agents/skills/architecture/platforms/mi-ios.md'
+  _smd_doc '## 11. Matriz
+
+| Path que vas a editar | Reference obligatorio |
+|---|---|
+| `**/*View*.swift` | `ios.md` |
+'
+  local out rc
+  out="$(SKILL_MATRIX_DOC="$_SMD_DOC" bash tools/check-skill-matrix-doc.sh 2>&1)"; rc=$?
+  [ "$rc" = "1" ] || {
+    echo "    'ios.md' se emparejó con 'mi-ios.md' (subcadena, no sufijo): exit $rc"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    echo "    Emparejar por subcadena hace coincidir tablas que no coinciden."
+    return 1; }
+}
+test_casa_empareja_por_sufijo_no_por_subcadena() {
+  _smd_sandbox _case_subcadena_no_es_sufijo
+}

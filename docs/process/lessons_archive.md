@@ -57,7 +57,7 @@
   quien las nombra. Y si filtra por tipo, el productor garantiza el tipo — la conversión va donde
   se produce el valor, no donde se consume. Si aun así hay que descartar algo, se dice: un
   descarte silencioso no es un filtro, es una pérdida.
-- **Detector:** `tools/tests/test_dora.sh::test_las_columnas_del_rollup_salen_de_los_datos` +
+- **Detector:** `tools/tests/test_dora_rollup.sh::test_las_columnas_del_rollup_salen_de_los_datos` +
   `::test_todo_lo_medido_llega_al_rollup` (este segundo compara la serie contra la tabla y
   exige que todo valor no nulo sea numérico).
 - **Área:** `tools/metrics/dora.py` — aplica a cualquier informe que agregue una serie.

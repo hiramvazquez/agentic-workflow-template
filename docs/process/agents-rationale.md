@@ -116,7 +116,9 @@ AFIRMA cobertura es tan peligrosa como un comentario que la afirma.
 | Path que vas a editar | Reference obligatorio |
 |---|---|
 | `**/*View*.swift`, `**/*Screen*.swift` | `architecture/SKILL.md` + `architecture/platforms/ios.md` |
+| `**/*.tsx`, `**/*Screen*.kt`, `**/ui/**` | `architecture/SKILL.md` |
 | `**/*ViewModel*.swift`, `**/*Logic*.swift`, `**/*UseCase*.swift` | `architecture/SKILL.md` + `domain/SKILL.md` + `process/references/tdd-workflow.md` + `platforms/swift-estado-del-arte.md` |
+| `**/*UseCase*.kt`, `**/services/*.ts` | `architecture/SKILL.md` + `domain/SKILL.md` + `process/references/tdd-workflow.md` |
 | `**/Domain/**` | `.agents/skills/domain/SKILL.md` + `process/references/tdd-workflow.md` |
 | `**/Data/**`, `<migraciones-db>/**` | `domain/SKILL.md` (puertos) + `security/SKILL.md` |
 | `docs/process/prds/[0-9]*.md` | `process/references/prd-lifecycle.md` + `feature-workflow.md` |

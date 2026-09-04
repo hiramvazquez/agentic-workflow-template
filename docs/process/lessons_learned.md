@@ -236,7 +236,7 @@ comportamiento. Si el juicio no es mecanizable, decláralo sin fingir cobertura:
 > Si necesitas el detalle de una, búscala ahí — no la reescribas.
 
 - [2026-09-03] Un `n/a` con la razón falsa es peor que el 0 que vino a sustituir — `tools/tests/test_dora.sh`
-- [2026-09-03] Un agregador que filtra en silencio borra el dato y deja un hueco idéntico al de "no medido" — `tools/tests/test_dora.sh`
+- [2026-09-03] Un agregador que filtra en silencio borra el dato y deja un hueco idéntico al de "no medido" — `tools/tests/test_dora_rollup.sh`
 - [2026-08-31] Un `command -v` que ELIGE implementación duplica el código bajo prueba, y cada plataforma solo ejercita una mitad — `tools/tests/test_ring3.sh`
 - [2026-08-27] `grep -r` sobre UN archivo: BSD dice el nombre, GNU no — `tools/tests/test_source_sets_fallback.sh`
 - [2026-08-27] Un test que dependía de con qué se atraganta semgrep: verde en macOS, rojo en CI — `tools/tests/test_source_sets_fallback.sh`

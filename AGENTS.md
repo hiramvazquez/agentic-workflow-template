@@ -157,8 +157,13 @@ con la que BLOQUEA **nombrando las referencias que te faltan** — por eso la ma
 no se copia aquí: la vista humana vive en `agents-rationale.md` §11, y
 `tools/check-skill-matrix-doc.sh` la compara contra el conf.
 
-**Exactamente el conf, ni una fila más.** Tocar `tools/**`, `ci/**` o
-`scripts/agent-hooks/**` NO está en la matriz a propósito; su gate es §8.
+`check-skill-matrix-doc.sh` verifica que las dos declaren **las mismas
+combinaciones de lecturas**, en los dos sentidos. Lo que NO verifica —y está
+declarado, no supuesto— es de qué fila cuelga cada una: permutar dos conjuntos
+enteros entre filas es invisible (`f-8b74d177`, abierto).
+
+Tocar `tools/**`, `ci/**` o `scripts/agent-hooks/**` NO está en la matriz a
+propósito; su gate es §8.
 
 ## 12. PRD obligatorio para features medianas/grandes
 

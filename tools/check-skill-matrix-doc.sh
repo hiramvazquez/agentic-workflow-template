@@ -118,9 +118,72 @@ done <<< "$CONF_REFS"
 N_DOC="$(printf '%s' "$SOLO_DOC" | grep -c . || true)"
 N_CONF="$(printf '%s' "$SOLO_CONF" | grep -c . || true)"
 
-echo "MATRIX_DOC_SUMMARY solo_en_doc=${N_DOC:-0} solo_en_conf=${N_CONF:-0}"
+# ── Y los CONJUNTOS por fila, que es lo que el conjunto global no ve ─
+# Comparar solo la unión de referencias deja pasar el error que más importa:
+# intercambiar dos lecturas entre filas no cambia la unión, pero le dice al
+# agente que edite una View leyendo la skill de dominio (`f-8b74d177`).
+#
+# Comparar pares `glob → refs` uno a uno NO es posible ni deseable: los globs de
+# la tabla AGRUPAN a propósito (una fila humana cubre varias del conf, y esa
+# agrupación es lo que la hace legible). Lo que sí tiene que coincidir es el
+# conjunto de COMBINACIONES: cada combinación de lecturas que el conf exige
+# existe como fila de la tabla, y ninguna fila inventa una que el conf no pida.
+_conjunto_canonico() { # <texto de la fila> → refs del conf, ordenadas, en una línea
+  local refs canon="" r c
+  refs="$(printf '%s' "$1" | grep -oE '[A-Za-z0-9_./-]+\.md' | sort -u)"
+  local n elegida
+  while IFS= read -r r; do
+    [ -z "$r" ] && continue
+    n=0; elegida=""
+    while IFS= read -r c; do
+      [ -z "$c" ] && continue
+      # Canoniza contra el conf: la tabla abrevia (`domain/SKILL.md`) y el conf
+      # escribe la ruta entera. Sin esto, dos escrituras del mismo fichero
+      # contarían como referencias distintas.
+      _casa "$r" "$c" && { n=$((n + 1)); elegida="$c"; }
+    done <<< "$CONF_REFS"
+    if [ "$n" -gt 1 ]; then
+      # AMBIGUA: casa por sufijo con VARIAS refs del conf. Quedarse con la
+      # primera daba verde sobre una tabla que no dice a cuál se refiere —
+      # `SKILL.md` a secas casa con architecture/, domain/ y security/. Se
+      # emite un token que no existe en ningún conjunto del conf, así que la
+      # fila queda descuadrada y el mensaje lo nombra.
+      canon="${canon}ambigua:${r}"$'\n'
+    elif [ -n "$elegida" ]; then
+      canon="${canon}${elegida}"$'\n'
+    fi
+  done <<< "$refs"
+  printf '%s' "$canon" | grep -v '^$' | sort -u | tr '\n' ' '
+}
 
-if [ "${N_DOC:-0}" -eq 0 ] && [ "${N_CONF:-0}" -eq 0 ]; then
+# Sin `case` aquí: bash 3.2 (el de macOS) rompe al parsear un `case` dentro de
+# `$( )` — el `)` del patrón le cierra la sustitución. Da un error de sintaxis
+# en tiempo de ejecución, no al cargar, así que el script "corría" y comparaba
+# basura. Un prefijo recortado dice lo mismo y es portable.
+CONF_SETS="$(grep -vE '^[[:space:]]*(#|$)' "$CONF" | while IFS= read -r linea; do
+  refs="${linea#*|}"
+  [ "$refs" = "$linea" ] && continue
+  _conjunto_canonico "$refs" && echo
+done | grep -v '^ *$' | sort -u)"
+
+DOC_SETS="$(awk -F'|' '
+  /^\| *Path que vas a editar/ { intable = 1; next }
+  intable && /^\|[ -]*-+/       { next }
+  intable && !/^\|/             { intable = 0 }
+  intable && NF >= 3            { print $3 }
+' "$DOC" | while IFS= read -r fila; do
+  _conjunto_canonico "$fila" && echo
+done | grep -v '^ *$' | sort -u)"
+
+SETS_SOLO_DOC="$(comm -23 <(printf '%s\n' "$DOC_SETS") <(printf '%s\n' "$CONF_SETS") | grep -v '^$' || true)"
+SETS_SOLO_CONF="$(comm -13 <(printf '%s\n' "$DOC_SETS") <(printf '%s\n' "$CONF_SETS") | grep -v '^$' || true)"
+N_SETS_DOC="$(printf '%s' "$SETS_SOLO_DOC" | grep -c . || true)"
+N_SETS_CONF="$(printf '%s' "$SETS_SOLO_CONF" | grep -c . || true)"
+
+echo "MATRIX_DOC_SUMMARY solo_en_doc=${N_DOC:-0} solo_en_conf=${N_CONF:-0} combinaciones_descuadradas=$(( ${N_SETS_DOC:-0} + ${N_SETS_CONF:-0} ))"
+
+if [ "${N_DOC:-0}" -eq 0 ] && [ "${N_CONF:-0}" -eq 0 ] \
+   && [ "${N_SETS_DOC:-0}" -eq 0 ] && [ "${N_SETS_CONF:-0}" -eq 0 ]; then
   exit 0
 fi
 
@@ -140,6 +203,26 @@ fi
     echo "   choca con un gate que su documentación no anuncia):"
     printf '%s' "$SOLO_CONF" | sed 's/^/     · /'
     echo "   Añádelo a la tabla de §11 ($DOC) en este mismo commit."
+  fi
+  if [ "${N_SETS_CONF:-0}" -gt 0 ]; then
+    echo ""
+    echo "   El conf exige estas COMBINACIONES de lecturas y ninguna fila de la"
+    echo "   tabla las anuncia — un adoptante en ese stack se choca con un gate"
+    echo "   que su documentación no menciona:"
+    printf '%s\n' "$SETS_SOLO_CONF" | sed 's/^/     · /'
+  fi
+  if [ "${N_SETS_DOC:-0}" -gt 0 ]; then
+    echo ""
+    if printf '%s' "$SETS_SOLO_DOC" | grep -q 'ambigua:'; then
+      echo "   La tabla usa una referencia AMBIGUA: casa por sufijo con varias"
+      echo "   del conf y no dice a cuál se refiere. Escríbela con directorio"
+      echo "   suficiente para que sea única:"
+      printf '%s\n' "$SETS_SOLO_DOC" | grep 'ambigua:' \
+        | tr ' ' '\n' | grep '^ambigua:' | sed 's/^ambigua:/     · /' | sort -u
+    fi
+    echo "   La tabla anuncia estas combinaciones y el conf no las pide en"
+    echo "   ninguna fila (defensa fingida, o refs movidas de fila):"
+    printf '%s\n' "$SETS_SOLO_DOC" | sed 's/^/     · /'
   fi
   echo ""
   echo "   Recuerda cuál manda: el conf es la fuente única (lo ejecuta"

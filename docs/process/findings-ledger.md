@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **83** · Cerrados: 174 · Total: 257
+Abiertos: **84** · Cerrados: 174 · Total: 258
 
 ## Abiertos
 
@@ -22,6 +22,7 @@ Abiertos: **83** · Cerrados: 174 · Total: 257
 | `f-1cafb3a8` | medium | auto-fix | `scripts/agent-hooks/session-start.sh:114` | session-start hardcodea ios/android/web/src como carpetas de codigo en maquinaria sincronizada |
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-29b0127a` | medium | auto-fix | `scripts/install-harness.sh (_verificar_clasificacion)` | install-harness: _verificar_clasificacion no expande SYNC_GLOBS, punto ciego dormido del mismo patron que ya fallo |
+| `f-2d8bdfbe` | medium | auto-fix | `tools/tests/test_e2e_ledger_y_lecciones.sh:138 + tools/lesson-detector-link.sh` | La suite no corre lesson-detector-link contra el corpus REAL: una cita rota llega verde a CI |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3793c17b` | medium | owner-decision | `.claude/settings.json:21 + .agents/ (convencion de rutas de estado)` | Un deny de Edit sobre .agents/state alcanza a las escrituras por Bash del sub-agente, y nada lo declara |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |

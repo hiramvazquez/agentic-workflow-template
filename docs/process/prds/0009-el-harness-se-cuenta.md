@@ -160,14 +160,27 @@ sería una afirmación disfrazada. Los dos que ya se pueden fijar, del aislamien
 | **El juez nocturno queda verde para siempre.** No hay credencial de IA en ningún workflow (0 coincidencias de `secrets.`/`ANTHROPIC`/`API_KEY` en los tres), y `ci/ai-review.sh` está escrito para fallar ABIERTO. | OQ-11b. Y reusar `ci/ai-review.sh`, que ya implementa el contrato, en vez de reimplementarlo en YAML. |
 | **`backlog/run.sh` no resuelve la fase 3b.** Crea el worktree para el runner **headless** de backlog, un camino por historia; el incidente fue un sub-agente en sesión **interactiva**, que ese camino no toca. Y `scope-check.sh` corre **después**, sobre el rango git del worktree: un `rm -rf` en el padre no aparece ahí. | OQ-10 decide qué se entrega: worktree por sub-agente interactivo (si la opción existe) o la política de enrutar el trabajo destructivo por `backlog/run.sh` — que es una regla, no código. |
 
-## 10. Open Questions — **todas bloqueantes**
+## 10. Open Questions
 
-- [ ] **OQ-1 (fase 7).** ¿Qué es irrenunciable en el contexto de cada turno? La guía de la
-      industria dice 30 líneas; estamos en 262. Bajar a ~120 exige mover reglas *con detector* a
-      la skill del área, y un agente que no cargue esa skill no las verá. **Y arrastra los
-      espejos**: `.cursor/rules/*.mdc`, `.codex/config.toml` y `CLAUDE.md` quedarían afirmando
-      reglas movidas de sitio, más los tres ficheros donde `test_security_contract` exige la
-      misma frase de §6.
+**Seis cerradas · una (OQ-4) APLAZADA con su razón.** Eran todas bloqueantes al abrirse; la
+que queda dejó de serlo cuando el lector de la fase 1 adoptó el default seguro.
+
+> **OQ-1 — CERRADA por el owner el 2026-09-03.** La pregunta era qué contexto es
+> irrenunciable en cada turno. La respuesta elegida: **aplicar el criterio del propio fichero**
+> —regla con detector en una línea que lo nombra, regla sin detector entera— y sacar a
+> referencias la pirámide de §14 y las tablas de §9 y §11.
+>
+> **Y la aplicación corrigió el objetivo.** El "~120" que acompañaba a esta OQ era una
+> estimación mía hecha antes de medir, y es errónea: **87 líneas son reglas sin detector
+> mecánico** que el criterio protege, y el resto ya está en su mínima expresión. El total lo
+> dice `wc -l`; no se escribe aquí.
+>
+> Lo que la OQ sí desbloqueó, y vale más que el recorte: **para adelgazar `AGENTS.md` no se
+> edita `AGENTS.md`, se mecanizan sus reglas.** Cada detector nuevo convierte párrafos en una
+> línea que lo nombra. El mutation score dormido es el ejemplo más caro (§5 es la sección más
+> grande y hoy solo se cumple leyéndola). Los espejos (`.cursor/rules/*.mdc`, `.codex/`,
+> `CLAUDE.md`) no quedaron afirmando de más: `CLAUDE.md` importa este fichero, no lo copia.
+
 > **OQ-2 — CERRADA por el owner el 2026-09-03: crudo local, resumen semanal commiteado.**
 > El JSONL sigue en `.agents/state/` (cada corrida escribe sin ensuciar el árbol) y un rollup
 > semanal agregado SÍ se commitea. Da histórico compartido y visible en CI sin conflictos de
@@ -227,7 +240,9 @@ sería una afirmación disfrazada. Los dos que ya se pueden fijar, del aislamien
 
 ## 11. Definition of Done
 
-Ya se puede escribir: las cinco OQ están cerradas. Cada condición es un comando, no una
+Ya se puede escribir. De las **siete** OQ, seis están cerradas y **OQ-4 sigue APLAZADA**
+con su razón (no cerrada): el lector de la fase 1 ya la trata con el default seguro, así que no
+bloquea nada entregado. Cada condición es un comando, no una
 afirmación.
 
 | # | Condición | Cómo se verifica | Estado |
@@ -267,5 +282,5 @@ OQ decidió que no se hacen así:
 | Fecha | Cambio | Quién |
 |---|---|---|
 | 2026-09-03 | Ronda 1 de la fase 5: RED. `recuperacion()` pareaba rojo→verde sobre la lista mezclada de workflows y publicaba recuperaciones que nunca ocurrieron; el número ya estaba en el fichero versionado. Se parea por workflow y se regeneró. Dos notas no bloqueantes al ledger. | reviewer |
-| 2026-09-03 | Fases 4 y 5 entregadas; DoD escrita con las cinco OQ cerradas. La fase 5 encontró dos huecos silenciosos propios: el rollup repetía a mano los nombres de las métricas (renombrar una la escondía), y guardaba la tasa de fallo como texto, así que la métrica MEDIDA se caía de la tabla commiteada igual que una no medida. | sesión de auditoría |
+| 2026-09-03 | Fases 4 y 5 entregadas; DoD escrita con seis de las siete OQ cerradas (OQ-4 aplazada). La fase 5 encontró dos huecos silenciosos propios: el rollup repetía a mano los nombres de las métricas (renombrar una la escondía), y guardaba la tasa de fallo como texto, así que la métrica MEDIDA se caía de la tabla commiteada igual que una no medida. | sesión de auditoría |
 | 2026-09-03 | Nace al partir el PRD 0008 original por el remedio de §13, tras dos design-reviews RED. Recoge sus fases con diseño ABIERTO y convierte en OQ bloqueante cada premisa que el código desmintió. | sesión de auditoría |
