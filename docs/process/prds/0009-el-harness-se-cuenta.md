@@ -251,8 +251,10 @@ OQ decidió que no se hacen así:
   fase que lo predica.
 - **7** — **entregada, y con el objetivo corregido.** El owner eligió aplicar el criterio del
   propio fichero (regla con detector → una línea; sin detector → entera) hasta donde llegara.
-  Llega a **228**, no a ~120: **87 líneas son reglas sin detector** que el criterio protege, y
-  el resto ya está en su mínima expresión. La estimación de ~120 se hizo antes de medir qué
+  No llega a ~120, y la aritmética dice por qué: **87 líneas son reglas sin detector** que el
+  criterio protege, y el resto ya está en su mínima expresión. (El total exacto no se escribe
+  aquí: `wc -l AGENTS.md`. Una cifra derivable en un doc vivo caduca sola — y esta ya lo hizo
+  en la misma sesión, porque restaurar la regla que la ronda 1 encontró perdida la movió.) La estimación de ~120 se hizo antes de medir qué
   fracción del fichero carece de detector, y era mía: la corrijo aquí.
 
   **Lo que sí desbloquea el camino:** para adelgazar `AGENTS.md` no se edita `AGENTS.md`, se
