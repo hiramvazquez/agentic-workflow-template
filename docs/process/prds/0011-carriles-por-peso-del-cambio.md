@@ -84,7 +84,7 @@ tools/tests/run-tests.sh    ← el runner ya expresa selección por filtro; no s
 | **1** | `carril.sh` + su conf + tests. Solo DERIVA y lo imprime; no cambia nada todavía | Poder medir antes de decidir |
 | **2** | `verify-run` elige por carril; la suite completa sale de pre-commit a pre-push | El grueso del tiempo devuelto |
 | **3** | El carril ligero no exige review; el normal exige una | El "string en una view" |
-| **4** | Lo pesado se mueve: juez de trayectoria, métricas y tests lentos a demanda/release | Camino crítico limpio |
+| **4** | Profundidad de review por carril (§6b) + los tests lentos fuera de pre-push | Lo único que queda del coste |
 | **5** | Retirada de gates: los que no cazaron nada, fuera, con su dato | Cerrar `f-wf09-ventana-de-valor` |
 
 ## 6. Modelo de datos — los tres carriles
@@ -95,13 +95,43 @@ un solo fichero es estructural, el cambio entero es estructural.
 | Carril | Qué lo activa | Qué corre |
 |---|---|---|
 | **ligero** | Nada que se ejecute: `docs/**`, prosa en `*.md` | Gates rápidos (secretos, marcadores de conflicto, exec-bits) · **ni tests ni review** |
-| **normal** | Código que se ejecuta y no es maquinaria de gates | Gates rápidos + los tests del área tocada + **una** review |
-| **estructural** | La maquinaria que decide qué se verifica: `lefthook.yml`, `.claude/settings.json`, `scripts/agent-hooks/**`, `ci/**`, `AGENTS.md`, `tools/verify.conf`, `tools/carril.*` | Todo lo anterior + suite completa + review |
+| **normal** | Código que se ejecuta y no es maquinaria de gates | Gates rápidos + los tests del área tocada + **una review ENFOCADA** (§6b) |
+| **estructural** | La maquinaria que decide qué se verifica: `lefthook.yml`, `.claude/settings.json`, `scripts/agent-hooks/**`, `ci/**`, `AGENTS.md`, `tools/verify.conf`, `tools/carril.*` | Todo lo anterior + suite completa + **una review PROFUNDA** (§6b) |
 
 **Por qué esa frontera y no otra.** Un cambio en un detector puede dar un resultado
 equivocado; un cambio en la maquinaria puede hacer que **ningún** detector corra. El
 segundo caso no lo caza ningún test del propio detector, así que es el único que
 justifica pagar la suite entera.
+
+## 6b. La profundidad de la review, también por carril
+
+La review es el 70% del coste por unidad, así que es donde queda el tiempo. La palanca
+**no** es diferirla: es pedirle menos cuando hay menos que romper.
+
+**Lo que la review cobra no es el diff, es el encargo.** Medido el 2026-09-04, con
+diffs de tamaño comparable:
+
+| Review | Qué se le pidió | Duró |
+|---|---|---:|
+| Unidad del saneo de `verify-run` | una pregunta, 4 ficheros | 577 s |
+| Fase 3, ronda 1 | 5 frentes + verificar mutantes ajenos + medir coste | 1208 s |
+
+El doble de tiempo salió del prompt, no del código. Por eso la profundidad se declara
+aquí y no se improvisa en cada invocación:
+
+- **`normal` → review ENFOCADA.** El diff, sus tests, y un intento de encontrar un
+  mutante que sobreviva. NO re-corre la suite (`verify-run` ya la corrió y su marker lo
+  demuestra), NO audita lo adyacente, NO mide costes. Objetivo: 250-400 s.
+- **`estructural` → review PROFUNDA.** La de hoy. Aquí sí valen 20 minutos: es el único
+  carril donde un fallo puede hacer que *ningún* detector corra, y es la que cazó el
+  bypass de lectura-desde-disco de la fase 3.
+
+**Y la review NO se difiere a un lote de commits.** La evidencia va atada a
+`sha256(diff staged)`: aplazar significa meter commits sin evidencia y revisarlos
+después en bloque. Si ese lote sale RED, el código malo ya está en la historia y su
+arreglo va enredado con todo lo que se commiteó encima — §14.1 al revés. La ronda 1 de
+la fase 3 encontró un bypass completo mirando 4 ficheros; sobre 12 y tres commits, es
+razonable dudar que lo hubiera visto.
 
 **Dos correcciones a esta tabla, hechas en la fase 3 y reproducidas antes de tocarlas.**
 Los **fixtures** salieron de `ligero`: `ligero` significa "nada que se ejecute", y un
@@ -167,10 +197,19 @@ baja de dos minutos a segundos, esto no sirvió.
       (§14.2). Y la exención por carril nunca alcanza las llaves del reino
       (`scope_siempre_producto`): la superficie que gobierna un gate no se exime.
 
-- [ ] **OQ-2.** ¿El carril `normal` mantiene una review por commit, o pasa a review a
-      demanda / al cerrar la unidad? La review es ~70% del coste por unidad y `normal`
-      cubre la mayoría de los commits, así que es donde queda el tiempo. Pendiente de
-      decisión del owner; la fase 3 entrega lo que este PRD aprobó (ligero=0, normal=1).
+- [x] **OQ-2 — RESUELTA (owner, 2026-09-04): una review por unidad, y la PROFUNDIDAD
+      por carril (§6b).** Diferirla a un lote se descartó por dos razones medidas, no
+      por principio. Primera: ya es por unidad — las tres unidades de la sesión fueron
+      un commit cada una, así que diferir no habría ahorrado nada; solo ahorraría cuando
+      una unidad son varios commits, que es justo cuando romper el binding al
+      `sha256(diff staged)` sale más caro. Segunda: el tiempo no lo pone el *cuándo*
+      sino el *cuánto se le pide* (la tabla de §6b: 577 s frente a 1208 s con diffs
+      parecidos). La palanca correcta es la profundidad, no el aplazamiento.
+
+      Queda para la fase 4 hacerlo real: `.claude/agents/reviewer.md` tiene que saber
+      leer el carril y ajustar su alcance. Mientras eso no exista, esto es una decisión
+      escrita, no un mecanismo — y este PRD no cuenta como entregado lo que solo está
+      declarado.
 
 ## 15. Definition of Done
 
@@ -183,3 +222,4 @@ medidos antes y después.
 |---|---|---|
 | 2026-09-04 | Nace de la auditoría de lentitud: el coste por cambio era plano y la mitad del trabajo lo generaba el propio trabajo | sesión de estabilización |
 | 2026-09-04 | Fases 1-3 entregadas. La fase 3 destapó dos misclasificaciones de la fase 1: `ligero\|*.md` se tragaba `.claude/agents/*` (el prompt del propio revisor) y los fixtures estaban en `ligero` pese a que un test los ejecuta. Corregidas: la primera a `estructural`, los segundos a `normal` | sesión de estabilización |
+| 2026-09-04 | OQ-2 resuelta por el owner: review por unidad con profundidad por carril (§6b); diferir a un lote descartado con datos. Y la fase 4 se redefine: al medirla, el juez de trayectoria y las métricas NO estaban en el camino crítico (solo se nombran en el banner de sesión y en `/status`), y la suite ya salió a pre-push en la fase 2. Lo que queda del coste es la review y los tests lentos | sesión de estabilización |

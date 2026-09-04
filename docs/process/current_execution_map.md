@@ -61,12 +61,17 @@
 
 ## Próximo paso
 
-**PRD 0011 fase 4: mover lo pesado fuera del camino crítico.** Las fases 1-3 están
-entregadas — el carril se deriva, `verify-run` ejecuta en proporción, y el carril ligero ya
-no exige review. Lo que queda del coste por unidad es la revisión (~70%) y tres cosas que
-corren en cada commit sin necesitarlo: el juez de trayectoria (cola de 12), las métricas, y
-la familia flaky de macOS, que sola cuesta la mitad de la suite
-(`f-wf01-ci-macos-intermitente`). Van a demanda, pre-push o release; no se borran (P3).
+**PRD 0011 fase 4: profundidad de review por carril.** Las fases 1-3 están entregadas —
+el carril se deriva, `verify-run` ejecuta en proporción, y el carril ligero ya no exige
+review. Al medir qué quedaba en el camino crítico, la mitad de la fase 4 resultó no
+existir: el juez de trayectoria y las métricas NUNCA estuvieron ahí (el primero solo se
+nombra en el banner de sesión, las segundas solo corren en `/status`), y la suite completa
+ya salió a pre-push en la fase 2. Lo que se paga hoy son 149 ms de gates, 260 ms por
+llamada del agente, y **una review de 250-1200 s** — el resto es ruido al lado.
+
+Así que la fase 4 es §6b del PRD: `.claude/agents/reviewer.md` tiene que leer el carril y
+ajustar su alcance (`normal` → enfocada; `estructural` → profunda). Y aparte, sacar del
+pre-push la familia flaky de macOS (`f-wf01-ci-macos-intermitente`).
 
 Después, por coste: `f-8b74d177` —`check-skill-matrix-doc.sh` compara el CONJUNTO global de
 referencias entre el conf y su vista humana, no los pares `path → referencias`, así que la
