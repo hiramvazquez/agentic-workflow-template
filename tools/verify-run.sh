@@ -142,11 +142,72 @@ if [ "${_FALTA:-0}" = "1" ]; then
   exit 3
 fi
 
-echo "━━━ verify-run: $CMD"
-set +e
-sh -c "$CMD"
-RC=$?
-set -e 2>/dev/null || true
+# ── ¿Qué hay que ejecutar para ESTE cambio? ─────────────────────────
+# PRD 0011 fase 2. Antes todo pagaba la suite entera: ~140 s para añadir un
+# string igual que para reescribir el motor. El carril se DERIVA del diff (nadie
+# lo declara) y dice qué toca: nada, los tests que nombran lo tocado, o todo.
+#
+# Si el clasificador no está o falla, se corre TODO. El default es el seguro:
+# un `verify-run` que no sabe qué ejecutar no puede decidir ejecutar menos.
+# `CARRIL_SH` por entorno es la costura que hace testeable el caso del
+# clasificador roto: escribirlo dentro del repo ensucia el árbol y
+# `verify-run` lo rechaza antes de llegar aquí. Mismo patrón que
+# `SKILL_MATRIX_DOC` y `DORA_GH_TIMEOUT`.
+_CARRIL_SH="${CARRIL_SH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/carril.sh}"
+QUE_CORRER="TODOS"
+CARRIL_NOMBRE="desconocido"
+if [ -x "$_CARRIL_SH" ] || [ -f "$_CARRIL_SH" ]; then
+  # El exit code se captura APARTE. `$(cmd || echo TODOS)` CONCATENA la salida
+  # del fallo con "TODOS" en vez de reemplazarla: el valor resultante no es ni
+  # NINGUNO ni TODOS, cae en la rama de tests dirigidos, filtra por basura, no
+  # casa nada — y `run-tests` sale 0 cuando un filtro no casa. Se firmaba en
+  # verde con CERO tests corridos. Lo cazó el review con el repro exacto.
+  QUE_CORRER="$(bash "$_CARRIL_SH" --tests 2>/dev/null)"
+  _carril_rc=$?
+  [ "$_carril_rc" -ne 0 ] && QUE_CORRER="TODOS"
+  # Y lo que no sea exactamente uno de los dos vocabularios o una lista de
+  # nombres de test plausibles, tampoco se acepta.
+  case "$QUE_CORRER" in
+    NINGUNO|TODOS) : ;;
+    *[!a-zA-Z0-9_$'\n'-]*) QUE_CORRER="TODOS" ;;
+  esac
+  CARRIL_NOMBRE="$(bash "$_CARRIL_SH" 2>/dev/null | sed -n 's/.*carril=\([a-z]*\).*/\1/p')"
+  [ -z "$QUE_CORRER" ] && QUE_CORRER="TODOS"
+  [ -z "$CARRIL_NOMBRE" ] && CARRIL_NOMBRE="desconocido"
+fi
+
+RC=0
+TESTS_HECHOS="$QUE_CORRER"
+if [ "$QUE_CORRER" = "NINGUNO" ]; then
+  # Nada de lo tocado se ejecuta. NO se corre la suite, y el marker lo DECLARA:
+  # un marker que no dice qué NO verificó es un gate mudo con disfraz de verde.
+  echo "━━━ verify-run: carril $CARRIL_NOMBRE — nada de lo tocado se ejecuta."
+  echo "    No se corre la suite. El marker lo deja escrito."
+  TESTS_HECHOS="ninguno"
+elif [ "$QUE_CORRER" = "TODOS" ]; then
+  echo "━━━ verify-run: carril $CARRIL_NOMBRE — $CMD"
+  set +e
+  sh -c "$CMD"
+  RC=$?
+  set -e 2>/dev/null || true
+  TESTS_HECHOS="todos"
+else
+  # Los tests que NOMBRAN lo tocado, uno por invocación: el runner acepta un
+  # solo filtro. Si cualquiera falla, RC deja de ser 0 y no se firma nada.
+  echo "━━━ verify-run: carril $CARRIL_NOMBRE — tests dirigidos:"
+  _LISTA=""
+  while IFS= read -r _t; do
+    [ -z "$_t" ] && continue
+    echo "    · $_t"
+    set +e
+    sh -c "$CMD $_t"
+    _rc=$?
+    set -e 2>/dev/null || true
+    [ "$_rc" -ne 0 ] && RC=$_rc
+    _LISTA="${_LISTA}${_t} "
+  done <<< "$QUE_CORRER"
+  TESTS_HECHOS="${_LISTA% }"
+fi
 
 if [ "$RC" -ne 0 ]; then
   echo ""
@@ -162,6 +223,8 @@ mkdir -p "$(dirname "$MARKER")"
   printf 'source: tool\n'
   printf 'tool: verify-run.sh\n'
   printf 'cmd: %s\n' "$CMD"
+  printf 'carril: %s\n' "$CARRIL_NOMBRE"
+  printf 'tests: %s\n' "$TESTS_HECHOS"
   printf 'exit: 0\n'
   printf 'head: %s\n' "$(git rev-parse --short HEAD 2>/dev/null || echo no-repo)"
   printf 'staged_sha: %s\n' "$STAGED_SHA"
