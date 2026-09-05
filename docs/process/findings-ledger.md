@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **91** · Cerrados: 180 · Total: 271
+Abiertos: **94** · Cerrados: 180 · Total: 274
 
 ## Abiertos
 
@@ -15,6 +15,7 @@ Abiertos: **91** · Cerrados: 180 · Total: 271
 | `f-20ed9b44` | high | owner-decision | `gobierno del harness · proceso de trabajo` | Tres RED seguidos por la misma causa: afirmar cobertura que no se verifico |
 | `f-6b761f06` | high | owner-decision | `tools/check-layers.sh:22 + tools/check-source-sets.sh + tools/lib/validate-selftest.sh` | check-layers y check-source-sets salen VERDE con exit 0 si los ejecutas desde una raiz sin fuentes |
 | `f-74be77fe` | high | owner-decision | `docs/process/lessons_archive.md:56-114 + tools/lesson-detector-link.sh` | La leccion que previene la clase reincidente declara un Detector que no la cubre, y lesson-detector-link da verde igual |
+| `f-7b2c785f` | high | auto-fix | `scripts/agent-hooks/capture-review-verdict.sh + .agents/state/reviews/` | El sistema guarda el veredicto de la review pero TIRA los hallazgos, y AMBER desbloquea el commit |
 | `f-bbe0a7e` | high | owner-decision | `tools/tests/test_scope_superficie.sh:105` | Octava via: la regla anti-indireccion se evade con un espacio de mas, y da FP con comentarios de cola |
 | `f-cafe53fd` | high | owner-decision | `tools/review-aislado.sh (limpiar) + protocolo de uso` | Limpiar el worktree de una revision viva: 'emitio veredicto' no es 'termino' |
 | `f-cb48c808` | high | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .claude/agents/reviewer.md` | El marker se firma al PARAR el sub-agente, no al revisar: un agente que termina tarde valida un diff que nunca miro |
@@ -23,6 +24,7 @@ Abiertos: **91** · Cerrados: 180 · Total: 271
 | `f-25df51c3` | medium | owner-decision | `docs/ + README.md (detector ausente)` | Ninguna capa verifica que las rutas citadas en la doc existan: el README apuntaba a un archivo fantasma |
 | `f-29b0127a` | medium | auto-fix | `scripts/install-harness.sh (_verificar_clasificacion)` | install-harness: _verificar_clasificacion no expande SYNC_GLOBS, punto ciego dormido del mismo patron que ya fallo |
 | `f-2d8bdfbe` | medium | auto-fix | `tools/tests/test_e2e_ledger_y_lecciones.sh:138 + tools/lesson-detector-link.sh` | La suite no corre lesson-detector-link contra el corpus REAL: una cita rota llega verde a CI |
+| `f-2e04c238` | medium | owner-decision | `tools/carril.conf (fila ligero|*.md)` | ligero|*.md casa CUALQUIER .md del arbol: se lleva parcheada la misma clase tres veces |
 | `f-35ef4b81` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + .gitignore` | La evidencia de design-review no es durable: reporte gitignored y reviews sin diff staged comparten identidad |
 | `f-3793c17b` | medium | owner-decision | `.claude/settings.json:21 + .agents/ (convencion de rutas de estado)` | Un deny de Edit sobre .agents/state alcanza a las escrituras por Bash del sub-agente, y nada lo declara |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
@@ -85,6 +87,7 @@ Abiertos: **91** · Cerrados: 180 · Total: 271
 | `f-89015e28` | low | owner-decision | `scripts/agent-hooks/session-start.sh + skill-reminder.sh + tools/harness-report.sh` | El literal de la ERE de FILL esta copiado en tres ficheros sin fuente compartida |
 | `f-8ceaae93` | low | auto-fix | `.claude/agents/reviewer.md (checklist)` | El reviewer uso git stash para aislar una regresion y des-stageo el lote en revision |
 | `f-97021ca1` | low | owner-decision | `tools/check-drift.sh` | El limite de tamano de §4 no se mide en los .sh del propio harness |
+| `f-97fcf6e3` | low | auto-fix | `tools/tests/test_carril.sh (test_las_entradas_de_verifica_doc_existen)` | El guard de verifica-doc acepta 'test_algo=1' como si fuera una funcion de test |
 | `f-9b078b03` | low | owner-decision | `tools/check-prd-tree.sh` | check-prd-tree no compara el bloque NO-TOUCH ni los PRDs Shipped: dos citas ya podridas quedan fuera de alcance |
 | `f-9e3a426d` | low | auto-fix | `tools/metrics/dora.py` | lead_time() ignora el tercer padre de un merge de pulpo, y es camino muerto sin test |
 | `f-a5f3e17c` | low | auto-fix | `tools/check-diff-nature.sh (clasificador)` | check-diff-nature parte el ledger en dos naturalezas y llama producto al .gitignore |
