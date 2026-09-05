@@ -24,7 +24,7 @@
   coste de verificar es ya proporcional a lo que un cambio puede romper: un PRD o cualquier
   prosa cuesta **0 s y 0 reviews**; un detector, **39 s y una review enfocada**; la maquinaria
   que decide qué se verifica, **150 s y una review profunda**. La review de una unidad normal
-  pasó de 1208 s a 95 s. Lo que NO se hizo, y por qué, está en su §5b y en `f-wf09`.
+  pasó de 1208 s a 95 s. Lo que NO se hizo, y por qué, está en su §5b y en `f-wf09-ventana-de-valor`.
 - **PRD abierto:** **0005 (estabilización del harness)**, Approved y parcial. Lo que queda es la
   mitad de más riesgo de su fase 2a (`upgrade.sh`, restricción de bootstrap) y la segunda pasada
   de su fase 3, que **espera medición, no código**: la telemetría de bloqueos tiene que acumular
@@ -66,7 +66,7 @@
 
 ## Próximo paso
 
-**Arreglar el flaky de `f-wf01`, que por fin tiene repro.** Es lo que queda con coste
+**Arreglar el flaky de `f-wf01-ci-macos-intermitente`, que por fin tiene repro.** Es lo que queda con coste
 medido y camino claro (lo abierto, al día: `bash tools/findings/findings.sh list --status open`).
 Cuesta **72 s en cada pre-push, el 49% del reloj**, y desde el
 2026-09-04 se reproduce a demanda en 81 s con
@@ -87,7 +87,7 @@ los 7 gates de la ventana: 3 no tienen sustrato en un repo `harness` (`check-sou
 corrió 0 veces con objetivos reales, `check-layers` 1 de 249, `check-drift` 1 de 242); 3 son
 KEEP sin discusión (0.04-0.13 s cada uno y fallo catastrófico); y `semgrep` es el único
 candidato real, pero mide sin sustrato porque sus reglas son de Swift y aquí no hay Swift.
-`f-wf09` sigue abierto a propósito: **se cierra cuando la ventana se recoja en un proyecto
+`f-wf09-ventana-de-valor` sigue abierto a propósito: **se cierra cuando la ventana se recoja en un proyecto
 adoptante**, no antes.
 
 Después, por coste: `f-8b74d177` —`check-skill-matrix-doc.sh` compara el CONJUNTO global de
@@ -98,7 +98,7 @@ del rollup, que mezclan ventanas de tiempo distintas en la misma fila (`f-cb4f71
 llega al worktree aislado, así que la review enfocada nunca puede leerlo y siempre re-corre).
 
 **Aviso para quien siga: cinco afirmaciones de este repo se cayeron al medirlas el
-2026-09-04.** `f-wf04` acusaba a dos ficheros sanos y callaba al peor con diferencia; `f-wf01`
+2026-09-04.** `f-wf04-archivos-sobre-el-limite` acusaba a dos ficheros sanos y callaba al peor con diferencia; `f-wf01-ci-macos-intermitente`
 culpaba a macOS; el "coste de semgrep" era 44% una corrida colgada de 936 s; el juez y las
 métricas nunca estuvieron en el camino crítico; y la ventana de valor mide el repo
 equivocado. Ninguna era mentira deliberada: eran agregados que nadie volvió a abrir. Antes

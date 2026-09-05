@@ -347,15 +347,33 @@ _case_review_infra_rota_sale_3_y_ruidosa() {
 }
 test_review_infra_rota_sale_3_y_ruidosa() { _ar_repo _case_review_infra_rota_sale_3_y_ruidosa; }
 
+# El runner va en SEGUNDO PLANO y se espera al fixture con el helper, igual que
+# sus dos hermanos de cancelación. Antes corría en primer plano y leía el pid
+# DESPUÉS de que el runner terminara, así que el arranque del fixture competía
+# contra el reloj del timeout: si el watchdog ganaba esa carrera, el test moría
+# con "el fixture review no registró al descendiente" — que NO es el bug que
+# dice buscar. Es el mismo descuido que la cabecera de este fichero documenta
+# para los tests de cancelación ("tenían su propio bucle escrito a mano en vez
+# de usar este helper, así que el arreglo de f-wf01 no los alcanzó"). Este era
+# el tercer hermano, y tampoco lo alcanzó.
+#
+# Ahora las dos cosas se distinguen: si el runner muere ANTES de que el fixture
+# se registre, el helper lo dice con su nombre; y si el fixture está vivo, lo
+# que se mide después es el watchdog y solo el watchdog.
 _case_review_timeout_mata_descendientes() {
   printf '#!/usr/bin/env bash\ntrap "" TERM HUP\n( trap "" TERM HUP; sleep 30 ) &\necho "$!" > review-tree-child.pid\nwait\n' \
     > review-tree.sh; chmod +x review-tree.sh
   FAKE_REVIEW_SCRIPT="$PWD/review-tree.sh" bash tools/agent-runner.sh review --backend fake \
-    --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout "$_AR_TIMEOUT" >/dev/null 2>&1
-  local rc=$? child
-  [ "$rc" = 124 ] || { echo "    timeout review del árbol devolvió $rc"; return 1; }
-  child="$(cat review-tree-child.pid 2>/dev/null)"
-  [ -n "$child" ] || { echo "    el fixture review no registró al descendiente"; return 1; }
+    --prompt-file prompt.md --base HEAD --head HEAD --cwd "$PWD" --timeout "$_AR_TIMEOUT" >/dev/null 2>&1 &
+  local runner=$! rc child
+  _espera_pid_de_hijo review-tree-child.pid "$runner" \
+    || { kill -9 "$runner" 2>/dev/null
+         echo "    el fixture review no arrancó antes de que el runner terminara."
+         echo "    Eso es la carrera del andamiaje, no el watchdog: no acuses al producto."
+         return 1; }
+  child="$(cat review-tree-child.pid)"
+  wait "$runner"; rc=$?
+  [ "$rc" = "124" ] || { echo "    timeout review del árbol devolvió $rc"; return 1; }
   _espera_proceso_muerto "$child" || {
     kill -9 "$child" 2>/dev/null
     echo "    quedó vivo el descendiente review $child que ignoraba TERM"; return 1;
