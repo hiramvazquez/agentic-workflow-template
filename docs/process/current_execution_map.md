@@ -20,6 +20,11 @@
 - **Fase:** el template está **en producción contra un adoptante real** (un proyecto iOS/Swift 6).
   El bucle —sincroniza, usa el harness, reporta lo que falla, se arregla AQUÍ, vuelve a bajar—
   es el flujo de trabajo actual, no una fase de pruebas.
+- **PRD 0011 (carriles por peso del cambio): COMPLETO** el 2026-09-04, sus cinco fases. El
+  coste de verificar es ya proporcional a lo que un cambio puede romper: un PRD o cualquier
+  prosa cuesta **0 s y 0 reviews**; un detector, **39 s y una review enfocada**; la maquinaria
+  que decide qué se verifica, **150 s y una review profunda**. La review de una unidad normal
+  pasó de 1208 s a 95 s. Lo que NO se hizo, y por qué, está en su §5b y en `f-wf09`.
 - **PRD abierto:** **0005 (estabilización del harness)**, Approved y parcial. Lo que queda es la
   mitad de más riesgo de su fase 2a (`upgrade.sh`, restricción de bootstrap) y la segunda pasada
   de su fase 3, que **espera medición, no código**: la telemetría de bloqueos tiene que acumular
@@ -61,22 +66,43 @@
 
 ## Próximo paso
 
-**PRD 0011 fase 4: profundidad de review por carril.** Las fases 1-3 están entregadas —
-el carril se deriva, `verify-run` ejecuta en proporción, y el carril ligero ya no exige
-review. Al medir qué quedaba en el camino crítico, la mitad de la fase 4 resultó no
-existir: el juez de trayectoria y las métricas NUNCA estuvieron ahí (el primero solo se
-nombra en el banner de sesión, las segundas solo corren en `/status`), y la suite completa
-ya salió a pre-push en la fase 2. Lo que se paga hoy son 149 ms de gates, 260 ms por
-llamada del agente, y **una review de 250-1200 s** — el resto es ruido al lado.
+**Arreglar el flaky de `f-wf01`, que por fin tiene repro.** Es lo que queda con coste
+medido y camino claro (lo abierto, al día: `bash tools/findings/findings.sh list --status open`).
+Cuesta **72 s en cada pre-push, el 49% del reloj**, y desde el
+2026-09-04 se reproduce a demanda en 81 s con
 
-Así que la fase 4 es §6b del PRD: `.claude/agents/reviewer.md` tiene que leer el carril y
-ajustar su alcance (`normal` → enfocada; `estructural` → profunda). Y aparte, sacar del
-pre-push la familia flaky de macOS (`f-wf01-ci-macos-intermitente`).
+    TESTS_SERIAL_FILES=__ninguno__ TESTS_JOBS=32 bash tools/tests/run-tests.sh
+
+3 de 3 corridas en rojo bajo presión de procesos; 4 de 4 en verde sin ella. El disparador
+NO es macOS —eso era el título viejo— es la presión: en local iba verde porque sobraban
+núcleos. La causa raíz está en la cabecera de `test_agent_runner.sh`: el fixture compite
+contra su propio timeout. Subirlo otra vez solo mueve el umbral; el arreglo es que el
+fixture espere a su descendiente con un sondeo acotado ANTES de arrancar el reloj.
+
+Mientras eso no se haga, `TESTS_SERIAL_FILES` **no se vacía**: se intentó el 2026-09-04 y
+el rojo volvió. Esa lista no es deuda, es la única defensa viva contra una causa que sigue ahí.
+
+**El PRD 0011 está completo, y su fase 5 terminó en "no se retira nada", con el dato.** De
+los 7 gates de la ventana: 3 no tienen sustrato en un repo `harness` (`check-source-sets`
+corrió 0 veces con objetivos reales, `check-layers` 1 de 249, `check-drift` 1 de 242); 3 son
+KEEP sin discusión (0.04-0.13 s cada uno y fallo catastrófico); y `semgrep` es el único
+candidato real, pero mide sin sustrato porque sus reglas son de Swift y aquí no hay Swift.
+`f-wf09` sigue abierto a propósito: **se cierra cuando la ventana se recoja en un proyecto
+adoptante**, no antes.
 
 Después, por coste: `f-8b74d177` —`check-skill-matrix-doc.sh` compara el CONJUNTO global de
 referencias entre el conf y su vista humana, no los pares `path → referencias`, así que la
-frase "exactamente el conf" de §11 promete una garantía que el detector no da— y las columnas
-del rollup, que mezclan ventanas de tiempo distintas en la misma fila (`f-cb4f7155`).
+frase "exactamente el conf" de §11 promete una garantía que el detector no da—; las columnas
+del rollup, que mezclan ventanas de tiempo distintas en la misma fila (`f-cb4f7155`); y
+`f-ec811739`, que hace inalcanzable el ahorro que §6b promete (el marker de `verify-run` no
+llega al worktree aislado, así que la review enfocada nunca puede leerlo y siempre re-corre).
+
+**Aviso para quien siga: cinco afirmaciones de este repo se cayeron al medirlas el
+2026-09-04.** `f-wf04` acusaba a dos ficheros sanos y callaba al peor con diferencia; `f-wf01`
+culpaba a macOS; el "coste de semgrep" era 44% una corrida colgada de 936 s; el juez y las
+métricas nunca estuvieron en el camino crítico; y la ventana de valor mide el repo
+equivocado. Ninguna era mentira deliberada: eran agregados que nadie volvió a abrir. Antes
+de actuar sobre una cifra de este mapa o del ledger, mira su distribución.
 
 ## Lo que ya NO es el próximo paso (estaba aquí y confundía)
 
