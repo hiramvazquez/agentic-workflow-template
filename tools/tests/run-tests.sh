@@ -242,9 +242,25 @@ if [ "$_RT_IS_WORKER" != "1" ] && [ "$JOBS" -gt 1 ] && [ -z "$FILTER" ]; then
   #
   # Una suite roja 2 de cada 3 veces es PEOR que una lenta: se desactiva. Así
   # que estos archivos se ejecutan uno a uno y con el resto ya terminado.
-  # Cuesta ~76s de los ~120s totales y es el precio de que el verde signifique
-  # algo. Cuando f-wf01 se cierre de verdad, esta lista se vacía y la suite baja
-  # sola a ~73s; hasta entonces, la lista ES la deuda, visible y con nombre.
+  # Cuesta ~72s de los ~146s totales y es el precio de que el verde signifique
+  # algo.
+  #
+  # SE INTENTÓ VACIARLA el 2026-09-04 y NO se pudo. La suite baja a 77s, medido
+  # con 4 corridas verdes — pero con `TESTS_JOBS=32` sobre 10 núcleos el rojo
+  # vuelve 3 de 3 veces, y falla exactamente esta familia. Lo que dispara el
+  # flaky es la PRESIÓN DE PROCESOS, no macOS; local iba verde solo porque
+  # sobraban núcleos. Así que esto no es deuda esperando a que alguien la
+  # borre: es la única defensa viva contra una causa raíz que sigue ahí.
+  #
+  # El repro está en f-wf01, y es la ganancia real de aquel intento: antes era
+  # un fantasma que solo aparecía en `macos-latest`; ahora sale a demanda en 81s.
+  # Vaciar esta lista solo será correcto cuando el fixture deje de competir
+  # contra su propio timeout — subirlo otra vez solo mueve el umbral.
+  #
+  # Y ojo al medir: `TESTS_SERIAL_FILES=""` NO desactiva nada. `${VAR:-default}`
+  # cae en el default con una cadena vacía, así que hace falta un centinela no
+  # vacío. Una tanda entera de medidas se perdió por eso, y solo se notó porque
+  # los tiempos salían idénticos al control.
   _RT_SERIE="${TESTS_SERIAL_FILES:-test_agent_runner.sh test_capability_probe.sh test_verdict.sh}"
   _RT_FILES=(); _RT_SERIE_FILES=()
   for f in "$PROJECT_ROOT"/tools/tests/test_*.sh; do
