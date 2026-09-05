@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **86** · Cerrados: 178 · Total: 264
+Abiertos: **88** · Cerrados: 178 · Total: 266
 
 ## Abiertos
 
@@ -49,6 +49,7 @@ Abiertos: **86** · Cerrados: 178 · Total: 264
 | `f-b144fe5e` | medium | owner-decision | `tools/lib/scope.sh (_scope_fuentes_de_app)` | La lista de extensiones de _scope_fuentes_de_app deja fuera stacks reales: .vue .jsx .php .dart .scala .c/.cpp |
 | `f-b968a740` | medium | auto-fix | `ci/run-gates.sh` | La auto-escalada de source-sets en CI es inerte: el exit 3 bloquea con o sin registro |
 | `f-be953d0c` | medium | auto-fix | `tools/lib/scope.sh` | La evidencia de scope no poda .claude/, asi que los worktrees de agentes disparan un aviso falso en cada gate |
+| `f-c5da9d33` | medium | auto-fix | `tools/tests/ (6 ficheros sin aislar DETECTOR_RUNS_LOG) + .agents/state/metrics/runs.jsonl` | Los tests contaminan la telemetria real de gates, que es con la que se decide retirarlos |
 | `f-cb4f7155` | medium | owner-decision | `tools/metrics/dora.py` | Una fila del rollup mezcla 'esta ventana' con 'todo el historico' sin decirlo |
 | `f-d13227b5` | medium | auto-fix | `scripts/agent-hooks/track-trajectory.sh:22-27` | La trayectoria pierde el binario real tras un cd encadenado y no distingue coordinador de sub-agente: 98 de 257 eventos Bash dicen solo cd |
 | `f-d179c95d` | medium | owner-decision | `gobierno del harness` | check-prd-tree.sh entra cableado al Anillo 3 como EXCEPCION DECLARADA al freeze de gates nuevos |
@@ -56,6 +57,7 @@ Abiertos: **86** · Cerrados: 178 · Total: 264
 | `f-d6aeef75` | medium | owner-decision | `tools/lib/scope.sh` | tools/tests/test_*.sh no son producto: el runner esta protegido y los 40 archivos con la verdad no |
 | `f-e012fcce` | medium | owner-decision | `lefthook.yml (pre-push) + scripts/agent-hooks/canon-enforce.sh (CHECK 4) + .claude/agents/reviewer.md` | Nada impide que algo mute el arbol mientras otra cosa lo verifica: tres incidentes en una sesion |
 | `f-e0447e8f` | medium | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh` | El reviewer firmo un marker sobre un diff VACIO y dio GREEN |
+| `f-e6568be7` | medium | owner-decision | `tools/semgrep-scan.sh (sin limite de tiempo propio)` | Un gate se colgo 936 s y murio por SIGTERM sin que nadie se enterara |
 | `f-ec811739` | medium | auto-fix | `tools/review-aislado.sh + .claude/agents/reviewer.md` | El marker de verify-run no llega al worktree aislado, asi que la review enfocada nunca puede leerlo |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
