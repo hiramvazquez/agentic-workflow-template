@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **89** · Cerrados: 178 · Total: 267
+Abiertos: **88** · Cerrados: 179 · Total: 267
 
 ## Abiertos
 
@@ -30,7 +30,6 @@ Abiertos: **89** · Cerrados: 178 · Total: 267
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
 | `f-61a3fb63` | medium | auto-fix | `tools/tests/run-tests.sh:19` | run-tests.sh:19 hace cd sin comprobarlo: si falla, la suite entera corre en el directorio equivocado |
-| `f-62d2ac5b` | medium | auto-fix | `tools/semgrep-scan.sh:82` | semgrep-scan.sh puede morir con TARGETS[@] unbound bajo bash 3.2 cuando semgrep esta operativo |
 | `f-67e07109` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh (guarda add+commit en la misma linea)` | reviewer-gate bloquea por el TEXTO del comando: un heredoc que contiene add+commit se lee como comando real |
 | `f-6d4e01b8` | medium | auto-fix | `scripts/agent-hooks/reviewer-gate.sh:210-225` | El git-guard bloquea escribir un test cuyo TEXTO contiene git add y git commit |
 | `f-7171089c` | medium | owner-decision | `tools/lib/scope.sh + tools/tests/test_scope_superficie.sh` | Lo que un gate CONSULTA no cuenta como superficie de enforcement |
@@ -69,11 +68,11 @@ Abiertos: **89** · Cerrados: 178 · Total: 267
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-26e45249` | low | owner-decision | `tools/lib/detector-run.sh (esquema de runs.jsonl)` | El registro de ejecucion no distingue 'no aplica' de 'no declaro objetivos': los dos son targets=null |
 | `f-298e3cd2` | low | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
-| `f-32811c99` | low | auto-fix | `tools/semgrep-scan.sh:107` | semgrep-scan revienta '${TARGETS[@]}' sobre array vacio en bash 3.2, y el guard correcto esta doce lineas mas abajo |
 | `f-41445734` | low | owner-decision | `tools/check-ring3.sh (_con_limite/_vivo) vs tools/tests/run-tests.sh (_run_test)` | Dos watchdogs portatiles independientes en tools/: _con_limite y _run_test resuelven el mismo problema con garantias distintas |
 | `f-589f151f` | low | owner-decision | `scripts/agent-hooks/session-start.sh (los dos checks de FILL)` | Los checks de FILL de session-start no quitan los backticks: documentar el patron dentro del fichero vigilado lo volveria a romper |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
 | `f-61c4b04b` | low | owner-decision | `tools/upgrade.sh:224 (SYNC_PATHS)` | Un comando nuevo del template no llega NUNCA a un adoptante ya existente, y nadie lo declara |
+| `f-62d2ac5b` | low | auto-fix | `tools/semgrep-scan.sh:107` | semgrep-scan expande TARGETS[@] vacio bajo bash 3.2 — reproducido, y el guard correcto esta doce lineas mas abajo |
 | `f-6e236c11` | low | auto-fix | `scripts/agent-hooks/session-start.sh (sed del bloque de check-ring3)` | El banner de sesion aplana la indentacion del diagnostico del Anillo 3 y pierde la jerarquia del remedio |
 | `f-708ec207` | low | owner-decision | `tools/check-execution-map.sh (PALABRAS_AMBIGUAS / exencion por posicion)` | Dos fugas de posicion en el detector de evidencia del mapa, encontradas tras cerrarlo |
 | `f-752b706e` | low | auto-fix | `scripts/agent-hooks/reviewer-gate.sh` | El git-guard del reviewer-gate casa git add/commit dentro de un heredoc, que es texto y no comando |
@@ -281,3 +280,4 @@ Abiertos: **89** · Cerrados: 178 · Total: 267
 | `f-8d0884f9` | fixed | Cerrado por la via del P3 del PRD 0010, decidida por el owner tras TRES revisiones con un hallazgo c |
 | `f-4e3aafc5` | fixed | Cerrado en el mismo commit: excluidos del pathspec los ficheros de datos generados, con test para el |
 | `f-9b37c351` | fixed | Cerrado con tools/review-aislado.sh. El hallazgo sigue siendo cierto sobre el mecanismo NATIVO -isol |
+| `f-32811c99` | fixed | Duplicado de f-62d2ac5b, abierto desde 2026-08-26 con el mismo bug. Se abrio sin comprobar si ya exi |

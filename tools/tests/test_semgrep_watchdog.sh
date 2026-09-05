@@ -105,6 +105,14 @@ FAKE
     return 1; }
   [ "$rc" = "0" ] || {
     echo "    con plazo no numérico y un scan sano, exit fue $rc (esperaba 0)"; return 1; }
+  # Y el fallback tiene que AVISAR, no ser silencioso. El comentario del código
+  # promete las dos cosas —"se avisa y se sigue con el default"— y sin esta
+  # aserción el `echo` se podía borrar sin que muriera ningún test: lo cazó la
+  # ronda 2 con ese mutante exacto. Una promesa a medias es una promesa falsa.
+  printf '%s' "$out" | grep -q "SEMGREP_TIMEOUT_SECS='abc'" || {
+    echo "    usó el default pero SIN avisar: el dev no se entera de su typo."
+    echo "    Un fallback silencioso convierte un error de config en un misterio."
+    return 1; }
 }
 test_un_plazo_no_numerico_no_inculpa_al_scan() {
   _sw_sandbox _case_plazo_no_numerico_no_inculpa_al_scan
