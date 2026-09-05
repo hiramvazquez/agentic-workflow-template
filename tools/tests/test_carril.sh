@@ -131,11 +131,21 @@ test_fuera_de_un_repo_git_devuelve_3() { _case_sin_git_no_pudo_mirar; }
 # lo ejercitan `test_drift_stop` y `test_drift_aggregation`, dos nombres
 # distintos— y una convención que falla en silencio dejaría tests sin correr
 # creyendo que corrieron.
-_case_ligero_no_corre_tests() {
+# Ligero NO paga la suite de CODIGO. Este test decia "ligero dice NINGUNO", y
+# eso resulto ser demasiado: hay tests que validan la documentacion real, y un
+# cambio de solo-prosa si los ejecuta (ver el caso de mas abajo). Lo que se
+# protege aqui sigue siendo lo mismo y es lo que importa: que la prosa no
+# arrastre la suite entera ni los tests del codigo.
+_case_ligero_no_paga_la_suite_de_codigo() {
   _stage docs/process/algo.md
-  _c --tests | grep -qx 'NINGUNO' || { echo "    ligero no dijo NINGUNO: $(_c --tests)"; return 1; }
+  local out; out="$(_c --tests)"
+  printf '%s' "$out" | grep -qx 'TODOS' && {
+    echo "    un cambio de docs pidio la suite ENTERA"; return 1; }
+  printf '%s' "$out" | grep -qE 'test_(carril|verify_marker|scope_kind|ratchets)' && {
+    echo "    un cambio de docs arrastro tests de codigo: $out"; return 1; }
+  return 0
 }
-test_ligero_no_ejecuta_tests() { _c_sandbox _case_ligero_no_corre_tests; }
+test_ligero_no_paga_la_suite_de_codigo() { _c_sandbox _case_ligero_no_paga_la_suite_de_codigo; }
 
 _case_estructural_corre_todo() {
   _stage lefthook.yml
@@ -342,3 +352,57 @@ _case_review_sin_nada_staged() {
     echo "    sin nada staged, --review no dijo ninguna: $out"; return 1; }
 }
 test_sin_nada_staged_no_se_pide_review() { _c_sandbox _case_review_sin_nada_staged; }
+
+# ── El carril ligero no puede correr CERO tests ─────────────────────
+# `ligero` significaba "nada que se ejecute", y para `docs/**` era falso: hay
+# tests que validan la DOCUMENTACIÓN REAL contra el ledger. Pasó de verdad —
+# el commit d9dc6a4 cito tres findings con sus ids cortos, salió ligero, corrió
+# cero tests, y puso la suite en rojo. Es el único fallo grave que el PRD 0011
+# declara para su clasificador: firmar en verde habiendo ejecutado de menos.
+# Aquí el clasificador hizo lo que su tabla decía; lo que estaba mal era la tabla.
+_case_ligero_corre_los_tests_de_doc() {
+  _stage docs/process/algo.md
+  local out; out="$(_c --tests)"
+  [ "$out" = "NINGUNO" ] && {
+    echo "    un cambio de docs corrió CERO tests; los que validan la doc sí aplican"
+    return 1; }
+  printf '%s' "$out" | grep -q 'test_finding_refs' || {
+    echo "    docs no derivó los tests que validan documentación. Dio: $out"; return 1; }
+}
+test_el_carril_ligero_corre_los_tests_de_documentacion() {
+  _c_sandbox _case_ligero_corre_los_tests_de_doc
+}
+
+# ── Cada entrada de `verifica-doc` tiene que EXISTIR ────────────────
+# Un typo la deja muda y no se nota: `verify-run` lanzaría el filtro, ningún
+# fichero casaría, y `run-tests` sale 0 cuando un filtro no casa. El marker
+# firmaría `tests: test_lo_que_sea` — evidencia que PARECE evidencia y es cero.
+# Es el gate mudo con disfraz de verde que §14.3 prohíbe, y lo cazó la review
+# con el mutante `test_finding_refs` → `test_finding_refsz`, que sobrevivía.
+#
+# No corre en sandbox: mira el conf y los tests REALES del repo.
+test_las_entradas_de_verifica_doc_existen() {
+  local malos="" n
+  n="$(sed -n 's/^verifica-doc|//p' tools/carril.conf | grep -vc '^$' || echo 0)"
+  [ "${n:-0}" -ge 1 ] || {
+    echo "    el conf no declara NINGÚN test de documentación; el carril ligero"
+    echo "    volvería a correr cero tests sobre docs (el agujero de d9dc6a4)."
+    return 1; }
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    if [ ! -f "tools/tests/$t.sh" ]; then
+      malos="${malos}  $t (no existe)"$'\n'
+    elif ! grep -q '^test_' "tools/tests/$t.sh"; then
+      # Existir no basta: un fichero sin funciones `test_*` hace que `run-tests`
+      # imprima "0 tests matchearon" y salga 0. El marker firmaria ese nombre
+      # como hecho sin haber ejecutado una sola asercion. Lo cazo la review con
+      # un fichero vacio declarado en la lista.
+      malos="${malos}  $t (existe pero no define ningun test_*)"$'\n'
+    fi
+  done <<< "$(sed -n 's/^verifica-doc|//p' tools/carril.conf)"
+  [ -z "$malos" ] || {
+    echo "    estas entradas de verifica-doc no corresponden a ningún test:"
+    printf '%s' "$malos"
+    echo "    Un filtro que no casa hace que run-tests salga 0 sin ejecutar nada."
+    return 1; }
+}

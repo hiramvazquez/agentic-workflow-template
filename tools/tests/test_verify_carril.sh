@@ -28,19 +28,29 @@ _case_ligero_no_corre_la_suite() {
   # `tools/verify.conf`: ese fichero está en el carril estructural, así que
   # stagearlo convertiría el cambio en estructural y el fixture probaría lo
   # contrario de lo que dice. El clasificador tenía razón y el fixture no.
-  local rc; VERIFY_CMD=false bash tools/verify-run.sh >/dev/null 2>&1; rc=$?
-  [ "$rc" = "0" ] || {
-    echo "    el carril ligero ejecutó el comando (exit $rc); no debía"
-    return 1; }
-  grep -q 'carril: ligero' .agents/state/markers/verify_run.txt 2>/dev/null || {
+  # Este caso decía "ligero no ejecuta NADA", y eso resultó ser demasiado: hay
+  # tests que validan la documentación real contra el ledger, y un cambio de
+  # solo-prosa SÍ los ejecuta. Se demostró rompiéndolo — un commit de docs con
+  # tres ids de finding mal citados salió ligero, corrió cero tests y puso la
+  # suite en rojo. Lo que se sigue protegiendo, que es lo que importa: que la
+  # prosa no pague la SUITE ENTERA, y que el marker declare qué corrió.
+  VERIFY_CMD=true bash tools/verify-run.sh >/dev/null 2>&1
+  local m=.agents/state/markers/verify_run.txt
+  [ -f "$m" ] || { echo "    no firmó nada con un comando que pasa"; return 1; }
+  grep -q 'carril: ligero' "$m" 2>/dev/null || {
     echo "    el marker no DECLARA el carril:"
-    sed 's/^/      /' .agents/state/markers/verify_run.txt 2>/dev/null
+    sed 's/^/      /' "$m" 2>/dev/null
     return 1; }
-  grep -q 'tests: ninguno' .agents/state/markers/verify_run.txt 2>/dev/null || {
-    echo "    el marker no declara que NO corrió tests — eso es un gate mudo (§14.3)"
+  grep -q 'tests: todos' "$m" 2>/dev/null && {
+    echo "    un cambio de prosa pagó la SUITE ENTERA:"
+    grep '^tests:' "$m" | sed 's/^/      /'
+    return 1; }
+  grep -qE '^tests: .*test_' "$m" 2>/dev/null || {
+    echo "    el marker no declara QUÉ tests corrió — un gate que no lo dice es mudo (§14.3):"
+    grep '^tests:' "$m" 2>/dev/null | sed 's/^/      /'
     return 1; }
 }
-test_el_carril_ligero_no_corre_la_suite() { _vm_sandbox _case_ligero_no_corre_la_suite; }
+test_el_carril_ligero_no_paga_la_suite_entera() { _vm_sandbox _case_ligero_no_corre_la_suite; }
 
 # Y el reverso, que es lo que impide que esto sea un agujero: si el carril NO es
 # ligero, el comando se ejecuta y un fallo sigue sin firmarse.

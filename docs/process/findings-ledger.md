@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **89** · Cerrados: 179 · Total: 268
+Abiertos: **91** · Cerrados: 180 · Total: 271
 
 ## Abiertos
 
@@ -27,6 +27,7 @@ Abiertos: **89** · Cerrados: 179 · Total: 268
 | `f-3793c17b` | medium | owner-decision | `.claude/settings.json:21 + .agents/ (convencion de rutas de estado)` | Un deny de Edit sobre .agents/state alcanza a las escrituras por Bash del sub-agente, y nada lo declara |
 | `f-3b69fa61` | medium | owner-decision | `lefthook.yml (sin job commit-msg) + tools/check-finding-refs.sh` | Ningun anillo lee el mensaje de commit: un id de finding inventado atraveso los tres |
 | `f-44331722` | medium | owner-decision | `tools/upgrade.sh + docs/ADOPTION.md` | upgrade.sh no crea tools/project.conf con kind inferido y ADOPTION.md no pide el flip |
+| `f-487de81a` | medium | owner-decision | `tools/tests/ (varios) + tools/tests/run-tests.sh (TESTS_SERIAL_FILES)` | Varios tests tocan el repo real sin aislarse, y por eso hace falta serializar (72 s por pre-push) |
 | `f-4ce1b697` | medium | auto-fix | `tools/tests/test_execution_map.sh` | El detector de git add -A no protege el archivo para el que se escribio, y no ve add -u ni commit -am |
 | `f-58ce4bd3` | medium | owner-decision | `ci/run-gates.sh:184` | El exit code de check-review-marker --range se descarta en CI: el Anillo 3 no lo hace cumplir |
 | `f-61a3fb63` | medium | auto-fix | `tools/tests/run-tests.sh:19` | run-tests.sh:19 hace cd sin comprobarlo: si falla, la suite entera corre en el directorio equivocado |
@@ -60,7 +61,7 @@ Abiertos: **89** · Cerrados: 179 · Total: 268
 | `f-ec811739` | medium | auto-fix | `tools/review-aislado.sh + .claude/agents/reviewer.md` | El marker de verify-run no llega al worktree aislado, asi que la review enfocada nunca puede leerlo |
 | `f-f0f40763` | medium | owner-decision | `AGENTS.md §13 (flujo sin orden declarado) + .claude/agents/reviewer.md:98` | El flujo pone al reviewer (nivel 7) antes que verify-run (nivel 3): un test rojo llego a la IA en vez de a la suite |
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
-| `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky por PRESION DE PROCESOS (no por macOS) — con repro local en 81s |
+| `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky en CI macOS — SIN repro valido: el que se creyo tener reproducia interferencia entre tests, no el bug |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `14 ficheros: test_execution_map.sh (1554) · upgrade.sh (796) · test_upgrade.sh (755) · +11` | 14 ficheros del harness sobre el hard limit de 400, y ningun detector los mira |
 | `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Ventana de valor: 2 de 7 gates decididos, 1 candidato real (semgrep) y 3 sin sustrato en este repo |
 | `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
@@ -69,6 +70,7 @@ Abiertos: **89** · Cerrados: 179 · Total: 268
 | `f-26e45249` | low | owner-decision | `tools/lib/detector-run.sh (esquema de runs.jsonl)` | El registro de ejecucion no distingue 'no aplica' de 'no declaro objetivos': los dos son targets=null |
 | `f-298e3cd2` | low | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
 | `f-41445734` | low | owner-decision | `tools/check-ring3.sh (_con_limite/_vivo) vs tools/tests/run-tests.sh (_run_test)` | Dos watchdogs portatiles independientes en tools/: _con_limite y _run_test resuelven el mismo problema con garantias distintas |
+| `f-4a8b548f` | low | owner-decision | `tools/carril.conf (filas verifica-doc) + tools/carril.sh` | El carril ligero cobra los CINCO tests de doc a cualquier prosa; cada uno valida un fichero concreto |
 | `f-589f151f` | low | owner-decision | `scripts/agent-hooks/session-start.sh (los dos checks de FILL)` | Los checks de FILL de session-start no quitan los backticks: documentar el patron dentro del fichero vigilado lo volveria a romper |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
 | `f-61c4b04b` | low | owner-decision | `tools/upgrade.sh:224 (SYNC_PATHS)` | Un comando nuevo del template no llega NUNCA a un adoptante ya existente, y nadie lo declara |
@@ -282,3 +284,4 @@ Abiertos: **89** · Cerrados: 179 · Total: 268
 | `f-4e3aafc5` | fixed | Cerrado en el mismo commit: excluidos del pathspec los ficheros de datos generados, con test para el |
 | `f-9b37c351` | fixed | Cerrado con tools/review-aislado.sh. El hallazgo sigue siendo cierto sobre el mecanismo NATIVO -isol |
 | `f-32811c99` | fixed | Duplicado de f-62d2ac5b, abierto desde 2026-08-26 con el mismo bug. Se abrio sin comprobar si ya exi |
+| `f-60db7b98` | fixed | Cerrado el 2026-09-04. carril.conf declara ahora verifica-doc| con los cinco tests que leen document |

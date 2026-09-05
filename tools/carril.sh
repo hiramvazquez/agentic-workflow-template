@@ -121,7 +121,14 @@ if [ "$MODO" != "--tests" ]; then
 fi
 
 # ── --tests: qué ejecutar para este cambio ──────────────────────────
-[ "$CARRIL" = "ligero" ]      && { echo "NINGUNO"; exit 0; }
+# Ligero NO es "cero tests": corre los que validan la documentación (ver la
+# sección `verifica-doc` del conf, y el porqué escrito allí). Si el conf no
+# declara ninguno, se cae a NINGUNO — el comportamiento anterior.
+if [ "$CARRIL" = "ligero" ]; then
+  _DOC_TESTS="$(sed -n 's/^verifica-doc|//p' "$CONF" 2>/dev/null | grep -v '^$' || true)"
+  [ -n "$_DOC_TESTS" ] && { printf '%s\n' "$_DOC_TESTS"; exit 0; }
+  echo "NINGUNO"; exit 0
+fi
 [ "$CARRIL" = "estructural" ] && { echo "TODOS"; exit 0; }
 
 # Normal: los tests que NOMBRAN alguno de los ficheros tocados.
