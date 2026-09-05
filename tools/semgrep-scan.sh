@@ -160,13 +160,83 @@ fi
 # El `--exclude` cubre el modo de descubrimiento (--all); el filtro de targets
 # de arriba cubre --staged. Hacen falta los dos porque semgrep decide distinto
 # según de dónde venga la ruta.
+# ── Watchdog: un scan que se cuelga NO puede llevarse el turno ───────
+# Pasó de verdad: la telemetría del 2026-09-04 tiene una corrida de 936 s con
+# exit=143 (SIGTERM). Quince minutos y medio colgada, matada desde fuera, y sin
+# que nadie se enterara — el único rastro era esa línea del log. Ese incidente
+# solo es el 44% del coste que la ventana de valor atribuía a este gate.
+#
+# La cabecera de arriba ya defiende del cuelgue del version-check; el scan en sí
+# no tenía esa defensa, y es el mismo modo de fallo. Un cuelgue es peor que un
+# crash: el crash es rápido y deja rastro; el cuelgue no dice nada mientras se
+# come el turno, el pre-commit o el job de CI.
+#
+# NO se usa `timeout`: macOS no lo trae. El patrón es el mismo perro guardián
+# que `tools/tests/run-tests.sh`.
+#
+# La pareja de limpieza de abajo es ASIMÉTRICA, y el reparto está comprobado con
+# mutantes: `pkill -P` es la mitad que hace el trabajo —quitarla mata el test de
+# huérfanos— y `kill "$_SG_WD"` es puramente defensiva: quitarla sola no mata
+# ningún test, porque al morir su `sleep` la subshell termina por su cuenta.
+# Se conserva igual, por un motivo que ningún test alcanza: entre matar al
+# `sleep` y matar a su subshell hay una ventana en la que el guardián podría
+# despertar y disparar su `kill -9` contra un PID que `wait` ya reaped — y que
+# el sistema puede haber reciclado. El orden es el del precedente, esa cautela
+# incluida. Lo corrigió la review: la version anterior de este comentario decia
+# que ninguna mitad mataba nada, y sobre-representaba la redundancia.
+#
+# El `>/dev/null 2>&1` del guardián NO es lo que evita que un llamador por
+# sustitución —`check-drift.sh` hace `< <(bash tools/semgrep-scan.sh)`— se
+# quede esperando: aquí el guardián siempre muere antes de que el script
+# retorne, así que su mutante sobrevive. Se deja porque cuesta cero y cubre el
+# orden que `run-tests.sh` sí sufrió, pero es seguro barato, no el mecanismo.
+#
+# El default es holgado a propósito: la corrida legítima más lenta observada en
+# la ventana fue de 11 s. 120 s no recorta ningún scan real, solo corta cuelgues.
+SEMGREP_TIMEOUT_SECS="${SEMGREP_TIMEOUT_SECS:-120}"
+# Un plazo que no sea un numero de segundos hace que `sleep` falle AL INSTANTE,
+# el guardian pasa directo a su `kill -9`, y el scan real muere sin haber tenido
+# ninguna oportunidad — reportado como TIMEOUT. Falla del lado seguro (exit 3,
+# nunca "limpio"), pero la razon seria FALSA: culparia a un cuelgue que no
+# ocurrio en vez de senalar el typo. Y "el hueco se declara con su razon, y esa
+# razon tiene que ser VERDADERA" es §14.3, la regla que justifica el mensaje de
+# timeout de mas abajo. Lo cazo la review de este mismo cambio, con su repro.
+#
+# Se AVISA y se sigue con el default en vez de bloquear: un error de config no
+# puede trabar al dev (§14.3, primer corolario).
+case "$SEMGREP_TIMEOUT_SECS" in
+  ''|*[!0-9]*|0)
+    echo "⚠️  semgrep: SEMGREP_TIMEOUT_SECS='$SEMGREP_TIMEOUT_SECS' no son segundos; uso 120." >&2
+    SEMGREP_TIMEOUT_SECS=120 ;;
+esac
 semgrep scan \
   --config "$RULES_DIR" \
   --json --quiet --no-git-ignore \
   --metrics=off \
   --exclude="$FIXTURES_DIR" \
   ${TARGETS[0]+"${TARGETS[@]}"} \
-  > "$OUT" 2>/dev/null || true
+  > "$OUT" 2>/dev/null &
+_SG_PID=$!
+( sleep "$SEMGREP_TIMEOUT_SECS"; kill -9 "$_SG_PID" 2>/dev/null ) >/dev/null 2>&1 &
+_SG_WD=$!
+wait "$_SG_PID" 2>/dev/null; _SG_RC=$?
+pkill -P "$_SG_WD" -x sleep 2>/dev/null   # -x sleep: si el pid se recicló, no matamos a un inocente
+kill "$_SG_WD" 2>/dev/null; wait "$_SG_WD" 2>/dev/null
+
+# Muerte por señal (128+n). El guard de JSON vacío de abajo también lo cazaría
+# —$OUT queda vacío o a medias— pero culparía a un crash, y la razón del hueco
+# tiene que ser VERDADERA (§14.3). Un timeout se declara como timeout.
+if [ "${_SG_RC:-0}" -ge 128 ]; then
+  {
+    echo "❌ semgrep: el scan NO terminó en ${SEMGREP_TIMEOUT_SECS}s — TIMEOUT, el detector no pudo mirar."
+    echo "   No es 'sin hallazgos': es un scan que se quedó esperando y lo cortó el watchdog."
+    echo "   Sube el margen con SEMGREP_TIMEOUT_SECS=<segundos> si tu repo es grande de verdad,"
+    echo "   pero mira antes si semgrep está esperando a la red: esta clase de cuelgue ya"
+    echo "   costó una corrida de 936 s el 2026-09-04."
+  } >&2
+  echo "SEMGREP_SUMMARY errors=0 warns=0"
+  exit 3          # fallo de INFRAESTRUCTURA: el llamador decide (local avisa, CI bloquea)
+fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "⚠️  jq ausente: no puedo parsear la salida de semgrep." >&2

@@ -344,3 +344,37 @@ EOF
 test_el_guard_de_json_no_depende_de_la_version_de_jq() {
   _fc_sandbox _case_guard_no_depende_de_la_version_de_jq
 }
+
+# ── Y uno que se CUELGA tampoco ─────────────────────────────────────
+# Hermano del que revienta, y el mas dificil de ver: reventar deja rastro y
+# es rapido; colgarse no dice nada y se lleva el turno entero. Paso de verdad
+# —una corrida de 936 s con exit=143 en la telemetria del 2026-09-04, matada
+# desde fuera y sin que nadie se enterara— y lo que dispara ese modo lo
+# documenta la propia cabecera de semgrep-scan.sh: semgrep "se cuelga, no
+# falla: espera".
+#
+# Un cuelgue es "no pude mirar", no "esta limpio": exit 3 (§14.3). Y el
+# mensaje tiene que decir TIMEOUT, no crash — el hueco se declara con su
+# razon, y esa razon tiene que ser VERDADERA.
+_case_semgrep_colgado_no_pasa_por_limpio() {
+  cat > bin/semgrep <<'FAKE'
+#!/usr/bin/env bash
+sleep 60
+FAKE
+  chmod +x bin/semgrep
+  echo "rules: []" > tools/semgrep/rules/dummy.yaml
+  local t0 t1 rc out
+  t0=$(date +%s)
+  out="$(SEMGREP_TIMEOUT_SECS=2 bash tools/semgrep-scan.sh 2>&1)"; rc=$?
+  t1=$(date +%s)
+  [ "$rc" = "3" ] || {
+    echo "    un semgrep COLGADO no dio exit 3 (obtenido: $rc)"; return 1; }
+  [ "$((t1-t0))" -lt 20 ] || {
+    echo "    espero $((t1-t0))s con timeout=2: el watchdog no corto"; return 1; }
+  printf '%s' "$out" | grep -qi "timeout\|colg" || {
+    echo "    salio 3 pero sin decir que fue un TIMEOUT — la razon del hueco"
+    echo "    tiene que ser verdadera (§14.3). Dijo:"
+    printf '%s' "$out" | sed 's/^/      /' | head -4
+    return 1; }
+}
+test_semgrep_colgado_no_pasa_por_limpio() { _fc_sandbox _case_semgrep_colgado_no_pasa_por_limpio; }

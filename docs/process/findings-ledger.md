@@ -3,7 +3,7 @@
 > **GENERADA — NO editar a mano.** Fuente: `tools/findings/ledger.jsonl`.
 > Regenerar: `bash tools/findings/findings.sh render`.
 
-Abiertos: **88** · Cerrados: 178 · Total: 266
+Abiertos: **89** · Cerrados: 178 · Total: 267
 
 ## Abiertos
 
@@ -69,6 +69,7 @@ Abiertos: **88** · Cerrados: 178 · Total: 266
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
 | `f-26e45249` | low | owner-decision | `tools/lib/detector-run.sh (esquema de runs.jsonl)` | El registro de ejecucion no distingue 'no aplica' de 'no declaro objetivos': los dos son targets=null |
 | `f-298e3cd2` | low | owner-decision | `tools/mutation-score.sh + tools/mutation-ratchet.json` | mutation-score.sh no tiene runner para shell, que es el lenguaje del harness: el nivel 4 no esta sin medir, esta sin poder medir aqui |
+| `f-32811c99` | low | auto-fix | `tools/semgrep-scan.sh:107` | semgrep-scan revienta '${TARGETS[@]}' sobre array vacio en bash 3.2, y el guard correcto esta doce lineas mas abajo |
 | `f-41445734` | low | owner-decision | `tools/check-ring3.sh (_con_limite/_vivo) vs tools/tests/run-tests.sh (_run_test)` | Dos watchdogs portatiles independientes en tools/: _con_limite y _run_test resuelven el mismo problema con garantias distintas |
 | `f-589f151f` | low | owner-decision | `scripts/agent-hooks/session-start.sh (los dos checks de FILL)` | Los checks de FILL de session-start no quitan los backticks: documentar el patron dentro del fichero vigilado lo volveria a romper |
 | `f-58cb672b` | low | auto-fix | `ci/run-gates.sh` | Las ramas de auto-escalada de run-gates no tienen test que las ejercite end-to-end |
