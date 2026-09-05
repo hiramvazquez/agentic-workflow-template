@@ -61,7 +61,7 @@ Abiertos: **86** · Cerrados: 178 · Total: 264
 | `f-fb2c01cc` | medium | owner-decision | `scripts/agent-hooks/reviewer-gate.sh (git-guard)` | El git-guard del reviewer-gate bloquea por el CONTENIDO de un heredoc, no por el comando que se ejecuta |
 | `f-wf01-ci-macos-intermitente` | medium | auto-fix | `tools/tests/test_capability_probe.sh + test_agent_runner.sh + test_verdict.sh (familia senales/procesos)` | Familia flaky por PRESION DE PROCESOS (no por macOS) — con repro local en 81s |
 | `f-wf04-archivos-sobre-el-limite` | medium | auto-fix | `14 ficheros: test_execution_map.sh (1554) · upgrade.sh (796) · test_upgrade.sh (755) · +11` | 14 ficheros del harness sobre el hard limit de 400, y ningun detector los mira |
-| `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Congelar gates nuevos hasta completar la ventana de observacion del PRD 0004 y decidir keep/tune/retire con telemetria |
+| `f-wf09-ventana-de-valor` | medium | owner-decision | `gobierno del harness` | Ventana de valor: 2 de 7 gates decididos, 1 candidato real (semgrep) y 3 sin sustrato en este repo |
 | `f-188c0a54` | low | owner-decision | `tools/secret-scan.sh (_resolver_rango)` | Un rango que resuelve pero cubre CERO commits sale limpio sin decirlo |
 | `f-19ea4047` | low | owner-decision | `scripts/agent-hooks/capture-review-verdict.sh + docs/ADOPTION.md` | Una sesion que revisa OTRO repo no puede alimentar su marker: el hook escribe en el cwd de la sesion |
 | `f-210cee72` | low | owner-decision | `tools/check-source-sets.sh` | Un segmento de import escapado con backticks evade los dos motores del detector KMP |
